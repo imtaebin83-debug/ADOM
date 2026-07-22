@@ -1,0 +1,31 @@
+dataset_name: rellis3d_cost4
+mapping_version: v1.0
+
+target_classes:
+  0: paved_low_cost
+  1: natural_low_cost
+  2: medium_cost
+  3: high_cost_or_obstacle
+  255: ignore
+
+rellis_to_target:
+  0: 255       # void
+  1: 1         # dirt
+  3: 1         # grass
+  4: 3         # tree
+  5: 3         # pole
+  6: 3         # water
+  7: 255       # sky
+  8: 3         # vehicle
+  9: 3         # object
+  10: 0        # asphalt
+  12: 3        # building
+  15: 3        # log
+  17: 3        # person
+  18: 3        # fence
+  19: 2        # bush
+  23: 0        # concrete
+  27: 3        # barrier
+  31: 2        # puddle
+  33: 2        # mud
+  34: 3        # rubble

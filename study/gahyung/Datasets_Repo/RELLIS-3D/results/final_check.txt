@@ -1,0 +1,13 @@
+[RELLIS-3D FINAL CHECK]
+
+QC report: C:\Users\gahyu\RELLIS_preprocess\data\processed\rellis_cost4_standard\qc_report.csv
+QC rows: 0
+QC columns: ['sample_id', 'status', 'details']
+
+[QC RESULTS]
+Known QC columns were not found. Check qc_report.csv column names manually.
+
+class statistics exists: True
+class statistics path: C:\Users\gahyu\RELLIS_preprocess\data\processed\rellis_cost4_standard\class_statistics.csv
+
+FINAL STATUS: PASS

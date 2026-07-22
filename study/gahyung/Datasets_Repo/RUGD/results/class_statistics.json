@@ -1,0 +1,143 @@
+{
+  "train": {
+    "image_count": 4779,
+    "total_pixels": 1808373600,
+    "valid_pixels_excluding_ignore": 1659399410,
+    "classes": {
+      "0": {
+        "class_id": 0,
+        "class_name": "paved_low_cost",
+        "pixel_count": 35882287,
+        "image_count_containing_class": 689,
+        "percentage_of_all_pixels": 1.9842,
+        "percentage_excluding_ignore": 2.1624
+      },
+      "1": {
+        "class_id": 1,
+        "class_name": "natural_low_cost",
+        "pixel_count": 595771262,
+        "image_count_containing_class": 4471,
+        "percentage_of_all_pixels": 32.9451,
+        "percentage_excluding_ignore": 35.9028
+      },
+      "2": {
+        "class_id": 2,
+        "class_name": "medium_cost",
+        "pixel_count": 251950153,
+        "image_count_containing_class": 3818,
+        "percentage_of_all_pixels": 13.9324,
+        "percentage_excluding_ignore": 15.1832
+      },
+      "3": {
+        "class_id": 3,
+        "class_name": "high_cost_or_obstacle",
+        "pixel_count": 775795708,
+        "image_count_containing_class": 4778,
+        "percentage_of_all_pixels": 42.9002,
+        "percentage_excluding_ignore": 46.7516
+      },
+      "255": {
+        "class_id": 255,
+        "class_name": "ignore",
+        "pixel_count": 148974190,
+        "image_count_containing_class": 4545,
+        "percentage_of_all_pixels": 8.238,
+        "percentage_excluding_ignore": null
+      }
+    }
+  },
+  "val": {
+    "image_count": 733,
+    "total_pixels": 277367200,
+    "valid_pixels_excluding_ignore": 259677388,
+    "classes": {
+      "0": {
+        "class_id": 0,
+        "class_name": "paved_low_cost",
+        "pixel_count": 10849095,
+        "image_count_containing_class": 211,
+        "percentage_of_all_pixels": 3.9115,
+        "percentage_excluding_ignore": 4.1779
+      },
+      "1": {
+        "class_id": 1,
+        "class_name": "natural_low_cost",
+        "pixel_count": 74946138,
+        "image_count_containing_class": 718,
+        "percentage_of_all_pixels": 27.0205,
+        "percentage_excluding_ignore": 28.8612
+      },
+      "2": {
+        "class_id": 2,
+        "class_name": "medium_cost",
+        "pixel_count": 46583098,
+        "image_count_containing_class": 660,
+        "percentage_of_all_pixels": 16.7947,
+        "percentage_excluding_ignore": 17.9388
+      },
+      "3": {
+        "class_id": 3,
+        "class_name": "high_cost_or_obstacle",
+        "pixel_count": 127299057,
+        "image_count_containing_class": 733,
+        "percentage_of_all_pixels": 45.8955,
+        "percentage_excluding_ignore": 49.022
+      },
+      "255": {
+        "class_id": 255,
+        "class_name": "ignore",
+        "pixel_count": 17689812,
+        "image_count_containing_class": 717,
+        "percentage_of_all_pixels": 6.3778,
+        "percentage_excluding_ignore": null
+      }
+    }
+  },
+  "test": {
+    "image_count": 1924,
+    "total_pixels": 728041600,
+    "valid_pixels_excluding_ignore": 676167298,
+    "classes": {
+      "0": {
+        "class_id": 0,
+        "class_name": "paved_low_cost",
+        "pixel_count": 9756459,
+        "image_count_containing_class": 428,
+        "percentage_of_all_pixels": 1.3401,
+        "percentage_excluding_ignore": 1.4429
+      },
+      "1": {
+        "class_id": 1,
+        "class_name": "natural_low_cost",
+        "pixel_count": 166317288,
+        "image_count_containing_class": 1754,
+        "percentage_of_all_pixels": 22.8445,
+        "percentage_excluding_ignore": 24.5971
+      },
+      "2": {
+        "class_id": 2,
+        "class_name": "medium_cost",
+        "pixel_count": 192175382,
+        "image_count_containing_class": 1677,
+        "percentage_of_all_pixels": 26.3962,
+        "percentage_excluding_ignore": 28.4213
+      },
+      "3": {
+        "class_id": 3,
+        "class_name": "high_cost_or_obstacle",
+        "pixel_count": 307918169,
+        "image_count_containing_class": 1921,
+        "percentage_of_all_pixels": 42.294,
+        "percentage_excluding_ignore": 45.5388
+      },
+      "255": {
+        "class_id": 255,
+        "class_name": "ignore",
+        "pixel_count": 51874302,
+        "image_count_containing_class": 1842,
+        "percentage_of_all_pixels": 7.1252,
+        "percentage_excluding_ignore": null
+      }
+    }
+  }
+}

@@ -1,0 +1,381 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+    cat <<'EOF'
+Cache one or more dataset archives on the RunPod Pod Volume.
+
+Preferred usage:
+  init_workspace.sh --dataset rellis3d \
+    --archive /workspace/adom/network-volume/rellis3d.tar
+  init_workspace.sh --dataset rugd \
+    --archive /workspace/adom/network-volume/rugd.tar
+  init_workspace.sh --all --network-volume /workspace/adom/network-volume
+
+Options:
+  --dataset NAME          Cache name exposed as /workspace/adom/datasets/NAME.
+  --archive PATH          Source .tar archive on the Network Volume.
+  --all                   Cache every .tar directly under the Network Volume.
+  --network-volume PATH   Archive directory (default: ADOM_NETWORK_VOLUME or
+                          /workspace/adom/network-volume).
+  --cache-root PATH       Fast host cache (default: ADOM_CACHE_ROOT or /tmp/data).
+  --link-root PATH        Repo link directory (default: ADOM_LINK_ROOT or
+                          /workspace/adom/repo/data/external).
+  --no-link               Do not create repo/data/external/NAME symlinks.
+  --strip-components N    Pass N to tar, or use "auto" (default).
+  --force                 Refresh even when the source signature is unchanged.
+  -h, --help              Show this help.
+
+Compatibility:
+  Passing a single archive path without flags is supported. The dataset name is
+  derived from the archive filename. Canonical filenames such as rellis3d.tar,
+  rugd.tar, and ycor.tar are recommended.
+
+Archive contract:
+  Each archive should contain the contents of one dataset directory. Source
+  archives should normally begin with raw/; training-ready packages may contain
+  images/, annotations/, and splits/. If a single top-level directory matches
+  the dataset name, auto mode strips it to avoid NAME/NAME nesting.
+EOF
+}
+
+NETWORK_VOLUME="${ADOM_NETWORK_VOLUME:-/workspace/adom/network-volume}"
+CACHE_ROOT="${ADOM_CACHE_ROOT:-/tmp/data}"
+LINK_ROOT="${ADOM_LINK_ROOT:-/workspace/adom/repo/data/external}"
+CONTAINER_DATA_ROOT="${ADOM_CONTAINER_DATA_ROOT:-/workspace/adom/datasets}"
+DATASET_NAME="${ADOM_DATASET_NAME:-}"
+DATASET_TAR="${ADOM_DATASET_TAR:-}"
+STRIP_COMPONENTS="${ADOM_STRIP_COMPONENTS:-auto}"
+CACHE_ALL=false
+CREATE_LINKS=true
+FORCE=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dataset)
+            [[ $# -ge 2 ]] || { echo >&2 "--dataset requires a value."; exit 2; }
+            DATASET_NAME="$2"
+            shift 2
+            ;;
+        --archive)
+            [[ $# -ge 2 ]] || { echo >&2 "--archive requires a value."; exit 2; }
+            DATASET_TAR="$2"
+            shift 2
+            ;;
+        --all)
+            CACHE_ALL=true
+            shift
+            ;;
+        --network-volume)
+            [[ $# -ge 2 ]] || { echo >&2 "--network-volume requires a value."; exit 2; }
+            NETWORK_VOLUME="$2"
+            shift 2
+            ;;
+        --cache-root)
+            [[ $# -ge 2 ]] || { echo >&2 "--cache-root requires a value."; exit 2; }
+            CACHE_ROOT="$2"
+            shift 2
+            ;;
+        --link-root)
+            [[ $# -ge 2 ]] || { echo >&2 "--link-root requires a value."; exit 2; }
+            LINK_ROOT="$2"
+            shift 2
+            ;;
+        --no-link)
+            CREATE_LINKS=false
+            shift
+            ;;
+        --strip-components)
+            [[ $# -ge 2 ]] || { echo >&2 "--strip-components requires a value."; exit 2; }
+            STRIP_COMPONENTS="$2"
+            shift 2
+            ;;
+        --force)
+            FORCE=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            echo >&2 "Unknown option: $1"
+            usage >&2
+            exit 2
+            ;;
+        *)
+            if [[ -z "${DATASET_TAR}" ]]; then
+                DATASET_TAR="$1"
+                shift
+            else
+                echo >&2 "Unexpected positional argument: $1"
+                usage >&2
+                exit 2
+            fi
+            ;;
+    esac
+done
+
+if [[ "${CACHE_ALL}" == true && ( -n "${DATASET_NAME}" || -n "${DATASET_TAR}" ) ]]; then
+    echo >&2 "--all cannot be combined with --dataset or --archive."
+    exit 2
+fi
+
+if [[ "${STRIP_COMPONENTS}" != "auto" && ! "${STRIP_COMPONENTS}" =~ ^[0-9]+$ ]]; then
+    echo >&2 "--strip-components must be a non-negative integer or 'auto'."
+    exit 2
+fi
+
+mkdir -p "${CACHE_ROOT}"
+CACHE_ROOT="$(cd "${CACHE_ROOT}" && pwd -P)"
+ARCHIVE_CACHE_DIR="${CACHE_ROOT}/.archives"
+MARKER_DIR="${CACHE_ROOT}/.adom-cache"
+mkdir -p "${ARCHIVE_CACHE_DIR}" "${MARKER_DIR}"
+
+if [[ "${CREATE_LINKS}" == true ]]; then
+    mkdir -p "${LINK_ROOT}"
+fi
+
+normalize_name() {
+    printf '%s' "$1" \
+        | tr '[:upper:]' '[:lower:]' \
+        | tr -cd 'a-z0-9'
+}
+
+derive_dataset_name() {
+    local archive_basename
+    archive_basename="$(basename "$1")"
+    printf '%s\n' "${archive_basename%.tar}" \
+        | tr '[:upper:] ' '[:lower:]_'
+}
+
+validate_dataset_name() {
+    local name="$1"
+    if [[ ! "${name}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+        echo >&2 "Invalid dataset name '${name}'. Use letters, digits, '.', '_' or '-'."
+        return 2
+    fi
+}
+
+resolve_strip_components() {
+    local name="$1"
+    local archive="$2"
+    local requested="$3"
+
+    if [[ "${requested}" != "auto" ]]; then
+        printf '%s\n' "${requested}"
+        return
+    fi
+
+    local -a members
+    mapfile -t members < <(tar -tf "${archive}")
+
+    local first_top=""
+    local member=""
+    local normalized_member=""
+    local top=""
+    local all_same=true
+
+    for member in "${members[@]}"; do
+        normalized_member="${member#./}"
+        [[ -n "${normalized_member}" ]] || continue
+        top="${normalized_member%%/*}"
+        [[ -n "${top}" ]] || continue
+
+        if [[ -z "${first_top}" ]]; then
+            first_top="${top}"
+        elif [[ "${top}" != "${first_top}" ]]; then
+            all_same=false
+            break
+        fi
+    done
+
+    if [[ "${all_same}" == true \
+        && -n "${first_top}" \
+        && "$(normalize_name "${first_top}")" == "$(normalize_name "${name}")" ]]; then
+        printf '1\n'
+    else
+        printf '0\n'
+    fi
+}
+
+STAGING_DIR=""
+ARCHIVE_TMP=""
+
+cleanup() {
+    if [[ -n "${STAGING_DIR}" && -d "${STAGING_DIR}" ]]; then
+        rm -rf -- "${STAGING_DIR}"
+    fi
+    if [[ -n "${ARCHIVE_TMP}" && -f "${ARCHIVE_TMP}" ]]; then
+        rm -f -- "${ARCHIVE_TMP}"
+    fi
+}
+trap cleanup EXIT
+
+cache_dataset() {
+    local name="$1"
+    local source_archive="$2"
+
+    validate_dataset_name "${name}"
+
+    if [[ ! -f "${source_archive}" || "${source_archive}" != *.tar ]]; then
+        echo >&2 "Dataset archive must be an existing .tar file: ${source_archive}"
+        return 2
+    fi
+
+    source_archive="$(
+        cd "$(dirname "${source_archive}")"
+        printf '%s/%s\n' "$(pwd -P)" "$(basename "${source_archive}")"
+    )"
+
+    local strip_count
+    strip_count="$(
+        resolve_strip_components \
+            "${name}" \
+            "${source_archive}" \
+            "${STRIP_COMPONENTS}"
+    )"
+
+    local dataset_dir="${CACHE_ROOT}/${name}"
+    local local_archive="${ARCHIVE_CACHE_DIR}/${name}.tar"
+    local marker="${MARKER_DIR}/${name}.signature"
+    local source_signature
+    source_signature="$(
+        stat -c '%s:%Y' "${source_archive}"
+    )"
+    source_signature="${source_archive}:${source_signature}:strip=${strip_count}"
+
+    if [[ "${FORCE}" != true \
+        && -f "${marker}" \
+        && "$(<"${marker}")" == "${source_signature}" \
+        && -d "${dataset_dir}" ]]; then
+        echo "[${name}] cache is current: ${dataset_dir}"
+    else
+        STAGING_DIR="$(mktemp -d "${CACHE_ROOT}/.${name}.extract.XXXXXX")"
+        ARCHIVE_TMP="${local_archive}.partial"
+
+        echo "[${name}] copying ${source_archive} to fast local storage..."
+        cp -- "${source_archive}" "${ARCHIVE_TMP}"
+        mv -- "${ARCHIVE_TMP}" "${local_archive}"
+        ARCHIVE_TMP=""
+
+        local unsafe_member
+        unsafe_member="$(
+            tar -tf "${local_archive}" \
+                | awk '$0 ~ /^\// || $0 ~ /(^|\/)\.\.(\/|$)/ { print; exit }'
+        )"
+        if [[ -n "${unsafe_member}" ]]; then
+            echo >&2 "[${name}] refusing unsafe archive member: ${unsafe_member}"
+            return 4
+        fi
+
+        local payload_dir="${STAGING_DIR}/payload"
+        mkdir -p "${payload_dir}"
+
+        local -a tar_args=(
+            --extract
+            --file "${local_archive}"
+            --directory "${payload_dir}"
+            --no-same-owner
+            --no-same-permissions
+        )
+        if [[ "${strip_count}" -gt 0 ]]; then
+            tar_args+=(--strip-components "${strip_count}")
+        fi
+
+        echo "[${name}] extracting to ${dataset_dir} (strip=${strip_count})..."
+        tar "${tar_args[@]}"
+
+        if [[ -z "$(find "${payload_dir}" -mindepth 1 -print -quit)" ]]; then
+            echo >&2 "[${name}] archive extraction produced no files."
+            return 4
+        fi
+
+        local backup_dir="${CACHE_ROOT}/.${name}.previous"
+        rm -rf -- "${backup_dir}"
+        if [[ -e "${dataset_dir}" ]]; then
+            mv -- "${dataset_dir}" "${backup_dir}"
+        fi
+
+        if mv -- "${payload_dir}" "${dataset_dir}"; then
+            rm -rf -- "${backup_dir}"
+        else
+            if [[ -d "${backup_dir}" ]]; then
+                mv -- "${backup_dir}" "${dataset_dir}"
+            fi
+            return 1
+        fi
+
+        printf '%s\n' "${source_signature}" > "${marker}"
+        rm -rf -- "${STAGING_DIR}"
+        STAGING_DIR=""
+    fi
+
+    if [[ "${CREATE_LINKS}" == true ]]; then
+        local link_path="${LINK_ROOT}/${name}"
+        local container_target="${CONTAINER_DATA_ROOT}/${name}"
+
+        if [[ -e "${link_path}" && ! -L "${link_path}" ]]; then
+            echo >&2 "[${name}] refusing to replace non-symlink path: ${link_path}"
+            return 3
+        fi
+        ln -sfn "${container_target}" "${link_path}"
+        echo "[${name}] repo link: ${link_path} -> ${container_target}"
+    fi
+
+    echo "[${name}] host cache: ${dataset_dir}"
+    echo "[${name}] container path: ${CONTAINER_DATA_ROOT}/${name}"
+}
+
+if [[ "${CACHE_ALL}" == true ]]; then
+    if [[ ! -d "${NETWORK_VOLUME}" ]]; then
+        echo >&2 "Network Volume directory does not exist: ${NETWORK_VOLUME}"
+        exit 2
+    fi
+
+    mapfile -t archives < <(
+        find "${NETWORK_VOLUME}" \
+            -maxdepth 1 \
+            -type f \
+            -name '*.tar' \
+            -print \
+            | sort
+    )
+
+    if [[ ${#archives[@]} -eq 0 ]]; then
+        echo >&2 "No .tar archives found in ${NETWORK_VOLUME}."
+        exit 2
+    fi
+
+    for archive in "${archives[@]}"; do
+        cache_dataset "$(derive_dataset_name "${archive}")" "${archive}"
+    done
+else
+    if [[ -z "${DATASET_TAR}" ]]; then
+        if [[ -n "${DATASET_NAME}" && -f "${NETWORK_VOLUME}/${DATASET_NAME}.tar" ]]; then
+            DATASET_TAR="${NETWORK_VOLUME}/${DATASET_NAME}.tar"
+        else
+            mapfile -t archives < <(
+                find "${NETWORK_VOLUME}" \
+                    -maxdepth 1 \
+                    -type f \
+                    -name '*.tar' \
+                    -print \
+                    | sort
+            )
+            if [[ ${#archives[@]} -ne 1 ]]; then
+                echo >&2 "Specify --dataset/--archive, or use --all. Found ${#archives[@]} archives."
+                exit 2
+            fi
+            DATASET_TAR="${archives[0]}"
+        fi
+    fi
+
+    if [[ -z "${DATASET_NAME}" ]]; then
+        DATASET_NAME="$(derive_dataset_name "${DATASET_TAR}")"
+    fi
+
+    cache_dataset "${DATASET_NAME}" "${DATASET_TAR}"
+fi
+
+echo "Dataset workspace initialization complete."

@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - Dockerfile
+      - 'requirements/**'  # 패키지 목록이 바뀌어도 자동 빌드!
+  workflow_dispatch:       # GitHub 웹사이트에서 클릭 한 번으로 수동 실행하는 버튼 생성!
 
 permissions:
   contents: read

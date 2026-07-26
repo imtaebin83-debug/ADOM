@@ -34,7 +34,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements/openmmlab.txt /tmp/requirements/openmmlab.txt
 
-RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+# setuptools<70.0.0 is required for pkg_resources. 
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel "setuptools<70.0.0" \
     && python -m pip install --no-cache-dir "openmim==0.3.9" \
     && mim install "mmengine>=0.7.4,<1.0.0"
 

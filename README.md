@@ -12,18 +12,18 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 
 - **Semantic segmentation baseline**: YOLOv8-Seg, DeepLabV3+, SegFormer 계열 비교
 - **Domain adaptation / fine-tuning**: RELLIS-3D 등 오프로드 데이터셋 기반 성능 개선
-- **Model optimization**: Jetson Orin NX 온보드 구동을 위한 TensorRT FP16/INT8 경량화
+- **Model optimization**: Jetson Orin Nano 8GB 온보드 구동을 위한 후속 TensorRT 최적화
 - **Perception to control**: semantic costmap, ROS2 Nav2, high-level vehicle control 연동
 
 ## Initial Scope
 
-1차 목표는 **segmentation benchmark**까지입니다. End-to-end 자율주행 demo는 benchmark 결과와 모델 경량화 방향이 정리된 뒤 다음 단계로 진행합니다.
+1차 목표는 **SegFormer-B0/B2 파인튜닝에 따른 정확도 향상 입증**입니다. FPS 최적화와 FP16/INT8 양자화는 정확도 benchmark 이후의 후속 단계이며, end-to-end 자율주행 demo도 그 뒤에 진행합니다.
 
 초기 benchmark 필수 metric:
 
 - segmentation: mIoU, class IoU, rare obstacle recall
 - runtime: FPS, latency p50/p95
-- edge deployment: power draw on Jetson Orin NX
+- edge deployment: power draw on Jetson Orin Nano 8GB
 - mapping readiness: costmap update rate
 
 ## Repository Map
@@ -59,4 +59,6 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 - [Benchmark protocol](docs/metrics/benchmark-protocol.md)
 - [System architecture overview](docs/system-architecture/overview.md)
 - [Development setup guide](docs/setup-guides/development.md)
+- [RunPod training and DevOps guide](docs/devops.md)
+- [Dataset preprocessing migration plan](docs/dataset-preprocessing-migration-plan.md)
 - [Contribution guide](CONTRIBUTING.md)

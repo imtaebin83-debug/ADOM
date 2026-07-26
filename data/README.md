@@ -2,14 +2,25 @@
 
 데이터셋 원본과 전처리 산출물은 git에 커밋하지 않습니다.
 
-권장 로컬 구조:
+저장소 내부에는 split, 상대경로 manifest, 배치 규칙만 관리합니다. RunPod에서
+실제 데이터는 Compose volume을 통해 `/workspace/adom/datasets`에 마운트합니다.
+
+권장 저장소 구조:
 
 ```text
 data/
-├── raw/          # 원본 데이터셋
-├── interim/      # 중간 전처리 결과
-├── processed/    # 학습/평가에 바로 쓰는 데이터
-└── external/     # 외부 공개 데이터셋 또는 symlink
+├── splits/       # Git 추적 가능, sample ID 또는 상대경로만 포함
+├── manifests/    # Git 추적 가능, 개인 PC 절대경로 금지
+└── external/     # Git 제외, runtime dataset symlink
+```
+
+RunPod container 구조:
+
+```text
+/workspace/adom/datasets/
+├── rellis3d/raw/
+├── rugd/raw/
+└── ycor/raw/
 ```
 
 데이터를 추가할 때는 이 파일이나 별도 메타데이터 문서에 다음 정보를 남깁니다.
@@ -20,3 +31,7 @@ data/
 - class ontology
 - train/validation/test split
 - preprocessing command
+
+전처리 결과는 `/workspace/adom/outputs/preprocessing/<dataset>`에 저장하며 Git에
+커밋하지 않습니다. 작은 통계와 QC 보고서만 검토 후 `results/datasets/`에
+복사합니다.

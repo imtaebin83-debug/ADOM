@@ -38,11 +38,11 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir "openmim==0.3.9" \
     && mim install "mmengine>=0.7.4,<1.0.0"
 
-# Prefer the OpenMMLab prebuilt MMCV wheel selected by MIM. If no wheel matches
-# this NGC PyTorch/CUDA combination, MMCV may need to be built from source.
+# Prefer the OpenMMLab prebuilt MMCV wheel. If no wheel matches this specific
+# NGC PyTorch/CUDA combination, fallback to compiling from source automatically.
 RUN if ! mim install "mmcv>=2.0.0,<2.2.0"; then \
-        echo >&2 "No compatible prebuilt MMCV wheel was found; an MMCV source build may be required."; \
-        exit 1; \
+        echo "No compatible prebuilt MMCV wheel was found. Falling back to source build (this will take 15-20 minutes)..."; \
+        MMCV_WITH_OPS=1 python -m pip install --no-cache-dir "mmcv>=2.0.0,<2.2.0"; \
     fi \
     && python -m pip install --no-cache-dir -r /tmp/requirements/openmmlab.txt \
     && rm -rf /root/.cache/pip /root/.cache/openmim

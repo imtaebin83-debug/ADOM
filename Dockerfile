@@ -43,7 +43,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip wheel "setuptools<70.0.0"
 # 2. Prefer the OpenMMLab prebuilt MMCV wheel...
 RUN if ! mim install "mmcv>=2.0.0,<2.2.0"; then \
         echo "No compatible prebuilt MMCV wheel was found. Falling back to source build (this will take 15-20 minutes)..."; \
-        # --no-build-isolation 옵션으로 격리 환경을 끄고 우리가 세팅한 setuptools<70.0.0을 사용하도록 강제합니다.
+        # --no-build-isolation 옵션으로 격리 환경을 끄고 우리가 세팅한 setuptools<70.0.0을 사용하도록 강제
         MAX_JOBS=2 MMCV_WITH_OPS=1 python -m pip install --no-cache-dir --no-build-isolation "mmcv>=2.0.0,<2.2.0"; \
     fi \
     && python -m pip install --no-cache-dir -r /tmp/requirements/openmmlab.txt \

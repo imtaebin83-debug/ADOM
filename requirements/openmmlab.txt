@@ -1,0 +1,17 @@
+# openmim, mmengine, and mmcv are installed with MIM in the Dockerfile so that
+# MMCV resolves a wheel compatible with the NGC image's PyTorch and CUDA build.
+mmsegmentation==1.2.2
+mmdeploy==1.3.1
+onnx==1.15.0
+onnxruntime==1.16.3
+opencv-python==4.8.1.78
+# NumPy 2.0 has Crashes with PyTorch and OpenCV
+numpy>=1.24.0,<2.0.0
+scipy>=1.10.0,<1.12.0
+matplotlib>=3.7.0,<3.9.0
+tqdm>=4.65.0,<5.0.0
+tensorboard>=2.14.0,<3.0.0
+albumentations>=1.3.1,<2.0.0
+pycocotools>=2.0.7,<3.0.0
+pandas>=2.0.0,<3.0.0
+scikit-learn>=1.3.0,<2.0.0

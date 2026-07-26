@@ -1,0 +1,17 @@
+services:
+  adom-train:
+    image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/adom-mmseg:latest
+    runtime: nvidia
+    ipc: host
+    shm_size: "16gb"
+    stdin_open: true
+    tty: true
+    working_dir: /workspace/adom/repo
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CUDA_VISIBLE_DEVICES: "0"
+    volumes:
+      - ./repo:/workspace/adom/repo
+      - /tmp/data:/workspace/adom/datasets
+      - ./outputs:/workspace/adom/outputs
+    command: bash

@@ -51,9 +51,7 @@ RUN if ! mim install "mmcv>=2.0.0,<2.2.0"; then \
 
 WORKDIR /workspace/adom/repo
 
-# Training data and generated artifacts are mounted at runtime;
-# they are never copied into the image.
-# Sanity Check
+# Sanity Check 
 RUN python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())" \
     && python -c "import mmcv, mmengine, mmseg, onnx; print('All libraries imported successfully.')"
 

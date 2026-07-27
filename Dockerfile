@@ -34,25 +34,81 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements/openmmlab.txt /tmp/requirements/openmmlab.txt
 
-# 1. Base Python packages: NumPy 2.0 C-API issue, so we limit NumPy to <2.0.0 for now.
-# setuptools<70.0.0 is required for pkg_resources
-RUN python -m pip install --no-cache-dir --upgrade pip wheel "setuptools<70.0.0" "numpy<2.0.0" Cython \
-    && python -m pip install --no-cache-dir "openmim==0.3.9" \
-    && mim install "mmengine>=0.7.4,<1.0.0"
+# Pin the packaging and numerical stacks before installing OpenMMLab.
+# NumPy 1.24.4 is the common compatible version for the NGC image's numba,
+# CuPy, SciPy, pandas, ONNX Runtime, and OpenCV packages.
+# Several NGC packages lack an uninstallable RECORD, so a regular upgrade
+# leaves their old module files behind. Overwrite these pure-Python modules.
+RUN python -m pip install --no-cache-dir --upgrade \
+        "pip==24.0" \
+        "wheel==0.41.2" \
+        "setuptools==69.5.1" \
+        "numpy==1.24.4" \
+        "Cython==3.0.12" \
+        "requests==2.31.0" \
+        "urllib3==1.26.18" \
+    && python -m pip install --no-cache-dir --ignore-installed --no-deps \
+        "requests==2.31.0" \
+        "typing-extensions==4.8.0" \
+        "urllib3==1.26.18"
 
-# 2. Prefer the OpenMMLab prebuilt MMCV wheel...
-RUN if ! mim install "mmcv>=2.0.0,<2.2.0"; then \
+# The OpenCV wheel variants all own the same cv2 namespace. Remove every
+# preinstalled variant before installing exactly one pinned variant below.
+# RAPIDS is not used by ADOM and conflicts irreconcilably with mmdeploy's
+# protobuf<=3.20.2 requirement.
+# Install the pinned application wheels without dependency resolution first,
+# so mmdeploy/mmseg cannot pull unpinned MMEngine, MMCV, NumPy, or OpenCV.
+RUN python -m pip uninstall -y \
+        opencv-python \
+        opencv-python-headless \
+        opencv-contrib-python \
+        opencv-contrib-python-headless \
+        cudf \
+        cugraph \
+        cugraph-service-client \
+        cugraph-service-server \
+        cuml \
+        dask-cuda \
+        dask-cudf \
+        raft-dask \
+    && rm -rf \
+        /usr/local/lib/python3.10/dist-packages/cv2 \
+        /usr/local/lib/python3.10/dist-packages/opencv_python.libs \
+        /usr/local/lib/python3.10/dist-packages/opencv_python_headless.libs \
+    && python -m pip install --no-cache-dir --no-deps -r /tmp/requirements/openmmlab.txt \
+    && python -m pip install --no-cache-dir --no-deps "mmengine==0.10.7"
+
+# Prefer an OpenMMLab binary wheel without allowing pip to mutate dependencies.
+# NGC 23.10 uses PyTorch 2.1 and CUDA 12.2; if no matching wheel exists, build
+# MMCV 2.1.0 from source with bounded parallelism and the pinned build stack.
+RUN if ! python -m pip install --no-cache-dir --no-deps \
+        --only-binary=mmcv \
+        --find-links https://download.openmmlab.com/mmcv/dist/cu122/torch2.1.0/index.html \
+        "mmcv==2.1.0"; then \
         echo "No compatible prebuilt MMCV wheel was found. Falling back to source build (this will take 15-20 minutes)..."; \
-        # --no-build-isolation 옵션으로 격리 환경을 끄고 우리가 세팅한 setuptools<70.0.0을 사용하도록 강제
-        MAX_JOBS=2 MMCV_WITH_OPS=1 python -m pip install --no-cache-dir --no-build-isolation "mmcv>=2.0.0,<2.2.0"; \
-    fi \
+        MAX_JOBS=2 MMCV_WITH_OPS=1 python -m pip install \
+            --no-cache-dir \
+            --no-build-isolation \
+            --no-deps \
+            "mmcv==2.1.0"; \
+    fi
+
+# Resolve the remaining runtime dependencies only after every ABI-sensitive
+# package is present at its pinned version. Validate that dependency graph,
+# then add Albumentations without its second OpenCV wheel.
+RUN python -m pip uninstall -y cugraph-dgl \
     && python -m pip install --no-cache-dir -r /tmp/requirements/openmmlab.txt \
-    && rm -rf /root/.cache/pip /root/.cache/openmim
+    && python -m pip check \
+    && python -m pip install --no-cache-dir --no-deps \
+        "qudida==0.0.4" \
+        "albumentations==1.3.1" \
+    && rm -rf /root/.cache/pip
 
 WORKDIR /workspace/adom/repo
 
 # Sanity Check 
 RUN python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())" \
-    && python -c "import mmcv, mmengine, mmseg, onnx; print('All libraries imported successfully.')"
+    && python -c "import albumentations, cv2, numpy, pandas, scipy, onnxruntime; print('Core scientific libraries imported successfully.')" \
+    && python -c "import mmcv, mmcv.ops, mmengine, mmseg, mmdeploy, onnx; print('All OpenMMLab libraries imported successfully.')"
 
 CMD ["bash"]

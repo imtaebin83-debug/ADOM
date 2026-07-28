@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/openmmlab.txt /tmp/requirements/openmmlab.txt
+COPY requirements/opencv-headless-compat /tmp/requirements/opencv-headless-compat
 
 # Pin the packaging and numerical stacks before installing OpenMMLab.
 # NumPy 1.24.4 is the common compatible version for the NGC image's numba,
@@ -99,16 +100,20 @@ RUN if ! python -m pip install --no-cache-dir --no-deps \
 RUN python -m pip uninstall -y cugraph-dgl \
     && python -m pip install --no-cache-dir -r /tmp/requirements/openmmlab.txt \
     && python -m pip check \
-    && python -m pip install --no-cache-dir --no-deps \
+    && python -m pip install --no-cache-dir --no-build-isolation --no-deps \
         "qudida==0.0.4" \
         "albumentations==1.3.1" \
+        /tmp/requirements/opencv-headless-compat \
+    && python -m pip check \
     && rm -rf /root/.cache/pip
 
 WORKDIR /workspace/adom/repo
 
-# Sanity Check 
-RUN python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())" \
-    && python -c "import albumentations, cv2, numpy, pandas, scipy, onnxruntime; print('Core scientific libraries imported successfully.')" \
-    && python -c "import mmcv, mmcv.ops, mmengine, mmseg, mmdeploy, onnx; print('All OpenMMLab libraries imported successfully.')"
+# Dependency and ABI sanity checks. CUDA availability is checked at RunPod
+# runtime because image builds do not have access to a GPU.
+RUN python -c "import torch; print(torch.__version__)" \
+    && python -c "import albumentations, cv2, numpy, pandas, scipy, onnxruntime; assert cv2.__version__ == '4.8.0'; print('Core scientific libraries imported successfully.')" \
+    && python -c "import mmcv, mmcv.ops, mmengine, mmseg, mmdeploy, onnx; print('All OpenMMLab libraries imported successfully.')" \
+    && python -c "from importlib.metadata import version; expected={'numpy':'1.24.4','setuptools':'69.5.1','opencv-python':'4.8.0.76','opencv-python-headless':'4.8.0.76','mmcv':'2.1.0','mmengine':'0.10.7','mmsegmentation':'1.2.2','mmdeploy':'1.3.1'}; actual={k:version(k) for k in expected}; assert actual==expected, (actual, expected); print(actual)"
 
 CMD ["bash"]

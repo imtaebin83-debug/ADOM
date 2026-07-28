@@ -1,0 +1,14 @@
+{
+  "dataset": "rellis3d",
+  "package_version": "v1.0",
+  "source": "team-drive",
+  "status": "rejected",
+  "approved_for_training": false,
+  "reasons": [
+    "images/images contains Matplotlib UI assets",
+    "annotation layout does not satisfy the canonical ADOM package contract",
+    "legacy QC output is not trustworthy"
+  ],
+  "replacement": "Regenerate Cost4 v2.0 from official RELLIS-3D raw data",
+  "retention_policy": "Keep for forensic reference; never mount as a training dataset"
+}

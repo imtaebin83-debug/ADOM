@@ -1,28 +1,42 @@
 # Scripts
 
-반복 작업 자동화 스크립트를 보관합니다.
+반복 가능한 운영 진입점만 둔다. 데이터 로직은 `src/adom/data`, MMSeg 확장은
+`src/adom/mmseg`, 실행 상태 관리는 `src/adom/runtime`에 있다.
 
-예상 범위:
+## RunPod 학습 1-cycle
 
-- dataset preparation
-- training launch helpers
-- evaluation and metric aggregation
-- ONNX/TensorRT export
-- Jetson benchmark helpers
-
-스크립트가 특정 실험에만 쓰이면 먼저 `experiments/<name>/`에 두고, 여러 실험에서 재사용되면 이곳으로 옮깁니다.
-
-팀 공용 데이터 전처리 코드는 `scripts/data_preprocessing/<dataset>/`에 둡니다.
-실제 raw/processed 데이터는 이 디렉토리에 두지 않으며, 실행 시 다음 경로 계약을
-사용합니다.
-
-```text
-input:   /workspace/adom/datasets/<dataset>/raw
-output:  /workspace/adom/outputs/preprocessing/<dataset>
-mapping: /workspace/adom/repo/configs/datasets/<dataset>/
+```bash
+bash scripts/run_training_cycle.sh \
+  --dataset /workspace/adom/datasets/rellis3d \
+  --models b0,b2 \
+  --output /workspace/adom/outputs/runs/<run-id>
 ```
 
-각 스크립트는 개인 PC 절대경로 대신 `--input-root`, `--output-root`, `--mapping`
-인자를 받아야 합니다. 자세한 이동 계획은
-[`docs/dataset-preprocessing-migration-plan.md`](../docs/dataset-preprocessing-migration-plan.md)를
-참고합니다.
+- strict dataset QC와 GPU/runtime doctor를 먼저 수행한다.
+- 실제 GPU 메모리 probe로 micro-batch를 정하고 effective batch를 16 이상으로
+  유지한다.
+- B0의 Stage 1, Stage 2, test, 두 ONNX parity가 모두 성공해야 B2를 시작한다.
+- 중단 후 같은 output에 `--resume`을 추가하면 완료된 phase만 건너뛴다.
+- 임의 glob으로 checkpoint를 선택하지 않는다. 각 stage에 best mIoU checkpoint가
+  정확히 하나 있어야 다음 단계로 진행한다.
+
+## Dataset cache
+
+`init_workspace.sh`는 Network Volume의 canonical tar를 `/tmp/data`로 복사하고
+안전하게 staging 추출한 뒤 컨테이너의 `/workspace/adom/datasets`에 노출한다.
+
+```bash
+bash scripts/init_workspace.sh \
+  --dataset rellis3d \
+  --archive /workspace/adom/network-volume/rellis3d-cost4-v2.tar
+```
+
+## Git artifact guard
+
+```bash
+python scripts/check_git_artifacts.py
+```
+
+학습 데이터, checkpoint, ONNX, TensorRT engine, 로그와 새 개인 절대경로가 Git에
+들어오는 것을 차단한다. `study/gahyung/Datasets_Repo`는 검증 근거용 legacy
+snapshot이라 검사 예외지만 canonical 코드에서는 import하지 않는다.

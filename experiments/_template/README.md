@@ -32,11 +32,11 @@ What question does this experiment answer?
 | --- | --- | --- | --- |
 | mIoU |  | % |  |
 | class IoU |  | % | Attach or link per-class table |
-| rare obstacle recall |  | % |  |
+| high_cost_or_obstacle recall |  | % | Cost4 class 3 |
 | FPS |  | frames/sec | batch size 1 |
 | latency p50 |  | ms |  |
 | latency p95 |  | ms |  |
-| power draw |  | W | Jetson Orin NX |
+| power draw |  | W | Jetson Orin Nano 8GB |
 | costmap update rate |  | Hz | If applicable |
 
 ## Results

@@ -21,7 +21,7 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 
 초기 benchmark 필수 metric:
 
-- segmentation: mIoU, class IoU, rare obstacle recall
+- segmentation: mIoU, class IoU, high_cost_or_obstacle recall
 - runtime: FPS, latency p50/p95
 - edge deployment: power draw on Jetson Orin Nano 8GB
 - mapping readiness: costmap update rate
@@ -60,5 +60,7 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 - [System architecture overview](docs/system-architecture/overview.md)
 - [Development setup guide](docs/setup-guides/development.md)
 - [RunPod training and DevOps guide](docs/devops.md)
+- [RunPod one-cycle command](docs/runpod-one-cycle.md)
+- [RELLIS-3D Cost4 data contract](docs/datasets/rellis3d-cost4.md)
 - [Dataset preprocessing migration plan](docs/dataset-preprocessing-migration-plan.md)
 - [Contribution guide](CONTRIBUTING.md)

@@ -27,8 +27,8 @@
 
 - mIoU
 - class IoU
-- rare obstacle recall
+- high_cost_or_obstacle recall
 - FPS
 - latency p50/p95
-- Jetson Orin NX power draw
+- Jetson Orin Nano 8GB power draw
 - costmap update rate, if applicable

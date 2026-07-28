@@ -1,0 +1,1 @@
+"""ADOM project tests."""

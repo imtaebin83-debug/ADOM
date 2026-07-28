@@ -6,8 +6,8 @@
 
 ## Target Hardware
 
-- Primary edge target: NVIDIA Jetson Orin NX
-- Training/server GPU는 별도로 기록하되, edge runtime 수치는 Orin NX 결과를 우선한다.
+- Primary edge target: NVIDIA Jetson Orin Nano 8GB
+- Training/server GPU는 별도로 기록하되, edge runtime 수치는 Orin Nano 8GB 결과를 우선한다.
 
 ## Required Metrics
 
@@ -15,11 +15,12 @@
 | --- | --- | --- | --- |
 | Segmentation | mIoU | percent | 전체 class 평균 IoU |
 | Segmentation | class IoU | percent | class별 IoU, 특히 obstacle/traversability 관련 class 확인 |
-| Segmentation | rare obstacle recall | percent | 구덩이, 진흙, 암석 등 희소 위험 class 기준 |
+| Segmentation | high_cost_or_obstacle recall | percent | Cost4 target class 3 전체 recall |
+| Segmentation | traversable precision | percent | 예측 0·1·2를 traversable positive로 합산 |
 | Runtime | FPS | frames/sec | batch size 1 기준 |
 | Runtime | latency p50 | ms | median end-to-end inference latency |
 | Runtime | latency p95 | ms | tail latency 확인용 |
-| Edge | power draw | W | Jetson Orin NX에서 측정 |
+| Edge | power draw | W | Jetson Orin Nano 8GB에서 측정 |
 | Mapping | costmap update rate | Hz | segmentation output을 costmap으로 변환하는 실험부터 필수 |
 
 ## Reporting Rule

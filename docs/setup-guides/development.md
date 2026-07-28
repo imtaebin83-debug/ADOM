@@ -8,7 +8,7 @@
 - Git
 - CUDA-capable GPU for training experiments
 - Ubuntu 22.04 + ROS2 Humble for ROS integration work
-- Jetson Orin NX for deployment validation
+- Jetson Orin Nano 8GB for deployment validation
 
 ## Clone
 

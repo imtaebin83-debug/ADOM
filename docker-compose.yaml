@@ -9,9 +9,10 @@ services:
     working_dir: /workspace/adom/repo
     environment:
       PYTHONUNBUFFERED: "1"
+      PYTHONPATH: "/workspace/adom/repo/src"
       CUDA_VISIBLE_DEVICES: "0"
     volumes:
-      - ./repo:/workspace/adom/repo
+      - .:/workspace/adom/repo
       - /tmp/data:/workspace/adom/datasets
       - ./outputs:/workspace/adom/outputs
     command: bash

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=69.5.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adom"
+version = "0.1.0"
+description = "ADOM off-road perception data and MMSegmentation extensions"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy==1.24.4",
+  "Pillow>=9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

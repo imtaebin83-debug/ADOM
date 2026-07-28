@@ -6,12 +6,12 @@
 *.pyc
 
 # Ignore data, outputs, and model checkpoints/exports
-datasets/
-data/
-outputs/
-models/checkpoints/
-models/exports/
-wandb/
+/datasets/
+/data/
+/outputs/
+/models/checkpoints/
+/models/exports/
+/wandb/
 
 # Ignore large model files and logs
 *.pth

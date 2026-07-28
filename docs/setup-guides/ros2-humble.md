@@ -15,7 +15,7 @@ ROS2 node는 가능한 한 얇게 유지하고, 핵심 알고리즘은 `src/`의
 
 - Ubuntu 22.04
 - ROS2 Humble
-- Jetson Orin NX
+- Jetson Orin Nano 8GB
 - ZED 2i camera
 
 ## Future Package Candidates

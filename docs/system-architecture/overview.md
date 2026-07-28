@@ -37,7 +37,7 @@ flowchart LR
 
 - TensorRT FP16 export for first real-time target
 - INT8 calibration if FP16 is not enough for target FPS or power
-- Target: at least 30 FPS on Jetson Orin NX
+- Target: at least 30 FPS on Jetson Orin Nano 8GB
 
 ### Integration
 
@@ -51,9 +51,9 @@ flowchart LR
 
 | Area | Metric |
 | --- | --- |
-| Segmentation | mIoU, class IoU, rare obstacle recall |
+| Segmentation | mIoU, class IoU, high_cost_or_obstacle recall |
 | Runtime | FPS, latency p50/p95, GPU memory |
-| Edge deployment | power draw on Jetson Orin NX, TensorRT build time, engine size |
+| Edge deployment | power draw on Jetson Orin Nano 8GB, TensorRT build time, engine size |
 | Mapping | costmap update rate, traversability error |
 | Control demo | intervention count, route completion, recovery success |
 

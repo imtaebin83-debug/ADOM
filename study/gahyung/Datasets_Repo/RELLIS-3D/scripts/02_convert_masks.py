@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import shutil
+import os
 from pathlib import Path
 
 import numpy as np
@@ -31,9 +32,27 @@ MASK_OUTPUT_DIR = OUTPUT_ROOT / "masks"
 
 MAPPING_PATH = (
     PROJECT_ROOT
-    / "scripts"
+    / "config"
     / "class_mapping.yaml"
 )
+
+## 0727 CLI-환경변수 경로 처리 함수 추가
+def resolve_path(
+    cli_value: Path | None,
+    env_name: str,
+    default: Path,
+) -> Path:
+    """
+    Resolve a path in the following order:
+    CLI argument -> environment variable -> repository-relative default.
+    """
+    value = cli_value or os.getenv(env_name)
+
+    if value is None:
+        return default.resolve()
+
+    return Path(value).expanduser().resolve()
+##
 
 RGB_SUFFIXES = {".jpg", ".jpeg", ".png"}
 MASK_SUFFIXES = {".png"}
@@ -191,6 +210,31 @@ def collect_rgb_mask_pairs() -> list[
         rgb_stems = set(rgb_files)
         mask_stems = set(mask_files)
 
+        ##0727 누락 RGB-mask pair를 오류로 처리
+        ## unlabeled RGB는 제외하고, 대응 RGB가 없는 mask만 오류 처리
+        unlabeled_rgb_stems = sorted(
+            rgb_stems - mask_stems
+        )
+
+        missing_rgb_stems = sorted(
+            mask_stems - rgb_stems
+        )
+
+        if unlabeled_rgb_stems:
+            print(
+                f"[INFO] sequence {sequence}: "
+                f"{len(unlabeled_rgb_stems)} unlabeled RGB frame(s) "
+                "will be excluded from mask conversion."
+            )
+
+        if missing_rgb_stems:
+            raise RuntimeError(
+                f"Mask without matching RGB in sequence {sequence}: "
+                f"count={len(missing_rgb_stems)} "
+                f"examples={missing_rgb_stems[:10]}"
+            )
+        ##
+
         paired_stems = sorted(
             rgb_stems & mask_stems
         )
@@ -207,6 +251,13 @@ def collect_rgb_mask_pairs() -> list[
                     mask_path,
                 )
             )
+
+    ##0727 pair가 0개인 경우 오류 추가
+    if not pairs:
+        raise RuntimeError(
+            f"No valid RGB-mask pairs were found under: {RAW_ROOT}"
+        )
+    ##
 
     return pairs
 
@@ -375,17 +426,17 @@ def main(
                     "original_stem": stem,
                     "rgb_path": (
                         rgb_path
-                        .relative_to(PROJECT_ROOT)
+                        .relative_to(RAW_ROOT)
                         .as_posix()
                     ),
                     "source_mask_path": (
                         mask_path
-                        .relative_to(PROJECT_ROOT)
+                        .relative_to(RAW_ROOT)
                         .as_posix()
                     ),
                     "converted_mask_path": (
                         output_path
-                        .relative_to(PROJECT_ROOT)
+                        .relative_to(OUTPUT_ROOT)
                         .as_posix()
                     ),
                     "width": rgb_size[0],
@@ -410,12 +461,12 @@ def main(
                     "original_stem": stem,
                     "rgb_path": (
                         rgb_path
-                        .relative_to(PROJECT_ROOT)
+                        .relative_to(RAW_ROOT)
                         .as_posix()
                     ),
                     "source_mask_path": (
                         mask_path
-                        .relative_to(PROJECT_ROOT)
+                        .relative_to(RAW_ROOT)
                         .as_posix()
                     ),
                     "converted_mask_path": "",
@@ -503,6 +554,38 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    ##0727 CLI 인자 추가
+    parser.add_argument(
+        "--input-root",
+        type=Path,
+        default=None,
+        help=(
+            "RELLIS-3D raw dataset root. "
+            "Environment variable: RELLIS_INPUT_ROOT"
+        ),
+    )
+
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=None,
+        help=(
+            "Directory for converted masks and metadata. "
+            "Environment variable: RELLIS_OUTPUT_ROOT"
+        ),
+    )
+
+    parser.add_argument(
+        "--mapping",
+        type=Path,
+        default=None,
+        help=(
+            "Path to class_mapping.yaml. "
+            "Environment variable: RELLIS_MAPPING_PATH"
+        ),
+    )
+    ##
+
     parser.add_argument(
         "--limit",
         type=int,
@@ -517,6 +600,28 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    ##0727 CLI 인자 추가
+    RAW_ROOT = resolve_path(
+        args.input_root,
+        "RELLIS_INPUT_ROOT",
+        RAW_ROOT,
+    )
+
+    OUTPUT_ROOT = resolve_path(
+        args.output_root,
+        "RELLIS_OUTPUT_ROOT",
+        OUTPUT_ROOT,
+    )
+
+    MAPPING_PATH = resolve_path(
+        args.mapping,
+        "RELLIS_MAPPING_PATH",
+        MAPPING_PATH,
+    )
+
+    MASK_OUTPUT_DIR = OUTPUT_ROOT / "masks"
+    ##
 
     main(
         limit=args.limit,

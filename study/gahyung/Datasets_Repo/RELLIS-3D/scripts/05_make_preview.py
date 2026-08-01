@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from pathlib import Path
 
 import numpy as np
@@ -10,19 +11,36 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-METADATA_PATH = (
+## 0727 RGB 원본과 처리 결과 경로를 분리하고 metadata 필수 열 정의
+DEFAULT_INPUT_ROOT = (
+    PROJECT_ROOT
+    / "data"
+    / "raw"
+    / "Rellis-3D"
+)
+
+DEFAULT_OUTPUT_ROOT = (
     PROJECT_ROOT
     / "data"
     / "processed"
     / "rellis_cost4_standard"
-    / "metadata.csv"
 )
 
-DEFAULT_OUTPUT_PATH = (
-    PROJECT_ROOT
-    / "reports"
+DEFAULT_PREVIEW_RELATIVE_PATH = (
+    Path("previews")
     / "rellis3d_preview.png"
 )
+
+REQUIRED_METADATA_COLUMNS = {
+    "sequence",
+    "sample_id",
+    "original_stem",
+    "rgb_path",
+    "converted_mask_path",
+    "status",
+    "ignore_ratio",
+}
+##
 
 # ADOM Cost4 시각화 색상
 PALETTE = {
@@ -41,38 +59,86 @@ CLASS_NAMES = {
     255: "255 ignore",
 }
 
+## 0727 CLI → 환경변수 → 기본값 순서로 경로를 결정하는 함수 추가
+def resolve_path(
+    cli_value: Path | None,
+    env_name: str,
+    default: Path,
+) -> Path:
+    """
+    Resolve a path in this order:
+
+    CLI argument -> environment variable -> default.
+    """
+    value = cli_value or os.getenv(env_name)
+
+    if value is None:
+        return default.resolve()
+
+    return Path(value).expanduser().resolve()
+##
+
+
+## 0727 metadata의 상대경로를 지정된 데이터 root 기준으로 변환
+def resolve_data_path(
+    base_root: Path,
+    path_text: str,
+) -> Path:
+    path = Path(path_text)
+
+    if path.is_absolute():
+        return path.resolve()
+
+    return (base_root / path).resolve()
+##
 
 def load_font(size: int) -> ImageFont.ImageFont:
-    """Windows Arial을 우선 사용하고, 없으면 기본 글꼴을 사용한다."""
+    ## 0727 깨진 글꼴 설명을 정상 문자열로 수정
+    """Use Arial when available and otherwise use PIL's default font."""
+    ##
     try:
         return ImageFont.truetype("arial.ttf", size)
     except OSError:
         return ImageFont.load_default()
 
-
-def resolve_project_path(path_text: str) -> Path:
-    """metadata.csv의 상대 경로를 실제 프로젝트 경로로 변환한다."""
-    path = Path(path_text)
-
-    if path.is_absolute():
-        return path
-
-    return PROJECT_ROOT / path
-
-
-def load_metadata() -> list[dict[str, str]]:
-    """정상 변환된 metadata 행만 읽는다."""
-    if not METADATA_PATH.exists():
+## 0727 metadata 경로를 외부에서 받고 필수 열과 정상 행을 검증하도록 수정
+def load_metadata(
+    metadata_path: Path,
+) -> list[dict[str, str]]:
+    """Load successfully converted rows from metadata.csv."""
+    if not metadata_path.is_file():
         raise FileNotFoundError(
-            f"metadata.csv가 없습니다: {METADATA_PATH}"
+            f"metadata.csv does not exist: {metadata_path}"
         )
 
-    with METADATA_PATH.open(
+    with metadata_path.open(
         "r",
         encoding="utf-8-sig",
         newline="",
     ) as file:
-        rows = list(csv.DictReader(file))
+        reader = csv.DictReader(file)
+
+        metadata_columns = set(
+            reader.fieldnames or []
+        )
+
+        missing_columns = sorted(
+            REQUIRED_METADATA_COLUMNS
+            - metadata_columns
+        )
+
+        if missing_columns:
+            raise RuntimeError(
+                "metadata.csv is missing required columns: "
+                f"{missing_columns}"
+            )
+
+        rows = list(reader)
+
+    if not rows:
+        raise RuntimeError(
+            "metadata.csv contains no data rows."
+        )
 
     valid_rows = [
         row
@@ -82,22 +148,25 @@ def load_metadata() -> list[dict[str, str]]:
 
     if not valid_rows:
         raise RuntimeError(
-            "metadata.csv에서 status=ok인 샘플을 찾지 못했습니다."
+            "No status=ok samples were found in metadata.csv."
         )
 
     return valid_rows
+##
 
 
+## 0727 sequence별 preview 샘플 선택과 ignore 비율 처리를 명확히 수정
 def select_samples(
     rows: list[dict[str, str]],
     per_sequence: int,
     max_ignore_ratio: float,
 ) -> list[dict[str, str]]:
     """
-    sequence별 대표 샘플을 선택한다.
+    Select evenly distributed preview samples for each sequence.
 
-    ignore 비율이 너무 높은 샘플은 우선 제외하고,
-    파일 순서상 고르게 떨어진 샘플을 선택한다.
+    Samples above max_ignore_ratio are excluded first. If no sample
+    satisfies the threshold for a sequence, all valid rows from that
+    sequence are used as fallback candidates.
     """
     grouped: dict[str, list[dict[str, str]]] = {}
 
@@ -110,18 +179,20 @@ def select_samples(
     for sequence in sorted(grouped):
         sequence_rows = grouped[sequence]
 
-        candidates = []
+        candidates: list[dict[str, str]] = []
 
         for row in sequence_rows:
             try:
-                ignore_ratio = float(row["ignore_ratio"])
+                ignore_ratio = float(
+                    row.get("ignore_ratio", "")
+                )
             except (TypeError, ValueError):
                 ignore_ratio = 1.0
 
             if ignore_ratio <= max_ignore_ratio:
                 candidates.append(row)
 
-        # 조건을 만족하는 샘플이 없으면 전체 샘플 사용
+        # Fall back to all rows when no sample satisfies the threshold.
         if not candidates:
             candidates = sequence_rows
 
@@ -147,7 +218,13 @@ def select_samples(
         for index in indexes:
             selected.append(candidates[index])
 
+    if not selected:
+        raise RuntimeError(
+            "No preview samples were selected."
+        )
+
     return selected
+##
 
 
 def resize_with_padding(
@@ -155,7 +232,9 @@ def resize_with_padding(
     size: tuple[int, int],
     resample: Image.Resampling,
 ) -> Image.Image:
-    """비율을 유지하면서 지정 크기에 맞추고 남는 영역은 검정색으로 채운다."""
+    ## 0727 RGB resize 동작 설명 수정
+    """Resize while preserving aspect ratio and pad unused areas."""
+    ##
     contained = ImageOps.contain(
         image,
         size,
@@ -183,7 +262,9 @@ def resize_mask_with_padding(
     mask: Image.Image,
     size: tuple[int, int],
 ) -> Image.Image:
-    """클래스 ID가 변하지 않도록 nearest-neighbor 방식으로 resize한다."""
+    ## 0727 mask ID 보존을 위한 nearest-neighbor resize 설명 수정
+    """Resize a mask with nearest-neighbor interpolation and padding."""
+    ##
     contained = ImageOps.contain(
         mask,
         size,
@@ -208,7 +289,9 @@ def resize_mask_with_padding(
 
 
 def colorize_mask(mask_array: np.ndarray) -> np.ndarray:
-    """단일 채널 Cost4 mask를 RGB 컬러 mask로 변환한다."""
+    ## 0727 단일 채널 Cost4 mask 색상 변환 설명 수정
+    """Convert a single-channel Cost4 mask into an RGB color mask."""
+    ##
     height, width = mask_array.shape
 
     color_mask = np.zeros(
@@ -227,7 +310,9 @@ def make_overlay(
     mask_array: np.ndarray,
     alpha: float,
 ) -> np.ndarray:
-    """ignore 영역을 제외하고 mask 색상을 RGB 위에 겹친다."""
+    ## 0727 ignore 영역을 제외한 RGB overlay 동작 설명 수정
+    """Overlay valid mask pixels on RGB while excluding ignore pixels."""
+    ##
     color_mask = colorize_mask(mask_array)
 
     overlay = rgb_array.astype(np.float32).copy()
@@ -246,14 +331,25 @@ def make_overlay(
     ).astype(np.uint8)
 
 
+## 0727 RGB root와 처리 결과 root를 분리하고 기존 preview 덮어쓰기 방지
 def create_preview(
     selected_rows: list[dict[str, str]],
+    input_root: Path,
+    output_root: Path,
     output_path: Path,
     panel_width: int,
     panel_height: int,
     alpha: float,
+    overwrite: bool,
 ) -> None:
-    """RGB, Cost4 mask, overlay를 한 장의 preview 이미지로 만든다."""
+    """Create one preview image containing RGB, mask, and overlay panels."""
+    if output_path.exists() and not overwrite:
+        raise FileExistsError(
+            "Preview output already exists. "
+            "Use --overwrite to replace it: "
+            f"{output_path}"
+        )
+##
     title_height = 70
     row_label_height = 42
     column_label_height = 42
@@ -313,29 +409,43 @@ def create_preview(
         sequence = row["sequence"]
         sample_id = row["sample_id"]
 
-        rgb_path = resolve_project_path(
-            row["rgb_path"]
+        ## 0727 RGB는 input_root, 변환 mask는 output_root 기준으로 경로 해석
+        rgb_path = resolve_data_path(
+            input_root,
+            row["rgb_path"],
         )
 
-        mask_path = resolve_project_path(
-            row["converted_mask_path"]
+        mask_path = resolve_data_path(
+            output_root,
+            row["converted_mask_path"],
         )
 
-        if not rgb_path.exists():
+        if not rgb_path.is_file():
             raise FileNotFoundError(
-                f"RGB 파일이 없습니다: {rgb_path}"
+                f"RGB file does not exist: {rgb_path}"
             )
 
-        if not mask_path.exists():
+        if not mask_path.is_file():
             raise FileNotFoundError(
-                f"변환 mask가 없습니다: {mask_path}"
+                f"Converted mask does not exist: {mask_path}"
             )
+        ##
 
         with Image.open(rgb_path) as image:
             rgb = image.convert("RGB")
 
         with Image.open(mask_path) as image:
             mask = image.convert("L")
+
+        ## 0727 preview 생성 전 RGB와 mask 원본 크기 일치 여부 검사
+        if rgb.size != mask.size:
+            raise ValueError(
+                "RGB and mask dimensions do not match: "
+                f"sample_id={sample_id}, "
+                f"rgb_size={rgb.size}, "
+                f"mask_size={mask.size}"
+            )
+        ##
 
         rgb_resized = resize_with_padding(
             rgb,
@@ -484,70 +594,177 @@ def create_preview(
         optimize=True,
     )
 
-    print(f"선택한 preview sample 수: {len(selected_rows)}")
-    print(f"저장 위치: {output_path}")
+    ## 0727 preview 생성 결과를 명확한 출력 형식으로 수정
+    print(
+        f"Selected preview samples: "
+        f"{len(selected_rows)}"
+    )
+    print(f"Preview output: {output_path}")
+    ##
 
 
+## 0727 원본 RGB, 처리 결과, metadata, preview 출력 경로를 CLI로 지정하도록 수정
 def main() -> None:
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--input-root",
+        type=Path,
+        default=None,
+        help=(
+            "Raw RELLIS-3D root used to resolve rgb_path. "
+            "Environment variable: RELLIS_INPUT_ROOT"
+        ),
+    )
+
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=None,
+        help=(
+            "Processed dataset root used to resolve "
+            "converted_mask_path. Environment variable: "
+            "RELLIS_OUTPUT_ROOT"
+        ),
+    )
+
+    parser.add_argument(
+        "--metadata",
+        type=Path,
+        default=None,
+        help=(
+            "Path to metadata.csv. The default is "
+            "output-root/metadata.csv. Environment variable: "
+            "RELLIS_METADATA_PATH"
+        ),
+    )
 
     parser.add_argument(
         "--per-sequence",
         type=int,
         default=1,
-        help="sequence별 대표 샘플 수",
+        help="Number of preview samples selected per sequence.",
     )
 
     parser.add_argument(
         "--max-ignore-ratio",
         type=float,
         default=0.6,
-        help="대표 샘플 선택 시 허용할 최대 ignore 비율",
+        help=(
+            "Maximum ignore_ratio used for preferred "
+            "preview sample selection."
+        ),
     )
 
     parser.add_argument(
         "--panel-width",
         type=int,
         default=480,
+        help="Width of each RGB, mask, and overlay panel.",
     )
 
     parser.add_argument(
         "--panel-height",
         type=int,
         default=300,
+        help="Height of each RGB, mask, and overlay panel.",
     )
 
     parser.add_argument(
         "--alpha",
         type=float,
         default=0.5,
-        help="overlay mask 투명도",
+        help="Mask opacity used for the RGB overlay.",
     )
 
     parser.add_argument(
         "--output",
         type=Path,
-        default=DEFAULT_OUTPUT_PATH,
+        default=None,
+        help=(
+            "Preview PNG output path. The default is "
+            "output-root/previews/rellis3d_preview.png. "
+            "Environment variable: RELLIS_PREVIEW_PATH"
+        ),
+    )
+
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace an existing preview PNG.",
     )
 
     args = parser.parse_args()
 
+    input_root = resolve_path(
+        args.input_root,
+        "RELLIS_INPUT_ROOT",
+        DEFAULT_INPUT_ROOT,
+    )
+
+    output_root = resolve_path(
+        args.output_root,
+        "RELLIS_OUTPUT_ROOT",
+        DEFAULT_OUTPUT_ROOT,
+    )
+
+    metadata_path = resolve_path(
+        args.metadata,
+        "RELLIS_METADATA_PATH",
+        output_root / "metadata.csv",
+    )
+
+    preview_path = resolve_path(
+        args.output,
+        "RELLIS_PREVIEW_PATH",
+        output_root / DEFAULT_PREVIEW_RELATIVE_PATH,
+    )
+
+    if not input_root.is_dir():
+        raise FileNotFoundError(
+            f"Input root does not exist: {input_root}"
+        )
+
+    if not output_root.is_dir():
+        raise FileNotFoundError(
+            f"Output root does not exist: {output_root}"
+        )
+
+    mask_root = output_root / "masks"
+
+    if not mask_root.is_dir():
+        raise FileNotFoundError(
+            f"Converted mask directory does not exist: {mask_root}"
+        )
+
     if args.per_sequence < 1:
         raise ValueError(
-            "--per-sequence는 1 이상이어야 합니다."
+            "--per-sequence must be at least 1."
         )
 
     if not 0.0 <= args.max_ignore_ratio <= 1.0:
         raise ValueError(
-            "--max-ignore-ratio는 0~1 범위여야 합니다."
+            "--max-ignore-ratio must be between 0 and 1."
+        )
+
+    if args.panel_width < 1:
+        raise ValueError(
+            "--panel-width must be at least 1."
+        )
+
+    if args.panel_height < 1:
+        raise ValueError(
+            "--panel-height must be at least 1."
         )
 
     if not 0.0 <= args.alpha <= 1.0:
         raise ValueError(
-            "--alpha는 0~1 범위여야 합니다."
+            "--alpha must be between 0 and 1."
         )
 
-    rows = load_metadata()
+    rows = load_metadata(
+        metadata_path
+    )
 
     selected_rows = select_samples(
         rows,
@@ -556,13 +773,17 @@ def main() -> None:
     )
 
     create_preview(
-        selected_rows,
-        output_path=args.output,
+        selected_rows=selected_rows,
+        input_root=input_root,
+        output_root=output_root,
+        output_path=preview_path,
         panel_width=args.panel_width,
         panel_height=args.panel_height,
         alpha=args.alpha,
+        overwrite=args.overwrite,
     )
 
 
 if __name__ == "__main__":
     main()
+##

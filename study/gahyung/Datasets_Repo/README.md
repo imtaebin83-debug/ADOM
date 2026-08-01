@@ -333,18 +333,18 @@ v2.0: 클래스 체계 또는 변환 로직 변경
 
 ### 7.1 Team Repository Clone
 
-기존 `C:\Users\gahyu\ADOM` 폴더가 Git 저장소가 아니라면 먼저 다른 이름으로 백업합니다.
+기존 `<USER_HOME>\ADOM` 폴더가 Git 저장소가 아니라면 먼저 다른 이름으로 백업합니다.
 
 ```powershell
-cd C:\Users\gahyu
+cd $HOME
 Rename-Item ADOM ADOM_local_backup
 ```
 
 팀 저장소를 `ADOM` 이름으로 clone합니다.
 
 ```powershell
-git clone <TEAM_GITHUB_REPOSITORY_URL> C:\Users\gahyu\ADOM
-cd C:\Users\gahyu\ADOM
+git clone <TEAM_GITHUB_REPOSITORY_URL> "$HOME\ADOM"
+cd "$HOME\ADOM"
 ```
 
 작업 브랜치를 만듭니다.
@@ -356,9 +356,9 @@ git checkout -b feature/dataset-preprocessing
 백업 폴더에서 필요한 파일을 복사합니다.
 
 ```text
-C:\Users\gahyu\ADOM_local_backup
+<USER_HOME>\ADOM_local_backup
                     ↓
-C:\Users\gahyu\ADOM
+<USER_HOME>\ADOM
 ```
 
 복사 후 상태 확인:

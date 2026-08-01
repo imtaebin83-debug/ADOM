@@ -52,3 +52,11 @@ Thumbs.db
 !**/results/**
 !**/splits/
 !**/splits/**
+
+# Never allow model artifacts, including under results/ and previews/
+**/*.pth
+**/*.pt
+**/*.ckpt
+**/*.onnx
+**/*.engine
+**/*.plan

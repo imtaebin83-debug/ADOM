@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
+from pathlib import Path
 
 from common import (
     PROCESSED_ROOT,
@@ -10,7 +12,35 @@ from common import (
 )
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Write YCOR training configuration information."
+    )
+
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=PROCESSED_ROOT,
+        help="Processed YCOR_ADOM output directory.",
+    )
+
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
+
+    processed_root = (
+        args.output_root
+        .expanduser()
+        .resolve()
+    )
+
+    processed_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
     info = {
         "dataset_name": "YCOR_ADOM",
         "task": "2D traversability semantic segmentation",
@@ -28,7 +58,9 @@ def main() -> None:
             {
                 "id": class_id,
                 "name": TARGET_CLASSES[class_id],
-                "palette_rgb": list(TARGET_PALETTE[class_id]),
+                "palette_rgb": list(
+                    TARGET_PALETTE[class_id]
+                ),
             }
             for class_id in (0, 1, 2, 3)
         ],
@@ -45,21 +77,45 @@ def main() -> None:
             },
         },
         "notes": [
-            "YCOR has no paved/asphalt class, so target ID 0 is expected to have zero pixels.",
-            "Use YCOR together with RELLIS-3D/RUGD for the full ADOM 4-class model.",
+            (
+                "YCOR has no paved/asphalt class, so target ID 0 "
+                "is expected to have zero pixels."
+            ),
+            (
+                "Use YCOR together with RELLIS-3D/RUGD "
+                "for the full ADOM 4-class model."
+            ),
             "Do not set reduce_zero_label=True.",
             "Use ignore_index=255.",
-            "No arbitrary test split is generated because the official session-separated train/valid split is preserved.",
+            (
+                "No arbitrary test split is generated because "
+                "the official session-separated train/valid split "
+                "is preserved."
+            ),
         ],
     }
 
-    info_path = PROCESSED_ROOT / "dataset_info.json"
-    with info_path.open("w", encoding="utf-8") as f:
-        json.dump(info, f, ensure_ascii=False, indent=2)
+    info_path = (
+        processed_root
+        / "dataset_info.json"
+    )
+
+    with info_path.open(
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(
+            info,
+            file,
+            ensure_ascii=False,
+            indent=2,
+        )
 
     snippet = """# MMSegmentation dataset fields for YCOR_ADOM
 dataset_type = 'BaseSegDataset'
-data_root = '/ABSOLUTE/PATH/YCOR_ADOM'
+
+# Replace this value with the local YCOR_ADOM directory.
+data_root = 'path/to/YCOR_ADOM'
 
 metainfo = dict(
     classes=(
@@ -110,11 +166,19 @@ val_dataloader = dict(
 # auxiliary_head.num_classes = 4  # only if an auxiliary head exists
 # loss_decode.ignore_index = 255
 """
-    snippet_path = PROCESSED_ROOT / "mmseg_dataset_snippet.py"
-    snippet_path.write_text(snippet, encoding="utf-8")
 
-    print(f"[saved] {info_path}")
-    print(f"[saved] {snippet_path}")
+    snippet_path = (
+        processed_root
+        / "mmseg_dataset_snippet.py"
+    )
+
+    snippet_path.write_text(
+        snippet,
+        encoding="utf-8",
+    )
+
+    print("[saved] dataset_info.json")
+    print("[saved] mmseg_dataset_snippet.py")
     print("08_write_training_info.py: PASS")
 
 
@@ -122,5 +186,8 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"\nERROR: {exc}", file=sys.stderr)
+        print(
+            f"\nERROR: {exc}",
+            file=sys.stderr,
+        )
         raise

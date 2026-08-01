@@ -1,34 +1,55 @@
-from pathlib import Path
+from __future__ import annotations
+
+import argparse
 import csv
+import os
+from collections import Counter
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# 실제 파일 위치에 따라 수정
-QC_REPORT = ROOT / "data" / "processed" / \
-    "rellis_cost4_standard" / "qc_report.csv"
+DEFAULT_OUTPUT_ROOT = (
+    ROOT
+    / "data"
+    / "processed"
+    / "rellis_cost4_standard"
+)
 
-CLASS_STATISTICS = ROOT / "data" / "processed" / \
-    "rellis_cost4_standard" / "class_statistics.csv"
-
-OUTPUT_DIR = ROOT / "github_results"
-OUTPUT_FILE = OUTPUT_DIR / "final_check.txt"
-
-
-TRUE_VALUES = {"1", "true", "yes", "pass", "ok"}
+DEFAULT_RESULTS_DIR = ROOT / "results"
 
 
-def is_true(value: str) -> bool:
-    return value.strip().lower() in TRUE_VALUES
+def resolve_path(
+    cli_value: Path | None,
+    env_name: str,
+    default: Path,
+) -> Path:
+    """
+    Resolve a path in the following order:
+    CLI argument -> environment variable -> repository-relative default.
+    """
+    value = cli_value or os.getenv(env_name)
+
+    if value is None:
+        return default.resolve()
+
+    return Path(value).expanduser().resolve()
 
 
-def main() -> None:
-    if not QC_REPORT.exists():
-        raise FileNotFoundError(f"qc_report.csv 없음: {QC_REPORT}")
+def main(
+    output_root: Path,
+    results_dir: Path,
+) -> None:
+    qc_report = output_root / "qc_report.csv"
+    class_statistics = output_root / "class_statistics.csv"
+    output_file = results_dir / "final_check.txt"
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if not qc_report.is_file():
+        raise FileNotFoundError(
+            f"qc_report.csv was not found: {qc_report}"
+        )
 
-    with QC_REPORT.open(
+    with qc_report.open(
         "r",
         encoding="utf-8-sig",
         newline="",
@@ -37,71 +58,142 @@ def main() -> None:
         rows = list(reader)
         columns = reader.fieldnames or []
 
-    check_columns = [
-        "image_readable",
-        "mask_readable",
-        "size_match",
-        "valid_ids",
-        "pair_exists",
-    ]
+    required_columns = {
+        "sample_id",
+        "status",
+        "details",
+    }
 
-    available_checks = [
-        column
-        for column in check_columns
-        if column in columns
-    ]
+    missing_columns = sorted(
+        required_columns - set(columns)
+    )
 
-    failure_counts = {}
+    status_counts = Counter(
+        (row.get("status") or "").strip().lower()
+        for row in rows
+    )
 
-    for column in available_checks:
-        failure_counts[column] = sum(
-            1
-            for row in rows
-            if not is_true(row.get(column, ""))
-        )
+    failure_count = sum(
+        count
+        for status, count in status_counts.items()
+        if status != "ok"
+    )
 
-    total_failures = sum(failure_counts.values())
-    final_status = "PASS" if total_failures == 0 else "CHECK REQUIRED"
+    checks = {
+        "qc_rows_present": bool(rows),
+        "required_qc_columns_present": not missing_columns,
+        "qc_failures_zero": failure_count == 0,
+        "class_statistics_exists": class_statistics.is_file(),
+    }
+
+    final_status = (
+        "PASS"
+        if all(checks.values())
+        else "FAIL"
+    )
+
+    results_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     lines = [
         "[RELLIS-3D FINAL CHECK]",
         "",
-        f"QC report: {QC_REPORT}",
+        f"QC report: {qc_report.relative_to(output_root).as_posix()}",
         f"QC rows: {len(rows)}",
         f"QC columns: {columns}",
         "",
-        "[QC RESULTS]",
+        "[QC STATUS COUNTS]",
     ]
 
-    if available_checks:
-        for column in available_checks:
+    if status_counts:
+        for status, count in sorted(status_counts.items()):
+            display_status = status or "<empty>"
             lines.append(
-                f"{column} failures: {failure_counts[column]}"
+                f"{display_status}: {count}"
             )
     else:
-        lines.append(
-            "Known QC columns were not found. "
-            "Check qc_report.csv column names manually."
-        )
+        lines.append("No QC rows were found.")
 
     lines.extend(
         [
             "",
-            f"class statistics exists: {CLASS_STATISTICS.exists()}",
-            f"class statistics path: {CLASS_STATISTICS}",
+            "[VALIDATION]",
+            f"qc_rows_present: {checks['qc_rows_present']}",
+            (
+                "required_qc_columns_present: "
+                f"{checks['required_qc_columns_present']}"
+            ),
+            f"missing_qc_columns: {missing_columns}",
+            f"qc_failure_count: {failure_count}",
+            (
+                "class_statistics_exists: "
+                f"{checks['class_statistics_exists']}"
+            ),
+            (
+                "class_statistics_path: "
+                f"{class_statistics.relative_to(output_root).as_posix()}"
+            ),
             "",
             f"FINAL STATUS: {final_status}",
         ]
     )
 
-    OUTPUT_FILE.write_text(
+    output_file.write_text(
         "\n".join(lines) + "\n",
         encoding="utf-8",
     )
 
-    print(OUTPUT_FILE.read_text(encoding="utf-8"))
-    print(f"[SAVE] {OUTPUT_FILE}")
+    print(output_file.read_text(encoding="utf-8"))
+    print(f"[SAVE] {output_file}")
+
+    if final_status != "PASS":
+        raise RuntimeError(
+            "RELLIS-3D final check failed. "
+            f"See: {output_file}"
+        )
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=None,
+        help=(
+            "Directory containing qc_report.csv and "
+            "class_statistics.csv. "
+            "Environment variable: RELLIS_OUTPUT_ROOT"
+        ),
+    )
+
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Directory for final_check.txt. "
+            "Environment variable: RELLIS_RESULTS_DIR"
+        ),
+    )
+
+    args = parser.parse_args()
+
+    resolved_output_root = resolve_path(
+        args.output_root,
+        "RELLIS_OUTPUT_ROOT",
+        DEFAULT_OUTPUT_ROOT,
+    )
+
+    resolved_results_dir = resolve_path(
+        args.results_dir,
+        "RELLIS_RESULTS_DIR",
+        DEFAULT_RESULTS_DIR,
+    )
+
+    main(
+        output_root=resolved_output_root,
+        results_dir=resolved_results_dir,
+    )

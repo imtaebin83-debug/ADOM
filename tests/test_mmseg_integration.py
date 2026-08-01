@@ -96,6 +96,10 @@ class MMSegIntegrationTests(unittest.TestCase):
             self.assertTrue(
                 all(not parameter.requires_grad for parameter in runner.model.backbone.parameters())
             )
+            runner.model.train()
+            self.assertTrue(runner.model.backbone.training)
+            freeze.before_train_iter(runner, 0)
+            self.assertFalse(runner.model.backbone.training)
             freeze.after_train(runner)
 
             audit = BackboneAuditHook()

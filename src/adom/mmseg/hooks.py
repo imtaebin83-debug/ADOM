@@ -105,6 +105,17 @@ class FreezeBackboneHook(Hook):
     def before_train_epoch(self, runner: Any) -> None:
         _unwrap_model(runner.model).backbone.eval()
 
+    def before_train_iter(
+        self,
+        runner: Any,
+        batch_idx: int,
+        data_batch: Any = None,
+    ) -> None:
+        # IterBasedTrainLoop calls runner.model.train() before every iteration.
+        # Re-apply eval mode here so stochastic depth/dropout in the frozen MiT
+        # encoder cannot be re-enabled by the outer model.
+        _unwrap_model(runner.model).backbone.eval()
+
     def after_train(self, runner: Any) -> None:
         final_hash = backbone_sha256(runner.model)
         passed = final_hash == self.initial_hash

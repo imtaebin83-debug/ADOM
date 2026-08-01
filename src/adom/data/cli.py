@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .models import DatasetError
-from .packaging import create_deterministic_tar
+from .packaging import approve_dataset, create_deterministic_tar
 from .pipeline import inspect_dataset, prepare_dataset
 from .validation import validate_package
 
@@ -49,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     package_parser = subparsers.add_parser("package")
     package_parser.add_argument("--dataset-root", required=True, type=_path)
     package_parser.add_argument("--archive", required=True, type=_path)
+    approve_parser = subparsers.add_parser("approve")
+    approve_parser.add_argument("--dataset-root", required=True, type=_path)
+    approve_parser.add_argument("--approver", required=True)
+    approve_parser.add_argument("--notes", default="")
+    approve_parser.add_argument("--replace", action="store_true")
     return parser
 
 
@@ -92,6 +97,14 @@ def main(argv: list[str] | None = None) -> None:
                 args.archive,
             )
             _emit({"archive": str(archive), "checksum": str(checksum)})
+        elif args.command == "approve":
+            approval = approve_dataset(
+                args.dataset_root,
+                approver=args.approver,
+                notes=args.notes,
+                replace=args.replace,
+            )
+            _emit({"approval": str(approval), "status": "APPROVED"})
         else:
             raise DatasetError(f"Unknown command: {args.command}")
     except (DatasetError, FileNotFoundError, NotADirectoryError) as error:

@@ -67,10 +67,20 @@ python -m adom.data validate \
 `reports/previews/`의 class별 대표 sample을 사람이 검토한다. 승인 후:
 
 ```bash
+python -m adom.data approve \
+  --dataset-root /workspace/adom/outputs/preprocessing/rellis3d \
+  --approver "<reviewer-name>" \
+  --notes "class statistics and generated previews reviewed"
+
 python -m adom.data package \
   --dataset-root /workspace/adom/outputs/preprocessing/rellis3d \
   --archive /workspace/adom/network-volume/rellis3d-cost4-v2.tar
 ```
+
+`approve`는 승인자, UTC 시각, 검토한 preview 목록, mapping/split checksum을
+`reports/approval.json`에 기록하고 package checksum을 갱신한다. 이 승인이
+없거나 승인 이후 mapping/split/preview가 바뀌면 `package`와 학습 cycle은
+실패한다.
 
 tar와 `.sha256`을 Network Volume에 함께 보존한다. manifest는 상대경로만
 포함하고 모든 파일은 `SHA256SUMS.txt`에 연결된다.
@@ -80,3 +90,14 @@ tar와 `.sha256`을 Network Volume에 함께 보존한다. manifest는 상대경
 공식 train/val/test의 sample ID는 겹치지 않지만 동일 sequence가 여러 split에
 등장한다. 가까운 frame의 시간적 상관 때문에 일반화 성능이 낙관적으로 보일 수
 있다. 공식 split을 유지하되 모든 dataset/model report에 이 한계를 적는다.
+
+## Phase 2 확장 경계
+
+이 package는 `0..3` 네 개의 학습 class와 loss에서 제외되는 `255` ignore를
+가진 **Cost4 + ignore** 단일-head 계약이다. `255`는 다섯 번째 logit class가
+아니다.
+
+현재 manifest의 `source_mask_relpath`는 provenance이며 원본 object mask를
+package 내부에 복사하지 않는다. 향후 19-class object head와 Cost4 head를 함께
+학습하려면 원본 object mask를 보존하고 두 label 경로를 명시하는 별도의
+multi-task package/manifest version을 정의해야 한다.

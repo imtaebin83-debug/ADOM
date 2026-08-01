@@ -263,7 +263,8 @@ def prepare_dataset(
                 "image_count",
             ],
         )
-        write_json(staging / "config" / "label_mapping.yaml", schema.snapshot())
+        packaged_mapping = staging / "config" / "label_mapping.yaml"
+        write_json(packaged_mapping, schema.snapshot())
         dataset_metadata = {
             "dataset": dataset,
             "version": version,
@@ -277,6 +278,7 @@ def prepare_dataset(
                 "may make generalization metrics optimistic."
             ],
             "mapping_sha256": sha256_file(mapping_path),
+            "packaged_mapping_sha256": sha256_file(packaged_mapping),
             "source_mapping_file": mapping_path.name,
             "official_split_sha256": {
                 split: sha256_file(split_root / f"{split}.txt")

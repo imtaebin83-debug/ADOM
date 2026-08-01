@@ -10,11 +10,15 @@ from PIL import Image
 
 from adom.data.io import sha256_file
 from adom.data.models import DatasetError, ValidationReport
-from adom.data.packaging import create_deterministic_tar, verify_archive_checksum
+from adom.data.packaging import (
+    approve_dataset,
+    create_deterministic_tar,
+    verify_archive_checksum,
+)
 from adom.data.pipeline import inspect_dataset, prepare_dataset
 from adom.data.schema import LabelSchema
 from adom.data.splits import load_splits
-from adom.data.validation import validate_package
+from adom.data.validation import validate_manual_approval, validate_package
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -94,19 +98,31 @@ class DataPipelineTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
             self.assertNotIn(str(root), manifest)
             self.assertNotIn("\\", manifest)
+            with self.assertRaises(DatasetError):
+                create_deterministic_tar(
+                    first,
+                    root / "unapproved.tar",
+                )
+            approve_dataset(first, approver="test-reviewer")
             archive, checksum = create_deterministic_tar(
                 first,
                 root / "rellis3d-cost4-v2-a.tar",
             )
             verify_archive_checksum(archive, checksum)
             second_archive, _ = create_deterministic_tar(
-                second,
+                first,
                 root / "rellis3d-cost4-v2-b.tar",
             )
             self.assertEqual(
                 sha256_file(archive),
                 sha256_file(second_archive),
             )
+            reviewed_preview = next(
+                path
+                for path in (first / "reports" / "previews").glob("*.jpg")
+            )
+            reviewed_preview.write_bytes(b"changed after approval")
+            self.assertTrue(validate_manual_approval(first))
 
     def test_unknown_source_id_fails_inspection(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -245,6 +261,47 @@ class DataPipelineTests(unittest.TestCase):
             )
             report = validate_package(output, verify_checksums=False)
             self.assertIn("qc_schema", {issue.code for issue in report.errors})
+
+    def test_validation_rejects_stale_embedded_qc_and_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = SyntheticRellis(root / "raw")
+            ids = [fixture.add_pair(f"frame{index:06d}") for index in range(3)]
+            fixture.write_splits([ids[0]], [ids[1]], [ids[2]])
+            output = root / "prepared"
+            prepare_dataset(
+                "rellis3d",
+                fixture.root,
+                output,
+                MAPPING,
+                fixture.splits,
+                "v2.0-test",
+            )
+
+            validation_path = output / "reports" / "validation.json"
+            validation = json.loads(validation_path.read_text(encoding="utf-8"))
+            validation["status"] = "FAIL"
+            validation["error_count"] = 1
+            validation_path.write_text(json.dumps(validation), encoding="utf-8")
+
+            metadata_path = output / "metadata" / "dataset.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["split_counts"]["train"] = 99
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+            statistics_path = output / "reports" / "class_statistics.csv"
+            statistics = statistics_path.read_text(encoding="utf-8")
+            statistics_path.write_text(
+                statistics.replace("train,0,paved_low_cost,2,", "train,0,paved_low_cost,999,"),
+                encoding="utf-8",
+            )
+
+            report = validate_package(output, verify_checksums=False)
+            codes = {issue.code for issue in report.errors}
+            self.assertIn("embedded_validation_failed", codes)
+            self.assertIn("embedded_validation_errors", codes)
+            self.assertIn("metadata_split_count_mismatch", codes)
+            self.assertIn("class_statistics_pixel_mismatch", codes)
 
     def test_validation_rejects_multichannel_target_and_unlisted_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

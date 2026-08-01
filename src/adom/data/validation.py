@@ -8,7 +8,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
-from .io import is_portable_relative, sha256_file, verify_checksum_manifest
+from .io import (
+    ensure_no_symlink_escape,
+    is_portable_relative,
+    sha256_file,
+    verify_checksum_manifest,
+)
 from .models import ValidationReport
 from .schema import ALLOWED_TARGET_IDS, COST4_CLASSES, LabelSchema
 
@@ -69,6 +74,11 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
             schema = LabelSchema.from_path(mapping_path)
             if schema.target_classes != COST4_CLASSES:
                 report.error("label_mapping_contract", str(mapping_path))
+            packaged_mapping_sha256 = metadata.get("packaged_mapping_sha256")
+            if not packaged_mapping_sha256:
+                report.error("missing_packaged_mapping_checksum", str(mapping_path))
+            elif sha256_file(mapping_path) != packaged_mapping_sha256:
+                report.error("packaged_mapping_checksum_mismatch", str(mapping_path))
         except Exception as error:
             report.error("invalid_label_mapping", str(error))
 
@@ -87,9 +97,20 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
                 )
             if not validation_value.get("statistics"):
                 report.error("empty_validation_statistics", str(validation_path))
+            if validation_value.get("status") != "PASS":
+                report.error(
+                    "embedded_validation_failed",
+                    f"status={validation_value.get('status')!r}",
+                )
+            if validation_value.get("error_count") != 0:
+                report.error(
+                    "embedded_validation_errors",
+                    f"error_count={validation_value.get('error_count')!r}",
+                )
         except (json.JSONDecodeError, OSError) as error:
             report.error("invalid_validation_report", str(error))
 
+    class_statistics_rows: list[dict[str, str]] = []
     for report_name, required_fields, require_rows in (
         ("class_statistics.csv", CLASS_STATISTICS_FIELDS, True),
         ("qc_errors.csv", QC_FIELDS, False),
@@ -110,6 +131,7 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
         if require_rows and not rows:
             report.error("empty_qc_file", str(report_path))
         if report_name == "class_statistics.csv" and rows:
+            class_statistics_rows = rows
             observed = {
                 (row.get("split"), row.get("class_id"))
                 for row in rows
@@ -126,10 +148,24 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
                     f"{sorted(observed, key=lambda item: (str(item[0]), str(item[1])))}, "
                     f"expected={sorted(expected)}",
                 )
+        if report_name == "qc_errors.csv":
+            embedded_errors = [
+                row for row in rows if row.get("severity", "").strip().lower() == "error"
+            ]
+            if embedded_errors:
+                report.error(
+                    "embedded_qc_errors",
+                    f"qc_errors.csv contains {len(embedded_errors)} error row(s)",
+                )
 
     seen: dict[str, str] = {}
     split_counts: dict[str, int] = {}
-    class_pixels: Counter[int] = Counter()
+    class_pixels_by_split: dict[str, Counter[int]] = {
+        split: Counter() for split in ("train", "val", "test")
+    }
+    image_counts_by_split: dict[str, Counter[int]] = {
+        split: Counter() for split in ("train", "val", "test")
+    }
     for split in ("train", "val", "test"):
         manifest_path = root / "metadata" / f"manifest_{split}.csv"
         split_path = root / "splits" / f"{split}.txt"
@@ -186,6 +222,12 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
             if previous is not None:
                 report.error("split_overlap", f"{previous} and {split}", sample_id)
             seen[sample_id] = split
+            if row.get("split") != split:
+                report.error(
+                    "manifest_split_field_mismatch",
+                    f"row split={row.get('split')!r}, expected={split!r}",
+                    sample_id,
+                )
             for field in (
                 "image_relpath",
                 "mask_relpath",
@@ -202,6 +244,12 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
                 continue
             if not mask_path.is_file():
                 report.error("missing_mask", str(mask_path), sample_id)
+                continue
+            try:
+                ensure_no_symlink_escape(root, image_path)
+                ensure_no_symlink_escape(root, mask_path)
+            except Exception as error:
+                report.error("symlink_escape", str(error), sample_id)
                 continue
             try:
                 with Image.open(image_path) as image:
@@ -247,10 +295,93 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
             if observed == {255}:
                 report.error("all_ignore_mask", str(mask_path), sample_id)
             for class_id, count in zip(ids, counts):
-                class_pixels[int(class_id)] += int(count)
+                class_id_int = int(class_id)
+                class_pixels_by_split[split][class_id_int] += int(count)
+                image_counts_by_split[split][class_id_int] += 1
 
     if not seen:
         report.error("no_samples", f"No samples found in {root}")
+    expected_split_counts = metadata.get("split_counts")
+    if not isinstance(expected_split_counts, dict):
+        report.error("dataset_metadata_schema", "split_counts must be a mapping")
+    else:
+        normalized_expected = {
+            split: expected_split_counts.get(split)
+            for split in ("train", "val", "test")
+        }
+        if normalized_expected != split_counts:
+            report.error(
+                "metadata_split_count_mismatch",
+                f"metadata={normalized_expected}, actual={split_counts}",
+            )
+
+    for row in class_statistics_rows:
+        split = row.get("split", "")
+        try:
+            class_id = int(row.get("class_id", ""))
+            expected_pixels = class_pixels_by_split[split][class_id]
+            expected_images = image_counts_by_split[split][class_id]
+            if int(row.get("pixel_count", "")) != expected_pixels:
+                report.error(
+                    "class_statistics_pixel_mismatch",
+                    f"{split}/{class_id}: expected={expected_pixels}, "
+                    f"reported={row.get('pixel_count')!r}",
+                )
+            if int(row.get("image_count", "")) != expected_images:
+                report.error(
+                    "class_statistics_image_mismatch",
+                    f"{split}/{class_id}: expected={expected_images}, "
+                    f"reported={row.get('image_count')!r}",
+                )
+            expected_name = "ignore" if class_id == 255 else COST4_CLASSES[class_id]
+            if row.get("class_name") != expected_name:
+                report.error(
+                    "class_statistics_name_mismatch",
+                    f"{split}/{class_id}: expected={expected_name!r}, "
+                    f"reported={row.get('class_name')!r}",
+                )
+            total_pixels = sum(class_pixels_by_split[split].values())
+            valid_pixels = total_pixels - class_pixels_by_split[split][255]
+            expected_ratio_all = (
+                expected_pixels / total_pixels if total_pixels else 0.0
+            )
+            if not np.isclose(
+                float(row.get("ratio_all_pixels", "")),
+                expected_ratio_all,
+                rtol=0.0,
+                atol=1e-12,
+            ):
+                report.error(
+                    "class_statistics_ratio_mismatch",
+                    f"{split}/{class_id}: ratio_all_pixels",
+                )
+            ratio_valid = row.get("ratio_valid_pixels", "")
+            if class_id == 255:
+                if ratio_valid != "":
+                    report.error(
+                        "class_statistics_ratio_mismatch",
+                        f"{split}/{class_id}: ignore ratio_valid_pixels must be empty",
+                    )
+            else:
+                expected_ratio_valid = (
+                    expected_pixels / valid_pixels if valid_pixels else 0.0
+                )
+                if not np.isclose(
+                    float(ratio_valid),
+                    expected_ratio_valid,
+                    rtol=0.0,
+                    atol=1e-12,
+                ):
+                    report.error(
+                        "class_statistics_ratio_mismatch",
+                        f"{split}/{class_id}: ratio_valid_pixels",
+                    )
+        except (KeyError, TypeError, ValueError):
+            report.error("invalid_class_statistics_row", str(row))
+
+    class_pixels: Counter[int] = Counter()
+    for counts in class_pixels_by_split.values():
+        class_pixels.update(counts)
     report.statistics.update(
         {
             "sample_count": len(seen),
@@ -265,3 +396,58 @@ def validate_package(root: Path, verify_checksums: bool = True) -> ValidationRep
         for error in verify_checksum_manifest(root):
             report.error("checksum", error)
     return report
+
+
+def validate_manual_approval(root: Path) -> list[str]:
+    approval_path = root / "reports" / "approval.json"
+    if not approval_path.is_file():
+        return ["reports/approval.json is missing"]
+    try:
+        approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as error:
+        return [f"approval record is invalid: {error}"]
+
+    errors: list[str] = []
+    if approval.get("status") != "APPROVED":
+        errors.append(f"approval status is {approval.get('status')!r}")
+    if not str(approval.get("approver", "")).strip():
+        errors.append("approval approver is empty")
+    if not approval.get("approved_at"):
+        errors.append("approval timestamp is missing")
+
+    mapping_path = root / "config" / "label_mapping.yaml"
+    if (
+        not mapping_path.is_file()
+        or approval.get("mapping_sha256") != sha256_file(mapping_path)
+    ):
+        errors.append("approval mapping checksum does not match")
+    approved_splits = approval.get("split_sha256")
+    if not isinstance(approved_splits, dict):
+        errors.append("approval split_sha256 is invalid")
+    else:
+        for split in ("train", "val", "test"):
+            split_path = root / "splits" / f"{split}.txt"
+            if (
+                not split_path.is_file()
+                or approved_splits.get(split) != sha256_file(split_path)
+            ):
+                errors.append(f"approval {split} split checksum does not match")
+
+    reviewed = approval.get("reviewed_previews")
+    if not isinstance(reviewed, list) or not reviewed:
+        errors.append("approval has no reviewed previews")
+    else:
+        for item in reviewed:
+            if not isinstance(item, dict):
+                errors.append(f"approved preview entry is invalid: {item!r}")
+                continue
+            relative = item.get("path")
+            if (
+                not isinstance(relative, str)
+                or not is_portable_relative(relative)
+                or not (root / relative).is_file()
+            ):
+                errors.append(f"approved preview is missing or unsafe: {relative!r}")
+            elif item.get("sha256") != sha256_file(root / relative):
+                errors.append(f"approved preview checksum does not match: {relative}")
+    return errors

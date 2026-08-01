@@ -21,7 +21,7 @@ def compare(
     model_config: Path,
     checkpoint: Path,
     onnx_path: Path,
-    image: Path,
+    images: list[Path],
     device: str,
 ) -> dict[str, Any]:
     import onnxruntime as ort
@@ -33,22 +33,6 @@ def compare(
     task_processor = build_task_processor(model_cfg, deploy_cfg, device)
     pytorch_model = task_processor.build_pytorch_model(str(checkpoint))
     pytorch_model.eval()
-    model_inputs, _ = task_processor.create_input(
-        str(image),
-        input_shape=deploy_cfg.onnx_config.input_shape,
-    )
-    processed = pytorch_model.data_preprocessor(model_inputs, training=False)
-    tensor = _as_input_tensor(processed["inputs"])
-    with torch.no_grad():
-        torch_logits = pytorch_model(
-            tensor,
-            data_samples=processed.get("data_samples"),
-            mode="tensor",
-        )
-    if isinstance(torch_logits, (tuple, list)):
-        torch_logits = torch_logits[0]
-    torch_array = torch_logits.detach().cpu().numpy()
-
     available_providers = set(ort.get_available_providers())
     providers = []
     if device.startswith("cuda") and "CUDAExecutionProvider" in available_providers:
@@ -56,48 +40,86 @@ def compare(
     providers.append("CPUExecutionProvider")
     session = ort.InferenceSession(str(onnx_path), providers=providers)
     input_name = session.get_inputs()[0].name
-    onnx_array = session.run(None, {input_name: tensor.detach().cpu().numpy()})[0]
-    if (
-        torch_array.ndim == 4
-        and onnx_array.ndim == 4
-        and torch_array.shape[:2] == onnx_array.shape[:2]
-        and torch_array.shape[2:] != onnx_array.shape[2:]
-    ):
-        # MMDeploy's segmentation rewrite may include the standard bilinear
-        # resize performed by EncoderDecoder.predict, while mode="tensor"
-        # returns decode-head resolution.
-        torch_array = (
-            torch.nn.functional.interpolate(
-                torch.from_numpy(torch_array),
-                size=onnx_array.shape[2:],
-                mode="bilinear",
-                align_corners=False,
+    samples: list[dict[str, Any]] = []
+    for image in images:
+        model_inputs, _ = task_processor.create_input(
+            str(image),
+            input_shape=deploy_cfg.onnx_config.input_shape,
+        )
+        processed = pytorch_model.data_preprocessor(model_inputs, training=False)
+        tensor = _as_input_tensor(processed["inputs"])
+        with torch.no_grad():
+            torch_logits = pytorch_model(
+                tensor,
+                data_samples=processed.get("data_samples"),
+                mode="tensor",
             )
-            .numpy()
-        )
-    if torch_array.shape != onnx_array.shape:
-        raise RuntimeError(
-            f"Output shape mismatch: torch={torch_array.shape}, onnx={onnx_array.shape}"
-        )
-    if not np.isfinite(torch_array).all() or not np.isfinite(onnx_array).all():
-        raise RuntimeError("Non-finite logits detected during ONNX parity")
+        if isinstance(torch_logits, (tuple, list)):
+            torch_logits = torch_logits[0]
+        torch_array = torch_logits.detach().cpu().numpy()
+        onnx_array = session.run(
+            None, {input_name: tensor.detach().cpu().numpy()}
+        )[0]
+        if (
+            torch_array.ndim == 4
+            and onnx_array.ndim == 4
+            and torch_array.shape[:2] == onnx_array.shape[:2]
+            and torch_array.shape[2:] != onnx_array.shape[2:]
+        ):
+            # MMDeploy's segmentation rewrite may include the standard
+            # bilinear resize performed by EncoderDecoder.predict, while
+            # mode="tensor" returns decode-head resolution.
+            torch_array = (
+                torch.nn.functional.interpolate(
+                    torch.from_numpy(torch_array),
+                    size=onnx_array.shape[2:],
+                    mode="bilinear",
+                    align_corners=False,
+                )
+                .numpy()
+            )
+        if torch_array.shape != onnx_array.shape:
+            raise RuntimeError(
+                f"Output shape mismatch for {image}: "
+                f"torch={torch_array.shape}, onnx={onnx_array.shape}"
+            )
+        if not np.isfinite(torch_array).all() or not np.isfinite(onnx_array).all():
+            raise RuntimeError(f"Non-finite logits detected for {image}")
 
-    max_absolute_error = float(np.max(np.abs(torch_array - onnx_array)))
-    torch_prediction = np.argmax(torch_array, axis=1)
-    onnx_prediction = np.argmax(onnx_array, axis=1)
-    agreement = float(np.mean(torch_prediction == onnx_prediction))
-    passed = max_absolute_error <= 1e-3 and agreement >= 0.999
+        max_absolute_error = float(np.max(np.abs(torch_array - onnx_array)))
+        torch_prediction = np.argmax(torch_array, axis=1)
+        onnx_prediction = np.argmax(onnx_array, axis=1)
+        agreement = float(np.mean(torch_prediction == onnx_prediction))
+        passed = max_absolute_error <= 1e-3 and agreement >= 0.999
+        samples.append(
+            {
+                "image": str(image),
+                "status": "PASS" if passed else "FAIL",
+                "torch_output_shape": list(torch_array.shape),
+                "onnx_output_shape": list(onnx_array.shape),
+                "finite_logits": True,
+                "max_absolute_error": max_absolute_error,
+                "pixel_argmax_agreement": agreement,
+            }
+        )
+    passed = bool(samples) and all(sample["status"] == "PASS" for sample in samples)
     return {
+        "format_version": 2,
         "status": "PASS" if passed else "FAIL",
-        "torch_output_shape": list(torch_array.shape),
-        "onnx_output_shape": list(onnx_array.shape),
-        "finite_logits": True,
-        "max_absolute_error": max_absolute_error,
-        "pixel_argmax_agreement": agreement,
+        "sample_count": len(samples),
+        "max_absolute_error": max(
+            (sample["max_absolute_error"] for sample in samples),
+            default=float("inf"),
+        ),
+        "min_pixel_argmax_agreement": min(
+            (sample["pixel_argmax_agreement"] for sample in samples),
+            default=0.0,
+        ),
         "thresholds": {
             "max_absolute_error": 1e-3,
             "pixel_argmax_agreement": 0.999,
         },
+        "samples": samples,
     }
 
 
@@ -107,7 +129,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--model-config", required=True, type=Path)
     parser.add_argument("--checkpoint", required=True, type=Path)
     parser.add_argument("--onnx", required=True, type=Path)
-    parser.add_argument("--image", required=True, type=Path)
+    parser.add_argument("--image", required=True, type=Path, action="append")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)

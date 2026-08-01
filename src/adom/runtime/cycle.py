@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import importlib
 import json
 import math
@@ -12,9 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from PIL import Image
+
 from adom.data.io import sha256_file, write_json
 from adom.data.schema import LabelSchema
-from adom.data.validation import validate_package
+from adom.data.validation import validate_manual_approval, validate_package
 from adom.runtime.checkpoints import resolve_single_best_checkpoint
 
 
@@ -34,7 +38,7 @@ class CycleState:
             self.value = json.loads(path.read_text(encoding="utf-8"))
         else:
             self.value = {
-                "format_version": 1,
+                "format_version": 2,
                 "status": "running",
                 "started_at": _now(),
                 "phases": {},
@@ -46,9 +50,19 @@ class CycleState:
 
     def completed(self, name: str, artifacts: list[Path]) -> bool:
         phase = self.value["phases"].get(name, {})
-        return phase.get("status") == "completed" and all(
-            path.exists() for path in artifacts
-        )
+        expected_hashes = phase.get("artifact_sha256")
+        if phase.get("status") != "completed" or not isinstance(
+            expected_hashes, dict
+        ):
+            return False
+        for path in artifacts:
+            resolved = str(path.resolve())
+            if (
+                not path.is_file()
+                or expected_hashes.get(resolved) != sha256_file(path)
+            ):
+                return False
+        return True
 
     def start(self, name: str, command: list[str]) -> None:
         self.value["phases"][name] = {
@@ -63,6 +77,9 @@ class CycleState:
         phase["status"] = "completed"
         phase["finished_at"] = _now()
         phase["artifacts"] = [str(path.resolve()) for path in artifacts]
+        phase["artifact_sha256"] = {
+            str(path.resolve()): sha256_file(path) for path in artifacts
+        }
         self.save()
 
     def fail(self, name: str, error: BaseException) -> None:
@@ -71,6 +88,25 @@ class CycleState:
         phase["finished_at"] = _now()
         phase["error"] = f"{type(error).__name__}: {error}"
         self.value["status"] = "failed"
+        self.save()
+
+    def bind_run_context(self, context: dict[str, Any], resume: bool) -> None:
+        existing = self.value.get("run_context")
+        if resume and existing is None and self.value.get("phases"):
+            raise RuntimeError(
+                "Existing run has no reproducibility fingerprint; start a new "
+                "output directory instead of resuming it"
+            )
+        if existing is not None and existing != context:
+            keys = sorted(set(existing) | set(context))
+            changed = [
+                key for key in keys if existing.get(key) != context.get(key)
+            ]
+            raise RuntimeError(
+                "Run context changed; refusing unsafe resume. "
+                f"Different fields: {changed}"
+            )
+        self.value["run_context"] = context
         self.save()
 
 
@@ -84,6 +120,46 @@ def _tool_path(package: str, relative: str) -> Path:
     if not path.is_file():
         raise RuntimeError(f"{package} tool not found: {path}")
     return path
+
+
+def _git_sha() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def _source_tree_sha256() -> str:
+    digest = hashlib.sha256()
+    roots = [
+        REPO_ROOT / "src" / "adom",
+        REPO_ROOT / "configs" / "adom",
+        REPO_ROOT / "configs" / "deployment",
+    ]
+    files = [
+        path
+        for root in roots
+        for path in root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    ]
+    files.extend(
+        [
+            REPO_ROOT / "scripts" / "run_training_cycle.sh",
+            REPO_ROOT / "requirements" / "openmmlab.txt",
+        ]
+    )
+    for path in sorted(files):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _run_phase(
@@ -123,9 +199,67 @@ def _first_test_image(dataset_root: Path) -> Path:
     return path
 
 
+def _select_parity_images(dataset_root: Path, limit: int) -> list[Path]:
+    if limit < 1:
+        raise RuntimeError("--parity-samples must be at least 1")
+    manifest = dataset_root / "metadata" / "manifest_test.csv"
+    with manifest.open("r", encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    if not rows:
+        raise RuntimeError(f"No test samples in {manifest}")
+
+    ranked_by_class: dict[int, list[tuple[int, str, Path]]] = {
+        class_id: [] for class_id in (0, 1, 2, 3, 255)
+    }
+    first_by_sequence: dict[str, tuple[str, Path]] = {}
+    ordered: list[tuple[str, Path]] = []
+    for row in rows:
+        sample_id = row["sample_id"]
+        image_path = dataset_root / row["image_relpath"]
+        mask_path = dataset_root / row["mask_relpath"]
+        if not image_path.is_file() or not mask_path.is_file():
+            raise RuntimeError(f"Parity sample pair is missing for {sample_id}")
+        with Image.open(mask_path) as mask_image:
+            mask = np.asarray(mask_image)
+        ids, counts = np.unique(mask, return_counts=True)
+        count_by_id = {
+            int(class_id): int(count) for class_id, count in zip(ids, counts)
+        }
+        for class_id in ranked_by_class:
+            ranked_by_class[class_id].append(
+                (count_by_id.get(class_id, 0), sample_id, image_path)
+            )
+        sequence = row.get("sequence", "")
+        first_by_sequence.setdefault(sequence, (sample_id, image_path))
+        ordered.append((sample_id, image_path))
+
+    selected: dict[str, Path] = {}
+    for class_id in (0, 1, 2, 3, 255):
+        ranked = sorted(
+            ranked_by_class[class_id],
+            key=lambda item: (-item[0], item[1]),
+        )
+        if ranked and ranked[0][0] > 0:
+            selected.setdefault(ranked[0][1], ranked[0][2])
+            if len(selected) >= limit:
+                return list(selected.values())
+    for sample_id, path in first_by_sequence.values():
+        selected.setdefault(sample_id, path)
+        if len(selected) >= limit:
+            return list(selected.values())
+    if limit > 1:
+        for index in np.linspace(0, len(ordered) - 1, num=limit, dtype=int):
+            sample_id, path = ordered[int(index)]
+            selected.setdefault(sample_id, path)
+            if len(selected) >= limit:
+                break
+    return list(selected.values())
+
+
 def _probe_batch(
     *,
     model: str,
+    stage: str,
     config: Path,
     output_root: Path,
     env: dict[str, str],
@@ -135,11 +269,22 @@ def _probe_batch(
     plan_path = output_root / model / "batch_plan.json"
     if resume and plan_path.is_file():
         value = json.loads(plan_path.read_text(encoding="utf-8"))
-        return int(value["micro_batch"]), int(value["accumulative_counts"])
+        stage_plan = value.get("stages", {}).get(stage)
+        if stage_plan:
+            return (
+                int(stage_plan["micro_batch"]),
+                int(stage_plan["accumulative_counts"]),
+            )
 
     candidates = [16, 8, 4, 2, 1] if model == "b0" else [8, 4, 2, 1]
     for micro_batch in candidates:
-        probe_dir = output_root / model / "probes" / f"micro_batch_{micro_batch}"
+        probe_dir = (
+            output_root
+            / model
+            / "probes"
+            / stage
+            / f"micro_batch_{micro_batch}"
+        )
         probe_dir.mkdir(parents=True, exist_ok=True)
         log_path = probe_dir / "probe.log"
         probe_env = dict(env)
@@ -153,10 +298,12 @@ def _probe_batch(
             str(probe_dir),
             "--cfg-options",
             "train_cfg.max_iters=2",
-            "train_cfg.val_interval=3",
+            "val_cfg=None",
+            "val_dataloader=None",
+            "val_evaluator=None",
             "default_hooks.checkpoint.interval=3",
         ]
-        print(f"[probe] {model}: trying micro-batch {micro_batch}")
+        print(f"[probe] {model} {stage}: trying micro-batch {micro_batch}")
         with log_path.open("w", encoding="utf-8") as log:
             result = subprocess.run(
                 command,
@@ -167,15 +314,29 @@ def _probe_batch(
             )
         if result.returncode == 0:
             accumulative = math.ceil(EFFECTIVE_BATCH / micro_batch)
+            plan: dict[str, Any] = {
+                "format_version": 2,
+                "model": model,
+                "stages": {},
+            }
+            if plan_path.is_file():
+                existing = json.loads(plan_path.read_text(encoding="utf-8"))
+                if (
+                    existing.get("format_version") == 2
+                    and existing.get("model") == model
+                    and isinstance(existing.get("stages"), dict)
+                ):
+                    plan = existing
+            plan["stages"][stage] = {
+                "config": config.relative_to(REPO_ROOT).as_posix(),
+                "micro_batch": micro_batch,
+                "accumulative_counts": accumulative,
+                "effective_batch": micro_batch * accumulative,
+                "probe_log": str(log_path.resolve()),
+            }
             write_json(
                 plan_path,
-                {
-                    "model": model,
-                    "micro_batch": micro_batch,
-                    "accumulative_counts": accumulative,
-                    "effective_batch": micro_batch * accumulative,
-                    "probe_log": str(log_path.resolve()),
-                },
+                plan,
             )
             return micro_batch, accumulative
         log_text = log_path.read_text(encoding="utf-8", errors="replace").lower()
@@ -183,7 +344,7 @@ def _probe_batch(
             raise RuntimeError(
                 f"{model} batch probe failed for a non-OOM reason; see {log_path}"
             )
-    raise RuntimeError(f"No viable micro-batch found for {model}")
+    raise RuntimeError(f"No viable micro-batch found for {model} {stage}")
 
 
 def _write_summary(output_root: Path, state: CycleState) -> None:
@@ -229,12 +390,15 @@ def _write_artifact_manifest(output_root: Path) -> None:
         "status.json",
         "summary.json",
         "summary.csv",
+        "parity_inputs.json",
         "**/batch_plan.json",
         "**/backbone_*_check.json",
         "**/test_metrics.json",
         "**/best_mIoU_iter_*.pth",
         "**/end2end.onnx",
         "**/deploy.json",
+        "**/detail.json",
+        "**/pipeline.json",
         "**/parity.json",
         "**/metadata.json",
     ):
@@ -297,11 +461,19 @@ def run_cycle(args: argparse.Namespace) -> None:
         command=doctor_command,
         artifacts=[doctor_path],
         env=env,
-        resume=args.resume,
+        # Runtime and dataset health are intentionally rechecked on every
+        # invocation, including resume.
+        resume=False,
     )
 
     report = validate_package(dataset_root, verify_checksums=True)
     report.require_success()
+    approval_errors = validate_manual_approval(dataset_root)
+    if approval_errors:
+        raise RuntimeError(
+            "Dataset has no valid manual preview approval: "
+            + "; ".join(approval_errors)
+        )
     for split in ("train", "val", "test"):
         package_split = dataset_root / "splits" / f"{split}.txt"
         committed_split = (
@@ -325,32 +497,81 @@ def run_cycle(args: argparse.Namespace) -> None:
     state.value["dataset_checksum_manifest_sha256"] = sha256_file(
         dataset_root / "SHA256SUMS.txt"
     )
+    doctor = json.loads(doctor_path.read_text(encoding="utf-8"))
+    gpu = doctor.get("gpu", {})
+    state.bind_run_context(
+        {
+            "git_sha": _git_sha(),
+            "source_tree_sha256": _source_tree_sha256(),
+            "dataset_checksum_manifest_sha256": sha256_file(
+                dataset_root / "SHA256SUMS.txt"
+            ),
+            "mapping_sha256": sha256_file(committed_mapping),
+            "models": models,
+            "device": args.device,
+            "parity_samples": args.parity_samples,
+            "gpu": {
+                "name": gpu.get("name"),
+                "memory_bytes": gpu.get("memory_bytes"),
+                "torch": gpu.get("torch"),
+            },
+            "versions": doctor.get("versions", {}),
+        },
+        resume=args.resume,
+    )
     state.save()
 
     train_tool = _tool_path("mmseg", ".mim/tools/train.py")
     test_tool = _tool_path("mmseg", ".mim/tools/test.py")
     deploy_tool = _tool_path("mmdeploy", ".mim/tools/deploy.py")
     image = _first_test_image(dataset_root)
+    parity_images = _select_parity_images(dataset_root, args.parity_samples)
+    write_json(
+        output_root / "parity_inputs.json",
+        {
+            "selection": "highest pixel count per Cost4/ignore class, then "
+            "sequence coverage and deterministic test-set spacing",
+            "images": [
+                path.relative_to(dataset_root).as_posix()
+                for path in parity_images
+            ],
+        },
+    )
     mapping = dataset_root / "config" / "label_mapping.yaml"
 
     for model in models:
         stage1_config = CONFIG_ROOT / "adom" / f"segformer_{model}_stage1_rellis3d.py"
         stage2_config = CONFIG_ROOT / "adom" / f"segformer_{model}_stage2_rellis3d.py"
         if args.skip_batch_probe:
-            micro_batch = 4 if model == "b0" else 2
-            accumulative = math.ceil(EFFECTIVE_BATCH / micro_batch)
+            stage1_micro_batch = 4 if model == "b0" else 2
+            stage2_micro_batch = 2 if model == "b0" else 1
+            stage1_accumulative = math.ceil(EFFECTIVE_BATCH / stage1_micro_batch)
+            stage2_accumulative = math.ceil(EFFECTIVE_BATCH / stage2_micro_batch)
         else:
-            micro_batch, accumulative = _probe_batch(
+            stage1_micro_batch, stage1_accumulative = _probe_batch(
                 model=model,
+                stage="stage1",
                 config=stage1_config,
                 output_root=output_root,
                 env=env,
                 train_tool=train_tool,
                 resume=args.resume,
             )
-        model_env = dict(env)
-        model_env["ADOM_MICRO_BATCH"] = str(micro_batch)
-        model_env["ADOM_ACCUMULATIVE_COUNTS"] = str(accumulative)
+            stage2_micro_batch, stage2_accumulative = _probe_batch(
+                model=model,
+                stage="stage2",
+                config=stage2_config,
+                output_root=output_root,
+                env=env,
+                train_tool=train_tool,
+                resume=args.resume,
+            )
+        stage1_env = dict(env)
+        stage1_env["ADOM_MICRO_BATCH"] = str(stage1_micro_batch)
+        stage1_env["ADOM_ACCUMULATIVE_COUNTS"] = str(stage1_accumulative)
+        stage2_env = dict(env)
+        stage2_env["ADOM_MICRO_BATCH"] = str(stage2_micro_batch)
+        stage2_env["ADOM_ACCUMULATIVE_COUNTS"] = str(stage2_accumulative)
 
         stage1_dir = output_root / model / "stage1"
         stage1_audit = stage1_dir / "backbone_freeze_check.json"
@@ -366,7 +587,7 @@ def run_cycle(args: argparse.Namespace) -> None:
             name=f"{model}_stage1",
             command=stage1_command,
             artifacts=[stage1_audit],
-            env=model_env,
+            env=stage1_env,
             resume=args.resume,
         )
         stage1_best = resolve_single_best_checkpoint(stage1_dir)
@@ -389,7 +610,7 @@ def run_cycle(args: argparse.Namespace) -> None:
             name=f"{model}_stage2",
             command=stage2_command,
             artifacts=[stage2_audit],
-            env=model_env,
+            env=stage2_env,
             resume=args.resume,
         )
         stage2_best = resolve_single_best_checkpoint(stage2_dir)
@@ -411,7 +632,7 @@ def run_cycle(args: argparse.Namespace) -> None:
             name=f"{model}_test",
             command=test_command,
             artifacts=[test_metrics],
-            env=model_env,
+            env=stage2_env,
             resume=args.resume,
         )
 
@@ -428,6 +649,8 @@ def run_cycle(args: argparse.Namespace) -> None:
             export_dir = output_root / model / "onnx" / profile
             onnx_path = export_dir / "end2end.onnx"
             deploy_info = export_dir / "deploy.json"
+            detail_info = export_dir / "detail.json"
+            pipeline_info = export_dir / "pipeline.json"
             parity_path = export_dir / "parity.json"
             metadata_path = export_dir / "metadata.json"
             export_command = [
@@ -447,8 +670,8 @@ def run_cycle(args: argparse.Namespace) -> None:
                 state,
                 name=f"{model}_onnx_{profile}",
                 command=export_command,
-                artifacts=[onnx_path, deploy_info],
-                env=model_env,
+                artifacts=[onnx_path, deploy_info, detail_info, pipeline_info],
+                env=stage2_env,
                 resume=args.resume,
             )
             parity_command = [
@@ -463,19 +686,19 @@ def run_cycle(args: argparse.Namespace) -> None:
                 str(stage2_best),
                 "--onnx",
                 str(onnx_path),
-                "--image",
-                str(image),
                 "--device",
                 args.device,
                 "--output",
                 str(parity_path),
             ]
+            for parity_image in parity_images:
+                parity_command.extend(["--image", str(parity_image)])
             _run_phase(
                 state,
                 name=f"{model}_parity_{profile}",
                 command=parity_command,
                 artifacts=[parity_path],
-                env=model_env,
+                env=stage2_env,
                 resume=args.resume,
             )
             metadata_command = [
@@ -494,8 +717,16 @@ def run_cycle(args: argparse.Namespace) -> None:
                 str(onnx_path),
                 "--deploy-info",
                 str(deploy_info),
+                "--detail-info",
+                str(detail_info),
+                "--pipeline-info",
+                str(pipeline_info),
+                "--test-metrics",
+                str(test_metrics),
                 "--mapping",
                 str(mapping),
+                "--model-variant",
+                model,
                 "--profile",
                 profile,
                 "--width",
@@ -510,7 +741,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 name=f"{model}_metadata_{profile}",
                 command=metadata_command,
                 artifacts=[metadata_path],
-                env=model_env,
+                env=stage2_env,
                 resume=args.resume,
             )
 
@@ -531,6 +762,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-batch-probe", action="store_true")
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--parity-samples", type=int, default=16)
     args = parser.parse_args(argv)
     try:
         run_cycle(args)

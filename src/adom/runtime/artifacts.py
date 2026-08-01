@@ -29,7 +29,11 @@ def write_export_metadata(
     checkpoint: Path,
     onnx_path: Path,
     deploy_info: Path,
+    detail_info: Path,
+    pipeline_info: Path,
+    test_metrics: Path,
     mapping_path: Path,
+    model_variant: str,
     profile: str,
     width: int,
     height: int,
@@ -42,6 +46,7 @@ def write_export_metadata(
     metadata = {
         "format_version": 1,
         "model": "SegFormer",
+        "model_variant": model_variant,
         "profile": profile,
         "input": {
             "shape_nchw": [1, 3, height, width],
@@ -89,6 +94,18 @@ def write_export_metadata(
                 "path": deploy_info.name,
                 "sha256": sha256_file(deploy_info),
             },
+            "detail_info": {
+                "path": detail_info.name,
+                "sha256": sha256_file(detail_info),
+            },
+            "pipeline_info": {
+                "path": pipeline_info.name,
+                "sha256": sha256_file(pipeline_info),
+            },
+            "test_metrics": {
+                "path": test_metrics.name,
+                "sha256": sha256_file(test_metrics),
+            },
             "label_mapping": {
                 "path": "config/label_mapping.yaml",
                 "sha256": sha256_file(mapping_path),
@@ -113,7 +130,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--checkpoint", required=True, type=Path)
     parser.add_argument("--onnx", required=True, type=Path)
     parser.add_argument("--deploy-info", required=True, type=Path)
+    parser.add_argument("--detail-info", required=True, type=Path)
+    parser.add_argument("--pipeline-info", required=True, type=Path)
+    parser.add_argument("--test-metrics", required=True, type=Path)
     parser.add_argument("--mapping", required=True, type=Path)
+    parser.add_argument("--model-variant", required=True, choices=["b0", "b2"])
     parser.add_argument("--profile", required=True)
     parser.add_argument("--width", required=True, type=int)
     parser.add_argument("--height", required=True, type=int)
@@ -126,7 +147,11 @@ def main(argv: list[str] | None = None) -> None:
         checkpoint=args.checkpoint,
         onnx_path=args.onnx,
         deploy_info=args.deploy_info,
+        detail_info=args.detail_info,
+        pipeline_info=args.pipeline_info,
+        test_metrics=args.test_metrics,
         mapping_path=args.mapping,
+        model_variant=args.model_variant,
         profile=args.profile,
         width=args.width,
         height=args.height,

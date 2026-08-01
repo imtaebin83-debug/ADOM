@@ -13,10 +13,11 @@ bash scripts/run_training_cycle.sh \
 ```
 
 - strict dataset QC와 GPU/runtime doctor를 먼저 수행한다.
-- 실제 GPU 메모리 probe로 micro-batch를 정하고 effective batch를 16 이상으로
-  유지한다.
+- frozen Stage 1과 end-to-end Stage 2를 각각 GPU 메모리 probe하여 단계별
+  micro-batch를 정하고 effective batch를 16 이상으로 유지한다.
 - B0의 Stage 1, Stage 2, test, 두 ONNX parity가 모두 성공해야 B2를 시작한다.
-- 중단 후 같은 output에 `--resume`을 추가하면 완료된 phase만 건너뛴다.
+- 중단 후 같은 output에 `--resume`을 추가하면 run fingerprint와 artifact
+  checksum이 모두 같은 완료 phase만 건너뛴다.
 - 임의 glob으로 checkpoint를 선택하지 않는다. 각 stage에 best mIoU checkpoint가
   정확히 하나 있어야 다음 단계로 진행한다.
 

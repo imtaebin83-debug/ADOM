@@ -86,15 +86,16 @@ bash scripts/run_training_cycle.sh \
   --output /workspace/adom/outputs/runs/<run-id>
 ```
 
-중단된 동일 run은 `--resume`을 붙인다. 상태 파일에 완료로 기록됐고 필수
-artifact가 실제 존재하는 phase만 건너뛴다.
+중단된 동일 run은 `--resume`을 붙인다. runtime doctor와 dataset QC는 다시
+실행하며, 코드/config/dataset/GPU fingerprint와 필수 artifact checksum이 모두
+일치하는 완료 phase만 건너뛴다.
 
 ## Artifact 보존
 
-각 run의 `status.json`, `summary.json/csv`, test metric, backbone audit, best
-checkpoint, ONNX, parity, metadata를 함께 보존한다. metadata는 dataset/config/
-checkpoint/Git/artifact checksum과 입력 resize/padding/normalization 규약을
-포함한다.
+각 run의 `status.json`, `summary.json/csv`, `parity_inputs.json`, test metric,
+backbone audit, best checkpoint, ONNX, MMDeploy JSON 세트, parity, metadata를
+함께 보존한다. metadata는 model variant, dataset/config/checkpoint/test metric/
+Git/artifact checksum과 입력 resize/padding/normalization 규약을 포함한다.
 
 Git artifact guard:
 

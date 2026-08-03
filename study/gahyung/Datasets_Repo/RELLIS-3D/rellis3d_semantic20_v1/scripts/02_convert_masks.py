@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import shutil
@@ -159,12 +159,13 @@ def remap_mask(
     mapping: dict[int, int],
     ignore_index: int,
 ) -> np.ndarray:
-    observed_ids = {
-        int(value)
-        for value in np.unique(source_mask)
-    }
+    observed_ids = np.unique(source_mask)
 
-    unknown_ids = observed_ids - set(mapping)
+    unknown_ids = {
+        int(value)
+        for value in observed_ids
+        if int(value) not in mapping
+    }
 
     if unknown_ids:
         raise ValueError(
@@ -172,18 +173,18 @@ def remap_mask(
             f"{sorted(unknown_ids)}"
         )
 
-    target_mask = np.full(
-        source_mask.shape,
+    maximum_source_id = max(mapping)
+
+    lookup_table = np.full(
+        maximum_source_id + 1,
         fill_value=ignore_index,
         dtype=np.uint8,
     )
 
     for source_id, target_id in mapping.items():
-        target_mask[
-            source_mask == source_id
-        ] = target_id
+        lookup_table[source_id] = target_id
 
-    return target_mask
+    return lookup_table[source_mask]
 
 
 def main() -> None:
@@ -241,18 +242,34 @@ def main() -> None:
         if not rgb_files and not mask_files:
             continue
 
-        rgb_only = set(rgb_files) - set(mask_files)
-        mask_only = set(mask_files) - set(rgb_files)
+        rgb_only = (
+            set(rgb_files) - set(mask_files)
+        )
 
-        if rgb_only or mask_only:
+        mask_only = (
+            set(mask_files) - set(rgb_files)
+        )
+
+        if mask_only:
             raise RuntimeError(
-                f"Unpaired files in "
+                f"Mask-only files in "
                 f"{sequence_directory.name}: "
-                f"RGB-only={len(rgb_only)}, "
-                f"mask-only={len(mask_only)}"
+                f"{len(mask_only)}"
             )
 
-        for stem in sorted(rgb_files):
+        paired_stems = sorted(
+            set(rgb_files) & set(mask_files)
+        )
+
+        print(
+            f"[{sequence_directory.name}] "
+            f"RGB={len(rgb_files)}, "
+            f"mask={len(mask_files)}, "
+            f"paired={len(paired_stems)}, "
+            f"RGB-only={len(rgb_only)}"
+        )
+
+        for stem in paired_stems:
             samples.append(
                 (
                     sequence_directory.name,

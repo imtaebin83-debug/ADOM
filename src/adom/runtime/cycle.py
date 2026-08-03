@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import importlib
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -25,6 +27,56 @@ PROFILES = {
     "640x384": (640, 384),
     "384x384": (384, 384),
 }
+
+
+def _bounded_wandb_id(value: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_-]+", "-", value).strip("-") or "adom-run"
+    if len(normalized) <= 64:
+        return normalized
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:8]
+    return f"{normalized[:55]}-{digest}"
+
+
+def _tracking_env(
+    base_env: dict[str, str],
+    *,
+    output_root: Path,
+    model: str,
+    phase: str,
+    job_type: str,
+) -> dict[str, str]:
+    env = dict(base_env)
+    logical_run = env.get("ADOM_RUN_ID", output_root.name)
+    run_prefix = env.get("WANDB_RUN_ID", logical_run)
+    name_prefix = env.get("WANDB_NAME", logical_run)
+    env.setdefault("WANDB_PROJECT", "adom")
+    env.setdefault("WANDB_RUN_GROUP", logical_run)
+    env.setdefault("WANDB_DIR", str(output_root / "wandb"))
+    env["WANDB_RUN_ID"] = _bounded_wandb_id(f"{run_prefix}-{model}-{phase}")
+    env["WANDB_NAME"] = f"{name_prefix}-{model}-{phase}"
+    env["WANDB_JOB_TYPE"] = job_type
+    env.setdefault("WANDB_RESUME", "allow")
+    tags = [item.strip() for item in env.get("WANDB_TAGS", "").split(",")]
+    tags.extend((f"model:{model}", f"phase:{phase}"))
+    env["WANDB_TAGS"] = ",".join(dict.fromkeys(item for item in tags if item))
+    return env
+
+
+def _resumable_checkpoint(work_dir: Path) -> Path | None:
+    marker = work_dir / "last_checkpoint"
+    if not marker.is_file():
+        return None
+    value = marker.read_text(encoding="utf-8").strip()
+    if not value:
+        raise RuntimeError(f"Checkpoint marker is empty: {marker}")
+    checkpoint = Path(value)
+    if not checkpoint.is_absolute():
+        checkpoint = work_dir / checkpoint
+    if not checkpoint.is_file():
+        raise RuntimeError(
+            f"Checkpoint marker points to a missing file: {marker} -> {checkpoint}"
+        )
+    return checkpoint.resolve()
 
 
 class CycleState:
@@ -145,6 +197,7 @@ def _probe_batch(
         probe_env = dict(env)
         probe_env["ADOM_MICRO_BATCH"] = str(micro_batch)
         probe_env["ADOM_ACCUMULATIVE_COUNTS"] = "1"
+        probe_env["WANDB_MODE"] = "disabled"
         command = [
             sys.executable,
             str(train_tool),
@@ -361,12 +414,22 @@ def run_cycle(args: argparse.Namespace) -> None:
             "--work-dir",
             str(stage1_dir),
         ]
+        stage1_checkpoint = _resumable_checkpoint(stage1_dir) if args.resume else None
+        if stage1_checkpoint is not None:
+            stage1_command.extend(["--resume", "--cfg-options", "load_from=None"])
+        stage1_env = _tracking_env(
+            model_env,
+            output_root=output_root,
+            model=model,
+            phase="stage1",
+            job_type="training",
+        )
         _run_phase(
             state,
             name=f"{model}_stage1",
             command=stage1_command,
             artifacts=[stage1_audit],
-            env=model_env,
+            env=stage1_env,
             resume=args.resume,
         )
         stage1_best = resolve_single_best_checkpoint(stage1_dir)
@@ -381,15 +444,25 @@ def run_cycle(args: argparse.Namespace) -> None:
             str(stage2_config),
             "--work-dir",
             str(stage2_dir),
-            "--cfg-options",
-            f"load_from={stage1_best}",
         ]
+        stage2_checkpoint = _resumable_checkpoint(stage2_dir) if args.resume else None
+        if stage2_checkpoint is not None:
+            stage2_command.extend(["--resume", "--cfg-options", "load_from=None"])
+        else:
+            stage2_command.extend(["--cfg-options", f"load_from={stage1_best}"])
+        stage2_env = _tracking_env(
+            model_env,
+            output_root=output_root,
+            model=model,
+            phase="stage2",
+            job_type="training",
+        )
         _run_phase(
             state,
             name=f"{model}_stage2",
             command=stage2_command,
             artifacts=[stage2_audit],
-            env=model_env,
+            env=stage2_env,
             resume=args.resume,
         )
         stage2_best = resolve_single_best_checkpoint(stage2_dir)
@@ -406,12 +479,19 @@ def run_cycle(args: argparse.Namespace) -> None:
             "--work-dir",
             str(test_dir),
         ]
+        test_env = _tracking_env(
+            model_env,
+            output_root=output_root,
+            model=model,
+            phase="test",
+            job_type="evaluation",
+        )
         _run_phase(
             state,
             name=f"{model}_test",
             command=test_command,
             artifacts=[test_metrics],
-            env=model_env,
+            env=test_env,
             resume=args.resume,
         )
 
@@ -443,12 +523,14 @@ def run_cycle(args: argparse.Namespace) -> None:
                 args.device,
                 "--dump-info",
             ]
+            artifact_env = dict(model_env)
+            artifact_env["WANDB_MODE"] = "disabled"
             _run_phase(
                 state,
                 name=f"{model}_onnx_{profile}",
                 command=export_command,
                 artifacts=[onnx_path, deploy_info],
-                env=model_env,
+                env=artifact_env,
                 resume=args.resume,
             )
             parity_command = [
@@ -475,7 +557,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 name=f"{model}_parity_{profile}",
                 command=parity_command,
                 artifacts=[parity_path],
-                env=model_env,
+                env=artifact_env,
                 resume=args.resume,
             )
             metadata_command = [
@@ -510,7 +592,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 name=f"{model}_metadata_{profile}",
                 command=metadata_command,
                 artifacts=[metadata_path],
-                env=model_env,
+                env=artifact_env,
                 resume=args.resume,
             )
 

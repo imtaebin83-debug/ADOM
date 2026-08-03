@@ -6,7 +6,12 @@ FROM nvcr.io/nvidia/pytorch:23.10-py3
 # and to ensure Python output is unbuffered.
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/opt/adom/src
+
+ARG ADOM_GIT_SHA=unknown
+LABEL org.opencontainers.image.revision=${ADOM_GIT_SHA}
+ENV ADOM_GIT_SHA=${ADOM_GIT_SHA}
 
 # Install OS System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -107,13 +112,22 @@ RUN python -m pip uninstall -y cugraph-dgl \
     && python -m pip check \
     && rm -rf /root/.cache/pip
 
-WORKDIR /workspace/adom/repo
-
 # Dependency and ABI sanity checks. CUDA availability is checked at RunPod
 # runtime because image builds do not have access to a GPU.
 RUN python -c "import torch; print(torch.__version__)" \
     && python -c "import albumentations, cv2, numpy, pandas, scipy, onnxruntime; assert cv2.__version__ == '4.8.0'; print('Core scientific libraries imported successfully.')" \
     && python -c "import mmcv, mmcv.ops, mmengine, mmseg, mmdeploy, onnx; print('All OpenMMLab libraries imported successfully.')" \
-    && python -c "from importlib.metadata import version; expected={'numpy':'1.24.4','setuptools':'69.5.1','opencv-python':'4.8.0.76','opencv-python-headless':'4.8.0.76','mmcv':'2.1.0','mmengine':'0.10.7','mmsegmentation':'1.2.2','mmdeploy':'1.3.1'}; actual={k:version(k) for k in expected}; assert actual==expected, (actual, expected); print(actual)"
+    && python -c "from importlib.metadata import version; expected={'numpy':'1.24.4','setuptools':'69.5.1','opencv-python':'4.8.0.76','opencv-python-headless':'4.8.0.76','mmcv':'2.1.0','mmengine':'0.10.7','mmsegmentation':'1.2.2','mmdeploy':'1.3.1','wandb':'0.22.3'}; actual={k:version(k) for k in expected}; assert actual==expected, (actual, expected); print(actual)"
 
-CMD ["bash"]
+# Keep application code outside /workspace because RunPod mounts the shared
+# Network Volume over /workspace. This makes each SHA-tagged image runnable
+# without a second git clone inside the Pod.
+WORKDIR /opt/adom
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+COPY configs ./configs
+COPY scripts ./scripts
+COPY data ./data
+RUN python -m pip install --no-cache-dir --no-deps .
+
+CMD ["sleep", "infinity"]

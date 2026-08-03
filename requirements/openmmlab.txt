@@ -11,6 +11,9 @@ matplotlib==3.8.0
 tqdm==4.66.1
 tensorboard==2.14.1
 tensorboard-data-server==0.7.2
+# Newer W&B releases require protobuf>=5, while MMDeploy 1.3.1 requires
+# protobuf<=3.20.2. W&B 0.22.3 supports protobuf 3.19+ and Python 3.10.
+wandb==0.22.3
 protobuf==3.20.2
 grpcio==1.59.0
 pycocotools==2.0.7

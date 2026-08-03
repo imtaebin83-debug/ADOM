@@ -3,13 +3,19 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from adom.data.io import sha256_file
 from adom.data.models import ValidationReport
 from adom.data.splits import load_splits
-from adom.runtime.artifacts import write_export_metadata
+from adom.runtime.artifacts import _git_sha, write_export_metadata
 from adom.runtime.checkpoints import resolve_single_best_checkpoint
+from adom.runtime.cycle import (
+    _bounded_wandb_id,
+    _resumable_checkpoint,
+    _tracking_env,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +85,38 @@ class RuntimeContractTests(unittest.TestCase):
             (root / "best_mIoU_iter_1000.pth").touch()
             with self.assertRaises(RuntimeError):
                 resolve_single_best_checkpoint(root)
+
+    def test_iteration_checkpoint_resume_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work_dir = Path(directory)
+            self.assertIsNone(_resumable_checkpoint(work_dir))
+            checkpoint = work_dir / "iter_500.pth"
+            checkpoint.touch()
+            (work_dir / "last_checkpoint").write_text(
+                checkpoint.name, encoding="utf-8"
+            )
+            self.assertEqual(_resumable_checkpoint(work_dir), checkpoint.resolve())
+            checkpoint.unlink()
+            with self.assertRaises(RuntimeError):
+                _resumable_checkpoint(work_dir)
+
+    def test_wandb_run_identity_is_stable_and_bounded(self) -> None:
+        output_root = Path("/workspace/adom/runs/phase1-baseline")
+        env = _tracking_env(
+            {"WANDB_PROJECT": "adom", "WANDB_TAGS": "rellis,seed:42"},
+            output_root=output_root,
+            model="b2",
+            phase="stage2",
+            job_type="training",
+        )
+        self.assertEqual(env["WANDB_RUN_GROUP"], "phase1-baseline")
+        self.assertEqual(env["WANDB_RUN_ID"], "phase1-baseline-b2-stage2")
+        self.assertIn("model:b2", env["WANDB_TAGS"])
+        self.assertLessEqual(len(_bounded_wandb_id("x" * 200)), 64)
+
+    def test_image_revision_precedes_git_checkout(self) -> None:
+        with patch.dict("os.environ", {"ADOM_GIT_SHA": "image-sha"}):
+            self.assertEqual(_git_sha(REPO_ROOT), "image-sha")
 
     def test_export_metadata_is_checksum_linked(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

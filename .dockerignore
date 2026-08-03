@@ -7,7 +7,11 @@
 
 # Ignore data, outputs, and model checkpoints/exports
 /datasets/
-/data/
+/data/raw/
+/data/interim/
+/data/processed/
+/data/external/
+/data/captures/
 /outputs/
 /models/checkpoints/
 /models/exports/

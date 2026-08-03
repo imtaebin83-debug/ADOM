@@ -126,6 +126,7 @@ class RuntimeContractTests(unittest.TestCase):
         for package, expected in (
             ("ftfy", "6.1.1"),
             ("regex", "2023.10.3"),
+            ("prettytable", "3.9.0"),
         ):
             self.assertIn(f"{package}=={expected}", requirements)
             self.assertEqual(EXPECTED_VERSIONS[package], expected)

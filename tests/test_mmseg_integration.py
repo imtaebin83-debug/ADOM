@@ -16,6 +16,9 @@ HAS_MMSEG = importlib.util.find_spec("mmseg") is not None
 class MMSegIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        from mmseg.utils import register_all_modules
+
+        register_all_modules(init_default_scope=True)
         import adom.mmseg  # noqa: F401
 
     def test_all_training_configs_load(self) -> None:

@@ -26,6 +26,7 @@ EXPECTED_VERSIONS = {
     "wandb": "0.22.3",
     "ftfy": "6.1.1",
     "regex": "2023.10.3",
+    "prettytable": "3.9.0",
 }
 
 
@@ -63,6 +64,7 @@ def run_doctor(dataset_root: Path | None, require_gpu: bool) -> dict[str, Any]:
         "wandb",
         "ftfy",
         "regex",
+        "prettytable",
     ):
         try:
             importlib.import_module(module_name)

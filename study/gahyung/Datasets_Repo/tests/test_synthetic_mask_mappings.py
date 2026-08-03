@@ -445,6 +445,25 @@ class SyntheticMaskMappingTests(
                 ),
             )
 
+    def test_rellis_official_raw_ids_29_30_32(
+        self,
+    ) -> None:
+        with RELLIS_MAPPING_PATH.open(
+            "r",
+            encoding="utf-8-sig",
+        ) as file:
+            config = yaml.safe_load(file)
+
+        source_to_target = {
+            int(source_id): int(target_id)
+            for source_id, target_id
+            in config["rellis_to_target"].items()
+        }
+
+        self.assertEqual(source_to_target[29], 1)
+        self.assertEqual(source_to_target[30], 1)
+        self.assertEqual(source_to_target[32], 3)
+
     def test_rugd_synthetic_rgb_mapping(
         self,
     ) -> None:

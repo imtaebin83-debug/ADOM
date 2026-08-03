@@ -26,6 +26,9 @@ rellis_to_target:
   19: 2        # bush
   23: 0        # concrete
   27: 3        # barrier
+  29: 1        # official RELLIS raw ID 29
+  30: 1        # official RELLIS raw ID 30
   31: 2        # puddle
+  32: 3        # official RELLIS raw ID 32
   33: 2        # mud
   34: 3        # rubble

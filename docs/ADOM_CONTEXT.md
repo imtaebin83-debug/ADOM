@@ -37,13 +37,17 @@
   - 255: `ignore` (Loss 계산 시 제외)
 
 **3. 하드웨어 및 시스템 통합**
-- **개발 환경:** RunPod RTX 4090/A6000 + Docker (`nvcr.io/nvidia/pytorch:23.10-py3`)
+- **개발 환경:** RunPod A100 80GB Secure Cloud + Docker (`nvcr.io/nvidia/pytorch:23.10-py3`)
 - **엣지 배포:** NVIDIA Jetson Orin Nano 8GB (ROS2 Humble 연동). 
 - *주의:* 현재는 하드웨어 스펙 업 가능성을 열어두고 있으므로, 30 FPS 방어 등의 엄격한 TensorRT 최적화보다는 **'연구적 가치 입증(데이터 증강, 듀얼 헤드 검증)'을 최우선**으로 둔다. 엣지 배포는 PoC(개념 증명) 목적으로 활용.
 
 **4. DevOps / MLOps 인프라**
 - OpenMIM 대신 `python -m pip` 직접 설치 및 `--no-deps` 덮어쓰기 정책 유지.
-- CI/CD: GitHub Actions -> Docker Hub 자동 빌드 파이프라인 적용.
+- CI/CD: GitHub Actions -> Docker Hub Git SHA 이미지 자동 빌드·테스트·푸시. 비용이 발생하는 RunPod Pod 생성과 학습 시작은 명시적 실행으로 분리.
+- 학습 순서: 현재 실행기의 B0 선행 후 B2 실행 제약을 유지.
+- 실험 추적: Weights & Biases를 주 추적기로, TensorBoard를 Network Volume의 로컬 백업으로 사용.
+- 복구: iteration checkpoint에 model/optimizer/scheduler 상태를 보존하고 같은 run 경로에서 `--resume`으로 재개.
+- Storage: 여러 Pod가 하나의 Network Volume에 있는 versioned dataset을 공유 읽기하고, run별 고유 output directory에만 쓰기.
 - Git 관리: 코드/config/Dockerfile/docs만 포함 (dataset/checkpoint/log 등은 제외).
 
 ---
@@ -59,3 +63,11 @@
 - **[2026-08-03] Phase 1 20-Class 단일 학습 선행 및 5-Class 도입 시점 변경**
   - *결정 사항:* 초기부터 5-Class Cost Map으로 매핑하여 학습하는 대신, Phase 1에서는 RELLIS 기준 20-Class 시맨틱 모델로 부족 클래스 데이터 증강 실험을 선행. 5-Class Cost 체계는 Phase 2 듀얼 헤드(Dual-Head) 도입 시 Head B에만 적용.
   - *결정 사유(Why):* 부족 데이터 보완을 통한 인식률 향상(핵심 목표 1)을 명확하게 수치화하고 증명하기 위해서는 기존 RELLIS 데이터셋의 20-Class 평가 지표(mIoU, Recall)를 그대로 사용하는 것이 실험군/대조군 비교에 유리하기 때문. 이후 듀얼 헤드로 확장할 때 Cost Map을 추가하는 것이 실험적으로 훨씬 탄탄한 논리 구조를 가짐.
+
+- **[2026-08-03] B0 선행/B2 후속 학습 순서 유지**
+  - *결정 사항:* 현재 실행기의 `B0 -> B2` 순서와 지원 모델을 B0/B2로 제한하는 계약을 유지한다.
+  - *결정 사유(Why):* B0를 저비용 runtime·pipeline gate로 먼저 통과시킨 뒤 B2 실험을 수행하는 현재 흐름이 연구 일정에 충분하며, 현 단계에서는 임의 모델 병렬화보다 안정적인 반복 실행이 우선이기 때문이다.
+
+- **[2026-08-03] RunPod A100 80GB 및 W&B 중심 MLOps 운영**
+  - *결정 사항:* RunPod A100 80GB Secure Cloud와 공유 Network Volume을 사용한다. W&B를 핵심 실험 추적기로, TensorBoard를 로컬 백업으로 사용하며, 500 iteration 주기의 model/optimizer/scheduler checkpoint로 중단 학습을 재개한다. Docker 이미지는 코드까지 포함한 Git SHA 불변 이미지로 배포한다.
+  - *결정 사유(Why):* 10일/20만원 범위에서 A100 80GB가 VRAM과 비용의 균형이 좋고, 여러 Pod가 데이터셋을 중복 저장하지 않으면서도 실험별 로그와 결과를 격리할 수 있어야 하기 때문이다. 중간 checkpoint와 중앙 로그는 GPU 중단 시 손실을 제한하고 모델 버전 비교를 재현 가능하게 만든다.

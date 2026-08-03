@@ -23,6 +23,7 @@ EXPECTED_VERSIONS = {
     "mmengine": "0.10.7",
     "mmsegmentation": "1.2.2",
     "mmdeploy": "1.3.1",
+    "wandb": "0.22.3",
 }
 
 
@@ -57,6 +58,7 @@ def run_doctor(dataset_root: Path | None, require_gpu: bool) -> dict[str, Any]:
         "onnx",
         "onnxruntime",
         "albumentations",
+        "wandb",
     ):
         try:
             importlib.import_module(module_name)

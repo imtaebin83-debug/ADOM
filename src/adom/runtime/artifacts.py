@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -10,6 +11,9 @@ from adom.data.schema import LabelSchema
 
 
 def _git_sha(repo_root: Path) -> str:
+    image_revision = os.getenv("ADOM_GIT_SHA", "").strip()
+    if image_revision:
+        return image_revision
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "HEAD"],

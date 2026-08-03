@@ -16,6 +16,7 @@ from adom.runtime.cycle import (
     _resumable_checkpoint,
     _tracking_env,
 )
+from adom.runtime.doctor import EXPECTED_VERSIONS
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -117,6 +118,17 @@ class RuntimeContractTests(unittest.TestCase):
     def test_image_revision_precedes_git_checkout(self) -> None:
         with patch.dict("os.environ", {"ADOM_GIT_SHA": "image-sha"}):
             self.assertEqual(_git_sha(REPO_ROOT), "image-sha")
+
+    def test_mmseg_tokenizer_dependencies_are_pinned(self) -> None:
+        requirements = (REPO_ROOT / "requirements" / "openmmlab.txt").read_text(
+            encoding="utf-8"
+        )
+        for package, expected in (
+            ("ftfy", "6.1.1"),
+            ("regex", "2023.10.3"),
+        ):
+            self.assertIn(f"{package}=={expected}", requirements)
+            self.assertEqual(EXPECTED_VERSIONS[package], expected)
 
     def test_export_metadata_is_checksum_linked(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

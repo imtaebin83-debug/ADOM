@@ -1,0 +1,50 @@
+dataset_name: rellis3d_semantic20_v1
+mapping_version: v1.0
+
+num_classes: 19
+ignore_index: 255
+reduce_zero_label: false
+
+target_classes:
+  0: dirt
+  1: grass
+  2: tree
+  3: pole
+  4: water
+  5: sky
+  6: vehicle
+  7: object
+  8: asphalt
+  9: building
+  10: log
+  11: person
+  12: fence
+  13: bush
+  14: concrete
+  15: barrier
+  16: puddle
+  17: mud
+  18: rubble
+  255: ignore
+
+rellis_to_target:
+  0: 255       # void
+  1: 0         # dirt
+  3: 1         # grass
+  4: 2         # tree
+  5: 3         # pole
+  6: 4         # water
+  7: 5         # sky
+  8: 6         # vehicle
+  9: 7         # object
+  10: 8        # asphalt
+  12: 9        # building
+  15: 10       # log
+  17: 11       # person
+  18: 12       # fence
+  19: 13       # bush
+  23: 14       # concrete
+  27: 15       # barrier
+  31: 16       # puddle
+  33: 17       # mud
+  34: 18       # rubble

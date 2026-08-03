@@ -50,6 +50,22 @@ RELLIS_MAPPING_PATH = (
     / "class_mapping.yaml"
 )
 
+RELLIS_SEMANTIC20_SCRIPT_PATH = (
+    DATASET_REPOSITORY_ROOT
+    / "RELLIS-3D"
+    / "rellis3d_semantic20_v1"
+    / "scripts"
+    / "02_convert_masks.py"
+)
+
+RELLIS_SEMANTIC20_MAPPING_PATH = (
+    DATASET_REPOSITORY_ROOT
+    / "RELLIS-3D"
+    / "rellis3d_semantic20_v1"
+    / "config"
+    / "class_mapping.yaml"
+)
+
 RUGD_SCRIPT_PATH = (
     DATASET_REPOSITORY_ROOT
     / "RUGD"
@@ -139,6 +155,11 @@ class SyntheticMaskMappingTests(
     def setUpClass(
         cls,
     ) -> None:
+        cls.rellis_semantic20_module = load_python_module(
+            "adom_rellis_semantic20_convert",
+            RELLIS_SEMANTIC20_SCRIPT_PATH,
+        )
+
         cls.rugd_module = load_python_module(
             "adom_rugd_remap",
             RUGD_SCRIPT_PATH,
@@ -465,6 +486,69 @@ class SyntheticMaskMappingTests(
         self.assertEqual(source_to_target[29], 1)
         self.assertEqual(source_to_target[30], 1)
         self.assertEqual(source_to_target[32], 3)
+
+    def test_rellis_semantic20_synthetic_mask_conversion(
+        self,
+    ) -> None:
+        semantic20_module = load_python_module(
+            "adom_rellis_semantic20_convert",
+            RELLIS_SEMANTIC20_SCRIPT_PATH,
+        )
+
+        mapping, ignore_index = (
+            semantic20_module.load_mapping(
+                RELLIS_SEMANTIC20_MAPPING_PATH
+            )
+        )
+
+        source_mask = np.asarray(
+            [[
+                0, 1, 3, 4, 5,
+                6, 7, 8, 9, 10,
+                12, 15, 17, 18, 19,
+                23, 27, 31, 33, 34,
+            ]],
+            dtype=np.uint8,
+        )
+
+        expected_mask = np.asarray(
+            [[
+                255, 0, 1, 2, 3,
+                4, 5, 6, 7, 8,
+                9, 10, 11, 12, 13,
+                14, 15, 16, 17, 18,
+            ]],
+            dtype=np.uint8,
+        )
+
+        actual_mask = semantic20_module.remap_mask(
+            source_mask,
+            mapping,
+            ignore_index,
+        )
+
+        self.assertEqual(
+            actual_mask.dtype,
+            np.dtype(np.uint8),
+        )
+
+        np.testing.assert_array_equal(
+            actual_mask,
+            expected_mask,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Unknown raw mask IDs",
+        ):
+            semantic20_module.remap_mask(
+                np.asarray(
+                    [[2]],
+                    dtype=np.uint8,
+                ),
+                mapping,
+                ignore_index,
+            )
 
     def test_rugd_synthetic_rgb_mapping(
         self,

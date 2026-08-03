@@ -30,3 +30,9 @@ PyYAML==6.0.1
 rich==13.4.2
 termcolor==2.3.0
 yapf==0.40.2
+# MMSegmentation 1.2.2 imports its bundled CLIP tokenizer when
+# mmseg.datasets is imported, but these dependencies are absent from the
+# package's runtime metadata. Keep them explicit so the --no-deps bootstrap
+# cannot produce an image that passes pip check but fails at runtime.
+ftfy==6.1.1
+regex==2023.10.3

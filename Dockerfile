@@ -9,10 +9,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/opt/adom/src
 
-ARG ADOM_GIT_SHA=unknown
-LABEL org.opencontainers.image.revision=${ADOM_GIT_SHA}
-ENV ADOM_GIT_SHA=${ADOM_GIT_SHA}
-
 # Install OS System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
@@ -55,6 +51,7 @@ RUN python -m pip install --no-cache-dir --upgrade \
         "urllib3==1.26.18" \
     && python -m pip install --no-cache-dir --ignore-installed --no-deps \
         "requests==2.31.0" \
+        "prettytable==3.9.0" \
         "typing-extensions==4.8.0" \
         "urllib3==1.26.18"
 
@@ -117,7 +114,14 @@ RUN python -m pip uninstall -y cugraph-dgl \
 RUN python -c "import torch; print(torch.__version__)" \
     && python -c "import albumentations, cv2, numpy, pandas, scipy, onnxruntime; assert cv2.__version__ == '4.8.0'; print('Core scientific libraries imported successfully.')" \
     && python -c "import mmcv, mmcv.ops, mmengine, mmseg, mmdeploy, onnx; print('All OpenMMLab libraries imported successfully.')" \
-    && python -c "from importlib.metadata import version; expected={'numpy':'1.24.4','setuptools':'69.5.1','opencv-python':'4.8.0.76','opencv-python-headless':'4.8.0.76','mmcv':'2.1.0','mmengine':'0.10.7','mmsegmentation':'1.2.2','mmdeploy':'1.3.1','wandb':'0.22.3'}; actual={k:version(k) for k in expected}; assert actual==expected, (actual, expected); print(actual)"
+    && python -c "import ftfy, regex; from prettytable import PrettyTable; from mmseg.datasets import BaseSegDataset; print('MMSeg dataset runtime imports successful.')" \
+    && python -c "from importlib.metadata import version; expected={'numpy':'1.24.4','setuptools':'69.5.1','opencv-python':'4.8.0.76','opencv-python-headless':'4.8.0.76','mmcv':'2.1.0','mmengine':'0.10.7','mmsegmentation':'1.2.2','mmdeploy':'1.3.1','wandb':'0.22.3','ftfy':'6.1.1','regex':'2023.10.3','prettytable':'3.9.0'}; actual={k:version(k) for k in expected}; assert actual==expected, (actual, expected); print(actual)"
+
+# Stamp the final image without invalidating the expensive dependency layers
+# for every source commit.
+ARG ADOM_GIT_SHA=unknown
+LABEL org.opencontainers.image.revision=${ADOM_GIT_SHA}
+ENV ADOM_GIT_SHA=${ADOM_GIT_SHA}
 
 # Keep application code outside /workspace because RunPod mounts the shared
 # Network Volume over /workspace. This makes each SHA-tagged image runnable
@@ -128,6 +132,7 @@ COPY src ./src
 COPY configs ./configs
 COPY scripts ./scripts
 COPY data ./data
-RUN python -m pip install --no-cache-dir --no-deps .
+RUN python -m pip install --no-cache-dir --no-deps . \
+    && python -c "import adom.mmseg; print('ADOM MMSeg extensions imported successfully.')"
 
 CMD ["sleep", "infinity"]

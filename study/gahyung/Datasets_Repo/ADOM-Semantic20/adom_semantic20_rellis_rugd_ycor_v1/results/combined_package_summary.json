@@ -1,0 +1,60 @@
+{
+  "dataset_name": "adom_semantic20_rellis_rugd_ycor_v1",
+  "target_dataset": "rellis3d_semantic20_v1",
+  "num_classes": 19,
+  "ignore_index": 255,
+  "total_manifest_count": 14421,
+  "source_counts": {
+    "rellis3d": 6234,
+    "rugd": 7436,
+    "ycor": 751
+  },
+  "main_split_counts": {
+    "train": 9868,
+    "val": 900,
+    "test": 899
+  },
+  "main_train_source_counts": {
+    "rellis3d": 4435,
+    "rugd": 4779,
+    "ycor": 654
+  },
+  "diagnostic_split_counts": {
+    "rugd_val_diagnostic.txt": 733,
+    "rugd_test_diagnostic.txt": 1924,
+    "ycor_val_diagnostic.txt": 97,
+    "rugd_train_source.txt": 4779,
+    "ycor_train_source.txt": 654
+  },
+  "rellis_observed_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    255
+  ],
+  "rellis_storage_modes": {
+    "image_hardlink": 6234,
+    "mask_hardlink": 6234
+  },
+  "validation_policy": {
+    "train": "RELLIS train + RUGD train + YCOR train",
+    "val": "RELLIS val only",
+    "test": "RELLIS test only"
+  }
+}

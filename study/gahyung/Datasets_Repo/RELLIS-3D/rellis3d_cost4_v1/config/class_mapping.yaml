@@ -1,4 +1,4 @@
-dataset_name: rellis3d_cost4
+dataset_name: rellis3d_cost4_v1
 mapping_version: v1.0
 
 target_classes:

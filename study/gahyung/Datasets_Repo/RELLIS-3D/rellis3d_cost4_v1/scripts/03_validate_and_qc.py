@@ -25,7 +25,7 @@ OUTPUT_ROOT = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "rellis_cost4_standard"
+    / "rellis3d_cost4_v1"
 )
 
 MAPPING_PATH = OUTPUT_ROOT / "class_mapping.yaml"

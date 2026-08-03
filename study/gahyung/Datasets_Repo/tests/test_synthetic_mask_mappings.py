@@ -37,6 +37,7 @@ ORDERED_ADOM_IDS = (
 RELLIS_SCRIPT_PATH = (
     DATASET_REPOSITORY_ROOT
     / "RELLIS-3D"
+    / "rellis3d_cost4_v1"
     / "scripts"
     / "02_convert_masks.py"
 )
@@ -44,6 +45,7 @@ RELLIS_SCRIPT_PATH = (
 RELLIS_MAPPING_PATH = (
     DATASET_REPOSITORY_ROOT
     / "RELLIS-3D"
+    / "rellis3d_cost4_v1"
     / "config"
     / "class_mapping.yaml"
 )

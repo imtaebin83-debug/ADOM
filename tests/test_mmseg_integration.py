@@ -36,6 +36,23 @@ class MMSegIntegrationTests(unittest.TestCase):
                 self.assertEqual(config.model.decode_head.num_classes, 4)
                 self.assertEqual(config.model.decode_head.ignore_index, 255)
 
+    def test_semantic20_training_configs_load(self) -> None:
+        from mmengine.config import Config
+
+        for experiment in ("e0_rellis", "e1_combined"):
+            for model in ("b0", "b2"):
+                for stage in ("stage1", "stage2"):
+                    path = (
+                        REPO_ROOT
+                        / "configs"
+                        / "adom"
+                        / "phase1_semantic20"
+                        / f"segformer_{model}_{stage}_{experiment}.py"
+                    )
+                    config = Config.fromfile(path)
+                    self.assertEqual(config.model.decode_head.num_classes, 19)
+                    self.assertEqual(config.model.decode_head.ignore_index, 255)
+
     def test_manifest_dataset_registration(self) -> None:
         import numpy as np
         from PIL import Image

@@ -16,19 +16,19 @@
 - **Core Models:** SegFormer-B2 (연구적 목적 달성을 위한 베이스라인)
 - **Framework:** OpenMMLab `mmsegmentation` (버전 1.2.2 고정)
 
-- **Phase 1 (현재 집중): 20-Class 시맨틱 성능 개선 (Data Imbalance 해소)**
-  - 기존 RELLIS-3D(20-Class) 베이스라인 체계를 그대로 유지하여 파인튜닝.
-  - 절대적으로 부족한 '치명적 장애물(물, 통나무, 기둥 등)' 데이터를 외부 오픈 데이터(RUGD, YCOR 등)로 증강.
-  - **목표:** 증강된 데이터셋을 통해 오프로드 특정 위험 객체의 인식률(Recall)이 비약적으로 향상됨을 20-Class 평가지표 기반으로 명확히 증명한다.
+- **Phase 1 (현재 집중): 23-Class 시맨틱 성능 개선 (Data Imbalance 해소)**
+  - 기존 RELLIS-3D의 20-Class 베이스라인 체계와 기존 클래스 ID 구조를 유지하면서, GOOSE 데이터셋의 클래스 세분화를 반영한 animal, artifact, snow 3개 클래스를 추가하여 총 23-Class 체계로 확장하 파인튜닝.
+  - 절대적으로 부족한 '치명적 장애물(물, 통나무, 기둥 등)' 데이터를 외부 오픈 데이터(RUGD, YCOR, GOOSE 등)로 증강.
+  - **목표:** 증강된 데이터셋을 통해 오프로드 특정 위험 객체의 인식률(Recall)이 비약적으로 향상됨을 23-Class 평가지표 기반으로 명확히 증명한다.
 
 - **Phase 2 (고도화): Dual-Head Architecture (Semantic + Cost Map)**
   - Phase 1에서 검증된 하나의 인코더(Shared Backbone)에 두 개의 병렬 헤드 구성.
-  - Head A (Ventral): 객체 외형 및 시맨틱 경계 인식 (20-Class 유지)
+  - Head A (Ventral): 객체 외형 및 시맨틱 경계 인식 (23-Class 유지)
   - Head B (Dorsal): 주행 궤적 기반 데이터를 역투영한 Cost Map 직접 예측 (이 단계에서 5-Class Cost 체계 도입)
   - **가설 검증:** Head A+B 동시 학습 시 인코더의 Feature Sharing 시너지로 인해 Cost Map 추론 성능이 향상됨을 입증한다.
 
 **2. 데이터 및 라벨링 정책**
-- **Phase 1 (Semantic):** RELLIS-3D의 20개 클래스 체계와 라벨링 유지. 부족 클래스는 타 데이터셋에서 추출 후 20-Class ID에 맞게 매핑.
+- **Phase 1 (Semantic):** RELLIS-3D의 기존 20개 클래스 체계와 클래스 ID를 유지하고, GOOSE 데이터셋에서 세분화된 animal, artifact, snow 3개 클래스를 추가한 총 23-Class 체계를 사용. 부족 클래스는 타 데이터셋에서 추출 후 23-Class ID 체계에 맞게 매핑.
 - **Phase 2 (Cost Map - Head B 전용 5-Class Cost Prior):**
   - 0: `paved` (포장/인공 지면)
   - 1: `natural_low` (흙길, 짧은 풀 등)
@@ -71,3 +71,7 @@
 - **[2026-08-03] RunPod A100 80GB 및 W&B 중심 MLOps 운영**
   - *결정 사항:* RunPod A100 80GB Secure Cloud와 공유 Network Volume을 사용한다. W&B를 핵심 실험 추적기로, TensorBoard를 로컬 백업으로 사용하며, 500 iteration 주기의 model/optimizer/scheduler checkpoint로 중단 학습을 재개한다. Docker 이미지는 코드까지 포함한 Git SHA 불변 이미지로 배포한다.
   - *결정 사유(Why):* 10일/20만원 범위에서 A100 80GB가 VRAM과 비용의 균형이 좋고, 여러 Pod가 데이터셋을 중복 저장하지 않으면서도 실험별 로그와 결과를 격리할 수 있어야 하기 때문이다. 중간 checkpoint와 중앙 로그는 GPU 중단 시 손실을 제한하고 모델 버전 비교를 재현 가능하게 만든다.
+ 
+- **[2026-08-04] GOOSE 데이터셋 기반 Phase 1 23-Class 확장**
+  - *결정 사항:* GOOSE 데이터셋의 클래스 세분화를 추가 보완 데이터로 활용하기로 결정하고, animal, artifact, snow를 기존 RELLIS-3D 기준 20-Class에 추가하여 Phase 1의 시맨틱 라벨 체계를 총 23-Class로 확장한다. 기존 RELLIS-3D의 20개 클래스와 ID 구조는 유지하며, 신규 3개 클래스는 별도 ID로 추가한다. 해당 변경은 GitHub에 직접 반영하지 않고, PR의 최종 수정 전에 팀원들의 검토와 확인을 받은 후 반영한다.
+  - *결정 사유(Why):* GOOSE 데이터셋에서는 오프로드 환경에서 의미 있는 animal, artifact, snow 클래스가 기존 RELLIS-3D 20-Class보다 세분화되어 제공된다. 기존 RELLIS-3D 클래스 체계와의 비교 가능성은 유지하면서도, 다양한 산악·야지 환경에서 발생할 수 있는 객체와 지형을 추가로 구분하여 Phase 1 시맨틱 모델의 환경 표현력과 위험 요소 인식 범위를 보완하기 위함이다.

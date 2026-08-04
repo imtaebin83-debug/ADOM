@@ -344,6 +344,8 @@ def run_cycle(args: argparse.Namespace) -> None:
         "--output",
         str(doctor_path),
     ]
+    if args.skip_export:
+        doctor_command.append("--skip-deployment")
     _run_phase(
         state,
         name="doctor_and_dataset_qc",
@@ -382,7 +384,11 @@ def run_cycle(args: argparse.Namespace) -> None:
 
     train_tool = _tool_path("mmseg", ".mim/tools/train.py")
     test_tool = _tool_path("mmseg", ".mim/tools/test.py")
-    deploy_tool = _tool_path("mmdeploy", ".mim/tools/deploy.py")
+    deploy_tool = (
+        None
+        if args.skip_export
+        else _tool_path("mmdeploy", ".mim/tools/deploy.py")
+    )
     image = _first_test_image(dataset_root)
     mapping = dataset_root / "config" / "label_mapping.yaml"
 
@@ -495,7 +501,15 @@ def run_cycle(args: argparse.Namespace) -> None:
             resume=args.resume,
         )
 
+        # Training success must not depend on the deployment stack. Semantic20
+        # uses a separate training cycle, and the retained Cost4 reference flow
+        # offers the same explicit opt-out.
+        if args.skip_export:
+            continue
+
         for profile, (width, height) in PROFILES.items():
+            if deploy_tool is None:
+                raise RuntimeError("MMDeploy tool is unavailable for export")
             export_model_config = (
                 CONFIG_ROOT
                 / "adom"
@@ -612,6 +626,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-batch-probe", action="store_true")
+    parser.add_argument("--skip-export", action="store_true")
     parser.add_argument("--device", default="cuda:0")
     args = parser.parse_args(argv)
     try:

@@ -1,5 +1,9 @@
 # Scripts
 
+Phase 1 Semantic20 B0/B2 gate는 `run_semantic20_cycle.sh`로 실행한다. 데이터
+root는 `--dataset` 또는 `ADOM_DATA_ROOT`로 전달하며 ONNX export는 학습과
+분리되어 있다. 자세한 명령은 `docs/semantic20-runpod-gates.md`에 있다.
+
 반복 가능한 운영 진입점만 둔다. 데이터 로직은 `src/adom/data`, MMSeg 확장은
 `src/adom/mmseg`, 실행 상태 관리는 `src/adom/runtime`에 있다.
 

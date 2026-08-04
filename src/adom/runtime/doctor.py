@@ -34,10 +34,16 @@ def _distribution_version(name: str) -> str:
     return importlib.metadata.version(name)
 
 
-def run_doctor(dataset_root: Path | None, require_gpu: bool) -> dict[str, Any]:
+def run_doctor(
+    dataset_root: Path | None,
+    require_gpu: bool,
+    require_deployment: bool = True,
+) -> dict[str, Any]:
     errors: list[str] = []
     versions: dict[str, str] = {}
     for distribution, expected in EXPECTED_VERSIONS.items():
+        if not require_deployment and distribution == "mmdeploy":
+            continue
         try:
             actual = _distribution_version(distribution)
         except importlib.metadata.PackageNotFoundError:
@@ -50,22 +56,22 @@ def run_doctor(dataset_root: Path | None, require_gpu: bool) -> dict[str, Any]:
             )
 
     imports: dict[str, str] = {}
-    for module_name in (
+    runtime_modules = [
         "cv2",
         "numpy",
         "mmcv",
         "mmcv.ops",
         "mmengine",
         "mmseg",
-        "mmdeploy",
-        "onnx",
-        "onnxruntime",
         "albumentations",
         "wandb",
         "ftfy",
         "regex",
         "prettytable",
-    ):
+    ]
+    if require_deployment:
+        runtime_modules.extend(("mmdeploy", "onnx", "onnxruntime"))
+    for module_name in runtime_modules:
         try:
             importlib.import_module(module_name)
             imports[module_name] = "ok"
@@ -108,6 +114,7 @@ def run_doctor(dataset_root: Path | None, require_gpu: bool) -> dict[str, Any]:
         "imports": imports,
         "gpu": gpu,
         "dataset": dataset,
+        "deployment_required": require_deployment,
         "errors": errors,
     }
 
@@ -116,9 +123,14 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Validate the ADOM training runtime")
     parser.add_argument("--dataset-root", type=Path)
     parser.add_argument("--require-gpu", action="store_true")
+    parser.add_argument("--skip-deployment", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
-    report = run_doctor(args.dataset_root, args.require_gpu)
+    report = run_doctor(
+        args.dataset_root,
+        args.require_gpu,
+        require_deployment=not args.skip_deployment,
+    )
     text = json.dumps(report, indent=2, sort_keys=True)
     print(text)
     if args.output:

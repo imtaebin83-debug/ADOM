@@ -21,7 +21,7 @@ DEFAULT_OUTPUT_ROOT = (
     PROJECT_ROOT
     / "data"
     / "processed"
-    / "rellis3d_cost4_v1"
+    / "rellis_cost4_standard"
 )
 
 SPLIT_NAMES = ("train", "val", "test")

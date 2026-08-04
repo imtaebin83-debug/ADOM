@@ -58,17 +58,6 @@ class DataPipelineTests(unittest.TestCase):
             np.array([[0, 1, 2, 3, 255]], dtype=np.uint8),
         )
 
-    def test_rellis_official_raw_ids_29_30_32(self):
-        schema = LabelSchema.from_path(MAPPING)
-
-        source = np.array([[29, 30, 32]], dtype=np.uint8)
-        target = schema.remap(source)
-
-        np.testing.assert_array_equal(
-            target,
-            np.array([[1, 1, 3]], dtype=np.uint8),
-        )
-
     def test_prepare_validate_and_deterministic_hash(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

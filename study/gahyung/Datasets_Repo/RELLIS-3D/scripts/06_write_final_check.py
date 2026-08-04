@@ -13,7 +13,7 @@ DEFAULT_OUTPUT_ROOT = (
     ROOT
     / "data"
     / "processed"
-    / "rellis3d_cost4_v1"
+    / "rellis_cost4_standard"
 )
 
 DEFAULT_RESULTS_DIR = ROOT / "results"

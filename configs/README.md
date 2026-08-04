@@ -1,6 +1,10 @@
 # Configs
 
-ADOM Phase 1의 학습 대상은 Cost4의 `0..3`이며 `255`는 loss/metric에서 제외한다.
+기존 Cost4 (`0..3`, ignore `255`) 설정은 Phase 2/reference 용도로 보존한다.
+Phase 1 Semantic20은 `configs/adom/phase1_semantic20/` 아래에 분리되어 있으며
+원 ontology 20개 중 void를 제외한 train ID `0..18`, ignore `255`를 사용한다.
+RunPod gate와 optimizer-update 환산 규약은
+[`docs/semantic20-runpod-gates.md`](../docs/semantic20-runpod-gates.md)를 따른다.
 
 ```text
 configs/

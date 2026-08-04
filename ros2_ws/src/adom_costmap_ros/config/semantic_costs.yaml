@@ -1,0 +1,12 @@
+semantic_costmap:
+  ros__parameters:
+    mask_topic: /adom/perception/semantic_mask
+    depth_topic: /zed/zed_node/depth/depth_registered
+    output_frame: odom
+    max_projection_range_m: 12.0
+    update_rate_hz: 10.0
+    class_costs:
+      traversable: 0
+      low_cost: 40
+      high_cost: 180
+      obstacle: 254

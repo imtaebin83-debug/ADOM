@@ -1,0 +1,5 @@
+frame_id: map
+waypoints:
+  # Replace with surveyed WGS84 coordinates. Heading is ENU radians: 0 = east.
+  - {latitude: 37.0000000, longitude: 127.0000000, altitude: 0.0, heading: 0.0}
+  - {latitude: 37.0000100, longitude: 127.0000100, altitude: 0.0, heading: 0.0}

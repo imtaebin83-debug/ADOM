@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="adom_vehicle">
+  <!-- Measure these values on the physical vehicle before autonomous testing. -->
+  <xacro:arg name="wheelbase" default="0.33"/>
+  <xacro:arg name="track_width" default="0.26"/>
+  <xacro:arg name="body_length" default="0.52"/>
+  <xacro:arg name="body_width" default="0.30"/>
+  <xacro:arg name="body_height" default="0.16"/>
+  <xacro:arg name="zed_x" default="0.12"/>
+  <xacro:arg name="zed_y" default="0.0"/>
+  <xacro:arg name="zed_z" default="0.24"/>
+  <xacro:arg name="zed_pitch" default="-0.1745"/>
+  <xacro:arg name="gnss_x" default="0.0"/>
+  <xacro:arg name="gnss_y" default="0.0"/>
+  <xacro:arg name="gnss_z" default="0.30"/>
+
+  <link name="base_footprint"/>
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 ${body_height / 2.0}"/>
+      <geometry><box size="${body_length} ${body_width} ${body_height}"/></geometry>
+      <material name="adom_green"><color rgba="0.16 0.32 0.18 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${body_height / 2.0}"/>
+      <geometry><box size="${body_length} ${body_width} ${body_height}"/></geometry>
+    </collision>
+  </link>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/><child link="base_link"/>
+  </joint>
+
+  <link name="zed_camera_link"/>
+  <joint name="zed_mount_joint" type="fixed">
+    <origin xyz="${zed_x} ${zed_y} ${zed_z}" rpy="0 ${zed_pitch} 0"/>
+    <parent link="base_link"/><child link="zed_camera_link"/>
+  </joint>
+
+  <link name="gnss_link"/>
+  <joint name="gnss_mount_joint" type="fixed">
+    <origin xyz="${gnss_x} ${gnss_y} ${gnss_z}"/>
+    <parent link="base_link"/><child link="gnss_link"/>
+  </joint>
+</robot>

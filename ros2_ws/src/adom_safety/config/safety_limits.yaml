@@ -1,0 +1,10 @@
+safety:
+  ros__parameters:
+    emergency_stop_topic: /emergency_stop
+    command_timeout_sec: 0.25
+    max_manual_speed_mps: 0.8
+    max_autonomous_speed_mps: 1.2
+    max_roll_rad: 0.52
+    max_pitch_rad: 0.52
+    gnss_fix_timeout_sec: 1.0
+    odometry_timeout_sec: 0.3

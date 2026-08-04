@@ -1,0 +1,25 @@
+/**:
+  ros__parameters:
+    general:
+      camera_model: zed2i
+      grab_resolution: HD720
+      grab_frame_rate: 30
+      pub_frame_rate: 30.0
+    depth:
+      depth_mode: NEURAL
+      point_cloud_freq: 15.0
+    pos_tracking:
+      pos_tracking_enabled: true
+      imu_fusion: true
+      two_d_mode: false
+      # The external localization stack owns map->odom and odom->base_link.
+      publish_tf: false
+      publish_map_tf: false
+    sensors:
+      publish_imu: true
+      publish_imu_raw: true
+      publish_mag: true
+      publish_imu_tf: true
+    gnss_fusion:
+      # ADOM initially uses robot_localization. Do not enable both fusion paths.
+      gnss_fusion_enabled: false

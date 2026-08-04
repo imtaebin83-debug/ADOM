@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>adom_planning</name>
+  <version>0.1.0</version>
+  <description>RTK waypoint and Nav2 planning configuration for ADOM.</description>
+  <maintainer email="adom@example.com">ADOM Team</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_smac_planner</exec_depend>
+  <exec_depend>nav2_regulated_pure_pursuit_controller</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

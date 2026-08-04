@@ -1,0 +1,10 @@
+nmea_serial_driver:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    baud: 115200
+    frame_id: gnss_link
+    time_ref_source: gps
+    useRMC: false
+
+# This is an NMEA fallback profile. If the Beitian receiver uses UBX or another
+# protocol, replace only the driver while preserving /fix: sensor_msgs/NavSatFix.

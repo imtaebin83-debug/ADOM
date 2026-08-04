@@ -1,0 +1,28 @@
+{
+  "dataset": "rellis3d_semantic20_v1",
+  "validation": "PASS",
+  "split_policy": "sequence_level",
+  "num_classes": 19,
+  "ignore_index": 255,
+  "reduce_zero_label": false,
+  "image_count": 6234,
+  "mask_count": 6234,
+  "paired_count": 6234,
+  "splits": {
+    "train": 4435,
+    "val": 900,
+    "test": 899
+  },
+  "split_total": 6234,
+  "train_sequences": [
+    "00000",
+    "00001",
+    "00002"
+  ],
+  "val_sequences": [
+    "00003"
+  ],
+  "test_sequences": [
+    "00004"
+  ]
+}

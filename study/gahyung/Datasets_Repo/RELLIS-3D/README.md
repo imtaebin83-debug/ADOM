@@ -1,13 +1,23 @@
-# RELLIS-3D Preprocessing
+﻿# RELLIS-3D Preprocessing
 
-RELLIS-3D semantic annotation을 ADOM Cost4 라벨로 변환한 과정과 결과를 저장합니다.
+This directory contains versioned preprocessing workflows for the
+RELLIS-3D dataset.
 
-## 실제 업로드 항목
+## Versions
 
-- 최종 전처리 스크립트
-- `config/class_mapping.yaml`
-- `splits/train.txt`, `val.txt`, `test.txt`
-- `results/class_statistics.csv`
-- `results/qc_report.csv`
-- `results/final_check.txt`
-- 소수의 representative preview
+- `rellis3d_cost4_v1/`
+  - Existing ADOM Cost4 preprocessing.
+  - Target IDs: `0`, `1`, `2`, `3`, and `255`.
+
+- `rellis3d_semantic20_v1/`
+  - RELLIS-3D original semantic ontology preprocessing.
+  - The ontology contains 20 classes including `void`.
+  - Training masks use 19 semantic classes and `255` for `void`.
+
+## Repository scope
+
+This repository stores preprocessing scripts, mappings, split files,
+tests, QC summaries, and representative previews.
+
+Raw RGB images, full masks, processed datasets, archives, model weights,
+and training artifacts are not tracked in Git.

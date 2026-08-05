@@ -66,6 +66,9 @@ data/external/
 data/captures/
 /datasets/
 *.tar
+*.zip
+*.tgz
+*.tar.gz
 models/checkpoints/
 models/exports/
 *.pt

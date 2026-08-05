@@ -141,6 +141,13 @@ gamepad_control:
 5. `B` 정지, 게임패드 연결 해제, 자율 명령 중단 시 중립을 확인한다.
 6. 그 뒤 `vehicle.yaml`의 `dry_run`을 `false`로 바꾸고 다시 빌드한다.
 
+설정을 영구 변경하지 않고 실제 PCA9685 PWM을 활성화하려면 모든 바퀴를 띄우고
+물리적 전원 차단 수단을 준비한 다음 다음처럼 명시적으로 실행한다.
+
+```bash
+ros2 launch adom_control gamepad_control.launch.py dry_run:=false
+```
+
 하드웨어 모드에는 `adafruit-circuitpython-pca9685`가 필요하다. 엔코더가 없는
 open-loop throttle이므로 명령의 `m/s` 값은 실제 측정 속도를 보장하지 않는다.
 소프트웨어 정지는 물리적인 LiPo/ESC 차단 장치를 대체하지 않는다.

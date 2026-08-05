@@ -23,11 +23,15 @@ wandb_init_kwargs = dict(
         "{{$WANDB_EXTRA_TAG:runpod}}",
     ],
 )
+wandb_mode = "{{$WANDB_MODE:online}}".strip().lower()
 vis_backends = [
-    dict(type="WandbVisBackend", init_kwargs=wandb_init_kwargs),
     dict(type="TensorboardVisBackend"),
     dict(type="LocalVisBackend"),
 ]
+if wandb_mode != "disabled":
+    vis_backends.insert(
+        0, dict(type="WandbVisBackend", init_kwargs=wandb_init_kwargs)
+    )
 visualizer = dict(
     type="SegLocalVisualizer",
     vis_backends=vis_backends,

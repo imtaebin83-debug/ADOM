@@ -362,9 +362,6 @@ def _train_stage(
         phase=f"{experiment}-{stage}-{gate}",
         job_type="training",
     )
-    stage_env["WANDB_EXTRA_TAG"] = "extra:" + stage_env.get(
-        "WANDB_TAGS", "runpod"
-    ).replace(",", "+")
     _run_phase(
         state,
         name=f"{model}_{stage}",
@@ -611,9 +608,6 @@ def run_cycle(args: argparse.Namespace) -> None:
             phase=f"{args.experiment}-test",
             job_type="evaluation",
         )
-        test_env["WANDB_EXTRA_TAG"] = "extra:" + test_env.get(
-            "WANDB_TAGS", "runpod"
-        ).replace(",", "+")
         _run_phase(
             state,
             name=f"{model}_test",

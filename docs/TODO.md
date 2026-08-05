@@ -1,5 +1,26 @@
 # TODO: Phase 1 Semantic20 전처리 안정화
 
+> 아래 상세 내용은 안정화 과정에서 발견한 결함과 완료 조건을 보존한 기록이다.
+> 실제 진행 여부는 이 체크리스트를 기준으로 한다.
+
+## 진행 현황 (2026-08-05)
+
+- [x] 공식 RUGD RGB mask와 indexed mask 입력을 모두 지원한다.
+- [x] unknown RGB, pair/크기, dtype/channel, target ID를 fail-fast 검증한다.
+- [x] 중단 후 재개 가능한 canonical preprocess CLI와 원자적 publish를 구현한다.
+- [x] legacy `study` runtime 의존성을 제거하고 Semantic20 package data를 이미지에 포함한다.
+- [x] RELLIS/RUGD split parsing 및 missing/unexpected/duplicate 검사를 보강한다.
+- [x] 관련 unit/integration test와 Docker image 내부 contract test를 통과한다.
+- [x] E0/E1 processed dataset과 `final_check.json` 완료 조건을 통과한다.
+- [x] GitHub Actions에서 immutable Git SHA Docker image 빌드·검사·push를 완료한다.
+- [x] RunPod A100 80GB runtime/image preflight와 E0/E1 전체 dataset contract를 통과한다.
+- [x] Gate 0: E0 SegFormer B0 micro-batch probe를 `16/1` effective batch 16으로 통과한다.
+- [ ] 학습 중 `tqdm` 진행률 표시를 구현한다.
+- [ ] Gate 1: E0 B0 50-update smoke를 통과한다.
+- [ ] Gate 2: E0 B0 500-update mini-run과 W&B/validation을 통과한다.
+- [ ] Gate 3: checkpoint 및 optimizer/scheduler resume을 검증한다.
+- [ ] 위 gate 결과 검토 후에만 E0 B0 full run을 시작한다.
+
 ## 범위와 담당 구분
 
 - 대상은 공식 RUGD RGB annotation을 RELLIS 기반 Semantic20 공간으로 변환하는
@@ -89,6 +110,25 @@ ValueError: Expected indexed mask, got shape (550, 688, 3):
   양방향 비교하여 missing, unexpected, duplicate를 모두 검출한다.
 - preflight에서 mask mode, shape, dtype, observed palette/ID를 표본이 아닌 전체
   또는 충분히 강한 deterministic audit으로 확인한다.
+
+## P1: tmux 학습 진행률 가시화
+
+- [ ] `tmux`의 interactive TTY에서 학습 runner iteration과 optimizer update 진행률을
+  `tqdm` progress bar로 실시간 표시한다.
+- [ ] 현재 gate, experiment, model, stage, update/total, loss, learning rate, ETA와
+  CUDA peak memory를 한 줄에서 확인할 수 있게 한다.
+- [ ] gradient accumulation을 사용할 때 runner iteration이 아니라 optimizer update
+  기준 진행률이 정확히 표시되도록 한다.
+- [ ] validation/test에는 처리한 sample 수와 전체 sample 수를 별도 progress bar로
+  표시한다.
+- [ ] non-TTY, GitHub Actions, 파일 redirection 환경에서는 progress bar를 자동으로
+  비활성화하고 기존 MMEngine logger를 유지한다.
+- [ ] `tqdm` 출력이 W&B, TensorBoard, MMEngine 로그 및 Network Volume에 보존되는
+  텍스트 로그를 깨뜨리지 않도록 한다.
+- [ ] 매 iteration의 불필요한 CUDA synchronize를 피하고 측정 가능한 학습 처리량
+  저하가 없도록 한다.
+- [ ] TTY/non-TTY 동작, gradient accumulation update 계산, 종료/예외 시 progress bar
+  정리를 회귀 테스트로 검증한다.
 
 ## 테스트 요구사항
 

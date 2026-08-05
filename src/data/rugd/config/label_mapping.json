@@ -1,0 +1,31 @@
+{
+  "dataset": "RUGD",
+  "mapping_version": "official-colormap-v1",
+  "source_palette_rgb": [
+    {"source_id": 0, "source_class": "void", "rgb": [0, 0, 0]},
+    {"source_id": 1, "source_class": "dirt", "rgb": [108, 64, 20]},
+    {"source_id": 2, "source_class": "sand", "rgb": [255, 229, 204]},
+    {"source_id": 3, "source_class": "grass", "rgb": [0, 102, 0]},
+    {"source_id": 4, "source_class": "tree", "rgb": [0, 255, 0]},
+    {"source_id": 5, "source_class": "pole", "rgb": [0, 153, 153]},
+    {"source_id": 6, "source_class": "water", "rgb": [0, 128, 255]},
+    {"source_id": 7, "source_class": "sky", "rgb": [0, 0, 255]},
+    {"source_id": 8, "source_class": "vehicle", "rgb": [255, 255, 0]},
+    {"source_id": 9, "source_class": "container", "rgb": [255, 0, 127]},
+    {"source_id": 10, "source_class": "asphalt", "rgb": [64, 64, 64]},
+    {"source_id": 11, "source_class": "gravel", "rgb": [255, 128, 0]},
+    {"source_id": 12, "source_class": "building", "rgb": [255, 0, 0]},
+    {"source_id": 13, "source_class": "mulch", "rgb": [153, 76, 0]},
+    {"source_id": 14, "source_class": "rock-bed", "rgb": [102, 102, 0]},
+    {"source_id": 15, "source_class": "log", "rgb": [102, 0, 0]},
+    {"source_id": 16, "source_class": "bicycle", "rgb": [0, 255, 128]},
+    {"source_id": 17, "source_class": "person", "rgb": [204, 153, 255]},
+    {"source_id": 18, "source_class": "fence", "rgb": [102, 0, 204]},
+    {"source_id": 19, "source_class": "bush", "rgb": [255, 153, 204]},
+    {"source_id": 20, "source_class": "sign", "rgb": [0, 102, 102]},
+    {"source_id": 21, "source_class": "rock", "rgb": [153, 204, 255]},
+    {"source_id": 22, "source_class": "bridge", "rgb": [102, 255, 255]},
+    {"source_id": 23, "source_class": "concrete", "rgb": [101, 101, 11]},
+    {"source_id": 24, "source_class": "picnic-table", "rgb": [114, 85, 47]}
+  ]
+}

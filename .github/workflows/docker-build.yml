@@ -49,10 +49,16 @@ jobs:
       - name: Run project tests inside the dependency image
         run: >-
           docker run --rm
-          -v "${GITHUB_WORKSPACE}:/workspace/adom/repo"
-          -e PYTHONPATH=/workspace/adom/repo/src
+          -v "${GITHUB_WORKSPACE}:/opt/adom-tests/repo:ro"
+          -e PYTHONPATH=/opt/adom/src
           adom-mmseg:smoke
-          python -m unittest discover -s /workspace/adom/repo/tests -v
+          python -m unittest discover -s /opt/adom-tests/repo/tests -v
+
+      - name: Verify immutable image source and Semantic20 assets
+        run: >-
+          docker run --rm
+          adom-mmseg:smoke
+          python -c "import os; from adom.data.semantic20 import resource_path; assert os.environ['ADOM_GIT_SHA'] == '${{ github.sha }}'; assert resource_path('rellis','splits','train.txt').is_file(); assert resource_path('rugd','config','label_mapping.json').is_file(); print('image-contract-pass')"
 
       - name: Push tested image
         run: |

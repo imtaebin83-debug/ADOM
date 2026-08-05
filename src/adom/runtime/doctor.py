@@ -4,6 +4,7 @@ import argparse
 import importlib
 import importlib.metadata
 import json
+import os
 import platform
 import sys
 from pathlib import Path
@@ -38,6 +39,9 @@ def run_doctor(
     dataset_root: Path | None,
     require_gpu: bool,
     require_deployment: bool = True,
+    require_gpu_name: str | None = None,
+    minimum_gpu_memory_gib: float | None = None,
+    expected_image_sha: str | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     versions: dict[str, str] = {}
@@ -68,6 +72,8 @@ def run_doctor(
         "ftfy",
         "regex",
         "prettytable",
+        "torch",
+        "adom.mmseg",
     ]
     if require_deployment:
         runtime_modules.extend(("mmdeploy", "onnx", "onnxruntime"))
@@ -93,6 +99,23 @@ def run_doctor(
         errors.append(f"torch GPU check failed: {error}")
     if require_gpu and not gpu["available"]:
         errors.append("CUDA GPU is required but torch.cuda.is_available() is false")
+    if require_gpu_name and require_gpu_name.casefold() not in str(gpu.get("name", "")).casefold():
+        errors.append(
+            f"GPU name must contain {require_gpu_name!r}, got {gpu.get('name')!r}"
+        )
+    if minimum_gpu_memory_gib is not None:
+        actual_gib = float(gpu.get("memory_bytes", 0)) / (1024**3)
+        if actual_gib < minimum_gpu_memory_gib:
+            errors.append(
+                f"GPU memory is {actual_gib:.2f} GiB, expected at least "
+                f"{minimum_gpu_memory_gib:.2f} GiB"
+            )
+
+    image_sha = os.getenv("ADOM_GIT_SHA", "unknown")
+    if expected_image_sha and image_sha != expected_image_sha:
+        errors.append(
+            f"image Git SHA mismatch: ADOM_GIT_SHA={image_sha}, expected={expected_image_sha}"
+        )
 
     dataset: dict[str, Any] | None = None
     if dataset_root is not None:
@@ -115,6 +138,7 @@ def run_doctor(
         "gpu": gpu,
         "dataset": dataset,
         "deployment_required": require_deployment,
+        "image_git_sha": image_sha,
         "errors": errors,
     }
 
@@ -124,12 +148,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dataset-root", type=Path)
     parser.add_argument("--require-gpu", action="store_true")
     parser.add_argument("--skip-deployment", action="store_true")
+    parser.add_argument("--require-gpu-name")
+    parser.add_argument("--minimum-gpu-memory-gib", type=float)
+    parser.add_argument("--expected-image-sha")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     report = run_doctor(
         args.dataset_root,
         args.require_gpu,
         require_deployment=not args.skip_deployment,
+        require_gpu_name=args.require_gpu_name,
+        minimum_gpu_memory_gib=args.minimum_gpu_memory_gib,
+        expected_image_sha=args.expected_image_sha,
     )
     text = json.dumps(report, indent=2, sort_keys=True)
     print(text)

@@ -7,10 +7,15 @@ import json
 import os
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from PIL import Image
+
 from adom.data.io import write_json
+from adom.data.semantic20 import resource_path
 from adom.runtime.checkpoints import resolve_single_best_checkpoint
 from adom.runtime.cycle import (
     CONFIG_ROOT,
@@ -26,16 +31,20 @@ from adom.runtime.cycle import (
 
 
 CONFIG_DIR = CONFIG_ROOT / "adom" / "phase1_semantic20"
-REFERENCE_SPLITS = (
-    REPO_ROOT
-    / "study"
-    / "gahyung"
-    / "Datasets_Repo"
-    / "RELLIS-3D"
-    / "rellis3d_semantic20_v1"
-    / "splits"
-)
+REFERENCE_SPLITS = resource_path("rellis", "splits")
 GATE_UPDATES = {"smoke": 50, "mini": 500}
+EXPECTED_SPLIT_COUNTS = {
+    "e0": {"train": 4435, "val": 900, "test": 899},
+    "e1": {"train": 9868, "val": 900, "test": 899},
+}
+EXPECTED_E1_MANIFEST_COUNT = 14421
+EXPECTED_E1_MAIN_SOURCE_COUNTS = Counter(
+    {"rellis3d": 6234, "rugd": 4779, "ycor": 654}
+)
+EXPECTED_E1_MANIFEST_SOURCE_COUNTS = Counter(
+    {"rellis3d": 6234, "rugd": 7436, "ycor": 751}
+)
+ALLOWED_TARGET_IDS = set(range(19)) | {255}
 
 
 def _read_split(path: Path) -> list[str]:
@@ -55,7 +64,37 @@ def _rellis_key(value: str) -> str:
     return value.removeprefix("rellis3d/")
 
 
+def _validate_semantic20_pair(image: Path, mask: Path, key: str) -> None:
+    if not image.is_file() or not mask.is_file():
+        raise FileNotFoundError(f"Missing dataset pair: {image}, {mask}")
+    with Image.open(image) as image_file:
+        image_file.load()
+        image_size = image_file.size
+    with Image.open(mask) as mask_file:
+        mask_file.load()
+        mask_mode = mask_file.mode
+        mask_array = np.asarray(mask_file)
+    if mask_array.ndim != 2 or mask_mode not in {"L", "P"}:
+        raise RuntimeError(
+            f"Mask must be single-channel for {key}: mode={mask_mode}, "
+            f"shape={mask_array.shape}"
+        )
+    if mask_array.dtype != np.uint8:
+        raise RuntimeError(f"Mask must be uint8 for {key}: {mask_array.dtype}")
+    if image_size != (mask_array.shape[1], mask_array.shape[0]):
+        raise RuntimeError(
+            f"Image/mask size mismatch for {key}: "
+            f"image={image_size}, mask={mask_array.shape}"
+        )
+    invalid_ids = {int(value) for value in np.unique(mask_array)} - ALLOWED_TARGET_IDS
+    if invalid_ids:
+        raise RuntimeError(f"Invalid Semantic20 target IDs for {key}: {sorted(invalid_ids)}")
+
+
 def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str, Any]:
+    success_marker = dataset_root / "_SUCCESS"
+    if not success_marker.is_file():
+        raise FileNotFoundError(f"Dataset success marker is missing: {success_marker}")
     expected: dict[str, list[str]] = {
         split: _read_split(REFERENCE_SPLITS / f"{split}.txt")
         for split in ("train", "val", "test")
@@ -64,6 +103,15 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         split: _read_split(dataset_root / "splits" / f"{split}.txt")
         for split in ("train", "val", "test")
     }
+    actual_counts = {key: len(value) for key, value in actual.items()}
+    if actual_counts != EXPECTED_SPLIT_COUNTS[experiment]:
+        raise RuntimeError(
+            f"{experiment} split counts differ from the Semantic20 contract: "
+            f"actual={actual_counts}, expected={EXPECTED_SPLIT_COUNTS[experiment]}"
+        )
+    all_keys = [key for values in actual.values() for key in values]
+    if len(all_keys) != len(set(all_keys)):
+        raise RuntimeError(f"{experiment} sample occurs in more than one main split")
     for split in ("val", "test"):
         normalized = [_rellis_key(value) for value in actual[split]]
         if normalized != expected[split]:
@@ -91,6 +139,12 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
 
     manifest_rows: dict[str, tuple[str, str]] = {}
     if experiment == "e1":
+        final_check_path = dataset_root / "results" / "final_check.json"
+        if not final_check_path.is_file():
+            raise FileNotFoundError(f"E1 final check is missing: {final_check_path}")
+        final_check = json.loads(final_check_path.read_text(encoding="utf-8-sig"))
+        if str(final_check.get("status", "")).upper() != "PASS":
+            raise RuntimeError(f"E1 final check is not PASS: {final_check_path}")
         manifest_path = dataset_root / "manifest.csv"
         if not manifest_path.is_file():
             raise FileNotFoundError(f"E1 manifest is missing: {manifest_path}")
@@ -107,22 +161,49 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
                 if key in manifest_rows:
                     raise RuntimeError(f"Duplicate E1 manifest sample: {key}")
                 manifest_rows[key] = (row["image_path"], row["mask_path"])
+        if len(manifest_rows) != EXPECTED_E1_MANIFEST_COUNT:
+            raise RuntimeError(
+                "E1 manifest count differs from contract: "
+                f"{len(manifest_rows)} != {EXPECTED_E1_MANIFEST_COUNT}"
+            )
 
     # Check every pair before paying for GPU time. E1 must use manifest paths
     # because RUGD images are PNG while RELLIS and YCOR images are JPEG.
+    main_source_counts: Counter[str] = Counter()
+    verified_pairs = 0
+    if experiment == "e1":
+        manifest_source_counts: Counter[str] = Counter()
+        for key, (image_relpath, mask_relpath) in manifest_rows.items():
+            image = (dataset_root / image_relpath).resolve()
+            mask = (dataset_root / mask_relpath).resolve()
+            if dataset_root.resolve() not in image.parents or dataset_root.resolve() not in mask.parents:
+                raise RuntimeError(f"E1 manifest path escapes dataset root: {key}")
+            _validate_semantic20_pair(image, mask, key)
+            manifest_source_counts[key.split("/", 1)[0]] += 1
+            verified_pairs += 1
+        if manifest_source_counts != EXPECTED_E1_MANIFEST_SOURCE_COUNTS:
+            raise RuntimeError(
+                "E1 manifest source counts differ from contract: "
+                f"{dict(manifest_source_counts)}"
+            )
+
     for split, keys in actual.items():
         for key in keys:
             if experiment == "e1":
                 if key not in manifest_rows:
                     raise RuntimeError(f"E1 split sample is absent from manifest: {key}")
-                image_relpath, mask_relpath = manifest_rows[key]
-                image = dataset_root / image_relpath
-                mask = dataset_root / mask_relpath
+                main_source_counts[key.split("/", 1)[0]] += 1
             else:
                 image = dataset_root / "images" / f"{key}.jpg"
                 mask = dataset_root / "masks" / f"{key}.png"
-            if not image.is_file() or not mask.is_file():
-                raise FileNotFoundError(f"Missing {split} pair: {image}, {mask}")
+                _validate_semantic20_pair(image, mask, key)
+                verified_pairs += 1
+
+    if experiment == "e1" and main_source_counts != EXPECTED_E1_MAIN_SOURCE_COUNTS:
+        # Main val/test are RELLIS-only, so 4,435+900+899 RELLIS pairs are checked.
+        raise RuntimeError(
+            f"E1 main split source counts differ from contract: {dict(main_source_counts)}"
+        )
 
     digest = hashlib.sha256()
     for split in ("train", "val", "test"):
@@ -131,7 +212,8 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         "experiment": experiment,
         "num_classes": 19,
         "ignore_index": 255,
-        "split_counts": {key: len(value) for key, value in actual.items()},
+        "split_counts": actual_counts,
+        "verified_pairs": verified_pairs,
         "split_contract_sha256": digest.hexdigest(),
         "validation_test_policy": "canonical RELLIS-only",
     }
@@ -299,6 +381,90 @@ def _train_stage(
     return best
 
 
+def _run_resume_gate(
+    *,
+    state: CycleState,
+    model: str,
+    experiment: str,
+    output_root: Path,
+    env: dict[str, str],
+    train_tool: Path,
+) -> None:
+    work_dir = output_root / model / "resume_check"
+    base_env = dict(env)
+    base_env.update(
+        {
+            "WANDB_MODE": "disabled",
+            "ADOM_VAL_INTERVAL_OPTIMIZER_UPDATES": "5",
+            "ADOM_CHECKPOINT_INTERVAL_OPTIMIZER_UPDATES": "1",
+            "ADOM_METRIC_OUTPUT_DIR": work_dir.as_posix(),
+        }
+    )
+    config = _config(model, "stage1", experiment)
+    first_env = dict(base_env)
+    first_env["ADOM_MAX_OPTIMIZER_UPDATES"] = "2"
+    _run_phase(
+        state,
+        name=f"{model}_resume_seed",
+        command=[
+            sys.executable,
+            str(train_tool),
+            str(config),
+            "--work-dir",
+            str(work_dir),
+        ],
+        artifacts=[work_dir / "last_checkpoint"],
+        env=first_env,
+        resume=False,
+    )
+    first_checkpoint = _resumable_checkpoint(work_dir)
+    if first_checkpoint is None:
+        raise RuntimeError("Resume gate did not create its seed checkpoint")
+
+    second_env = dict(base_env)
+    second_env["ADOM_MAX_OPTIMIZER_UPDATES"] = "4"
+    _run_phase(
+        state,
+        name=f"{model}_resume_restore",
+        command=[
+            sys.executable,
+            str(train_tool),
+            str(config),
+            "--work-dir",
+            str(work_dir),
+            "--resume",
+            "--cfg-options",
+            "load_from=None",
+        ],
+        artifacts=[work_dir / "last_checkpoint"],
+        env=second_env,
+        resume=False,
+    )
+    second_checkpoint = _resumable_checkpoint(work_dir)
+    if second_checkpoint is None or second_checkpoint == first_checkpoint:
+        raise RuntimeError("Resume gate did not advance to a new checkpoint")
+
+    import torch
+
+    checkpoint = torch.load(second_checkpoint, map_location="cpu")
+    required = {"state_dict", "optimizer", "param_schedulers"}
+    missing = required - set(checkpoint)
+    if missing:
+        raise RuntimeError(
+            f"Resumed checkpoint is missing optimizer/scheduler state: {sorted(missing)}"
+        )
+    write_json(
+        work_dir / "resume_check.json",
+        {
+            "status": "PASS",
+            "seed_checkpoint": str(first_checkpoint),
+            "resumed_checkpoint": str(second_checkpoint),
+            "optimizer_state": True,
+            "scheduler_state": True,
+        },
+    )
+
+
 def run_cycle(args: argparse.Namespace) -> None:
     dataset_root = args.dataset.resolve()
     output_root = args.output.resolve()
@@ -325,18 +491,25 @@ def run_cycle(args: argparse.Namespace) -> None:
         raise RuntimeError("--models contains duplicates")
 
     doctor_path = output_root / "doctor.json"
+    doctor_command = [
+        sys.executable,
+        "-m",
+        "adom.runtime.doctor",
+        "--require-gpu",
+        "--require-gpu-name",
+        "A100",
+        "--minimum-gpu-memory-gib",
+        "75",
+        "--skip-deployment",
+        "--output",
+        str(doctor_path),
+    ]
+    if args.expected_image_sha:
+        doctor_command.extend(["--expected-image-sha", args.expected_image_sha])
     _run_phase(
         state,
         name="runtime_doctor",
-        command=[
-            sys.executable,
-            "-m",
-            "adom.runtime.doctor",
-            "--require-gpu",
-            "--skip-deployment",
-            "--output",
-            str(doctor_path),
-        ],
+        command=doctor_command,
         artifacts=[doctor_path],
         env=env,
         resume=args.resume,
@@ -386,6 +559,16 @@ def run_cycle(args: argparse.Namespace) -> None:
         model_env = dict(env)
         model_env["ADOM_MICRO_BATCH"] = str(micro_batch)
         model_env["ADOM_ACCUMULATIVE_COUNTS"] = str(accumulative)
+        if args.gate == "resume":
+            _run_resume_gate(
+                state=state,
+                model=model,
+                experiment=args.experiment,
+                output_root=output_root,
+                env=model_env,
+                train_tool=train_tool,
+            )
+            continue
         stage1_best = _train_stage(
             state=state,
             model=model,
@@ -478,10 +661,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--experiment", choices=("e0", "e1"), required=True)
     parser.add_argument("--models", default="b0,b2")
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--gate", choices=("probe", "smoke", "mini", "full"), default="full")
+    parser.add_argument(
+        "--gate",
+        choices=("probe", "smoke", "mini", "resume", "full"),
+        default="full",
+    )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-batch-probe", action="store_true")
     parser.add_argument("--micro-batch", type=int)
+    parser.add_argument(
+        "--expected-image-sha",
+        help="Require ADOM_GIT_SHA inside the immutable Docker image to match.",
+    )
     parser.add_argument(
         "--skip-export",
         action="store_true",

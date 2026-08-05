@@ -1,16 +1,16 @@
-# ADOM Semantic24 bridge
+# ADOM Semantic23 bridge
 
 This package does not download or unpack source datasets. It reads the outputs
 or validated native layouts produced by each dataset-specific preprocessing
-folder, converts masks into the shared ADOM Semantic24 ID space, and then
+folder, converts masks into the shared ADOM Semantic23 ID space, and then
 optionally combines the four converted bridge outputs.
 
 ## Target IDs
 
-RELLIS trainable IDs `0..18` are preserved. ID `19` is reserved and must never
-occur in a mask. The additions are `snow=20`, `animal=21`, `artifact=22`, and
-`cobble=23`; `artifact` contains only GOOSE `traffic_light`, `traffic_sign`,
-and `misc_sign`. Ignore remains `255`.
+RELLIS trainable IDs `0..18` are preserved. The additions continue without a
+gap: `snow=19`, `animal=20`, `artifact=21`, and `cobble=22`; `artifact`
+contains only GOOSE `traffic_light`, `traffic_sign`, and `misc_sign`. Ignore
+remains `255`.
 
 Classes unavailable in a source remain valid target columns with zero counts.
 
@@ -28,13 +28,13 @@ Classes unavailable in a source remain valid target columns with zero counts.
 ## Convert each source
 
 ```bash
-mapping=src/data/semantic_24/config/bridge_mapping.yaml
-script=src/data/semantic_24/scripts/01_convert_dataset_bridge.py
+mapping=src/data/semantic_23/config/bridge_mapping.yaml
+script=src/data/semantic_23/scripts/01_convert_dataset_bridge.py
 
 python "$script" --dataset rellis \
   --input-root /workspace/adom/datasets/processed/phase1-20class-v1/rellis \
   --split-root /workspace/adom/src/data/rellis/splits \
-  --output-root /workspace/adom/datasets/processed/phase1-24class-v1/bridge/rellis \
+  --output-root /workspace/adom/datasets/processed/phase1-23class-v1/bridge/rellis \
   --mapping "$mapping"
 
 python "$script" --dataset rugd \
@@ -42,17 +42,17 @@ python "$script" --dataset rugd \
   --image-root "$RUGD_IMAGE_ROOT" \
   --mask-root "$RUGD_INDEX_MASK_ROOT" \
   --split-root /workspace/adom/src/data/rugd/splits \
-  --output-root /workspace/adom/datasets/processed/phase1-24class-v1/bridge/rugd \
+  --output-root /workspace/adom/datasets/processed/phase1-23class-v1/bridge/rugd \
   --mapping "$mapping"
 
 python "$script" --dataset ycor \
   --input-root "$YCOR_NATIVE_ROOT" \
-  --output-root /workspace/adom/datasets/processed/phase1-24class-v1/bridge/ycor \
+  --output-root /workspace/adom/datasets/processed/phase1-23class-v1/bridge/ycor \
   --mapping "$mapping"
 
 python "$script" --dataset goose \
   --input-root /workspace/adom/datasets/raw/goose/dataset/goose-2d-visible-v1 \
-  --output-root /workspace/adom/datasets/processed/phase1-24class-v1/bridge/goose \
+  --output-root /workspace/adom/datasets/processed/phase1-23class-v1/bridge/goose \
   --mapping "$mapping"
 ```
 
@@ -62,7 +62,7 @@ Each output root must be absent or empty. Source files are never modified.
 
 For every GOOSE native pair the converter:
 
-1. maps the original 64-class mask to Semantic24;
+1. maps the original 64-class mask to Semantic23;
 2. calculates each target class pixel count and percentage using all image
    pixels, including ignored pixels, as the denominator;
 3. materializes every RGB/mask pair without class-ratio or class-presence
@@ -79,16 +79,16 @@ GOOSE-specific mapping additions are `cobble -> cobble`, `crops -> bush`,
 ## Combine and validate
 
 ```bash
-root=/workspace/adom/datasets/processed/phase1-24class-v1
+root=/workspace/adom/datasets/processed/phase1-23class-v1
 
-python src/data/semantic_24/scripts/02_build_combined_package.py \
+python src/data/semantic_23/scripts/02_build_combined_package.py \
   --rellis-root "$root/bridge/rellis" \
   --rugd-root "$root/bridge/rugd" \
   --ycor-root "$root/bridge/ycor" \
   --goose-root "$root/bridge/goose" \
   --output-root "$root/combined"
 
-python src/data/semantic_24/scripts/03_validate_combined_package.py \
+python src/data/semantic_23/scripts/03_validate_combined_package.py \
   --input-root "$root/combined"
 ```
 

@@ -11,11 +11,11 @@ import numpy as np
 from PIL import Image
 
 
-ALLOWED_IDS = set(range(24)) | {255}
+ALLOWED_IDS = set(range(23)) | {255}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Validate an ADOM Semantic24 package.")
+    parser = argparse.ArgumentParser(description="Validate an ADOM Semantic23 package.")
     parser.add_argument("--input-root", type=Path, required=True)
     return parser.parse_args()
 
@@ -97,8 +97,8 @@ def main() -> None:
         values, counts = np.unique(mask, return_counts=True)
         ids = {int(value) for value in values}
         invalid = sorted(ids - ALLOWED_IDS)
-        if invalid or 19 in ids:
-            raise ValueError(f"Invalid/reserved target IDs in {mask_path}: {invalid or [19]}")
+        if invalid:
+            raise ValueError(f"Invalid target IDs in {mask_path}: {invalid}")
         for value, count in zip(values, counts):
             class_pixels[int(value)] += int(count)
             class_frames[int(value)] += 1
@@ -113,14 +113,13 @@ def main() -> None:
         "source_counts": dict(sorted(source_counts.items())),
         "main_split_counts": {key: len(value) for key, value in main_splits.items()},
         "valid_target_ids": sorted(class_pixels),
-        "reserved_target_id_19_pixels": class_pixels[19],
-        "class_pixel_counts": {str(key): class_pixels[key] for key in range(24)},
-        "class_frame_counts": {str(key): class_frames[key] for key in range(24)},
+        "class_pixel_counts": {str(key): class_pixels[key] for key in range(23)},
+        "class_frame_counts": {str(key): class_frames[key] for key in range(23)},
         "evaluation_policy": "main val/test contain RELLIS only",
     }
     report_path = root / "metadata" / "validation_report.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Semantic24 validation PASS: {report_path}")
+    print(f"Semantic23 validation PASS: {report_path}")
 
 
 if __name__ == "__main__":

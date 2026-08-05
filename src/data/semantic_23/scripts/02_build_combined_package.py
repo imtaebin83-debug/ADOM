@@ -16,7 +16,7 @@ SOURCES = ("rellis", "rugd", "ycor", "goose")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Combine four already converted Semantic24 bridge outputs."
+        description="Combine four already converted Semantic23 bridge outputs."
     )
     for source in SOURCES:
         parser.add_argument(f"--{source}-root", type=Path, required=True)
@@ -178,9 +178,8 @@ def main() -> None:
     summary = {
         "status": "PASS",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "dataset_name": "adom_semantic24_rellis_rugd_ycor_goose_v1",
-        "num_classes": 24,
-        "reserved_target_id": 19,
+        "dataset_name": "adom_semantic23_rellis_rugd_ycor_goose_v1",
+        "num_classes": 23,
         "ignore_index": 255,
         "sample_count": len(combined_rows),
         "source_counts": dict(sorted(source_counts.items())),
@@ -193,7 +192,7 @@ def main() -> None:
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"Semantic24 combined package completed: {output_root}")
+    print(f"Semantic23 combined package completed: {output_root}")
 
 
 if __name__ == "__main__":

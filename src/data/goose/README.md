@@ -5,7 +5,7 @@ keeps visible windshield RGB images and original `*_labelids.png` masks. It
 does not remap labels, select frames, or modify an existing output directory.
 
 The resulting immutable source folder is the GOOSE input to
-`src/data/semantic_24`; ADOM24 conversion is deliberately a separate stage.
+`src/data/semantic_23`; ADOM23 conversion is deliberately a separate stage.
 
 ## Server execution
 

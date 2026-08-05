@@ -1,4 +1,4 @@
-# 0006: GOOSE native preprocessing and Semantic24 data bridge
+# 0006: GOOSE native preprocessing and contiguous Semantic23 data bridge
 
 - Status: proposed for review
 - Date: 2026-08-05
@@ -13,7 +13,7 @@ materializes visible windshield RGB plus the original 64-class label-ID masks.
 It validates selected ZIP member CRCs, pairing, dimensions, and IDs, and writes
 portable metadata. It does not remap labels or select frames.
 
-`src/data/semantic_24` is a bridge over validated source outputs. It accepts:
+`src/data/semantic_23` is a bridge over validated source outputs. It accepts:
 
 - RELLIS Semantic20 indexed masks;
 - RUGD original index-label masks and committed splits;
@@ -28,15 +28,14 @@ diagnostic splits.
 ## Label contract
 
 The existing RELLIS preprocessing has 19 trainable classes with IDs `0..18`.
-To retain the explicitly approved new IDs, target ID `19` is reserved and is
-forbidden in every output mask. Model output indices are:
+The four GOOSE additions continue directly from ID 18 with no reserved or
+unused output channel. Model output indices are:
 
 - RELLIS semantic classes: `0..18`;
-- reserved, no pixels: `19`;
-- snow: `20`;
-- animal: `21`;
-- artifact: `22`;
-- cobble: `23`;
+- snow: `19`;
+- animal: `20`;
+- artifact: `21`;
+- cobble: `22`;
 - ignore: `255`.
 
 GOOSE artifact contains only `traffic_light`, `traffic_sign`, and `misc_sign`.
@@ -59,7 +58,7 @@ Separating immutable source normalization from experimental ontology mapping
 allows mapping and selection policy changes without repeatedly unpacking the
 large GOOSE archives. Source-specific validation remains owned by each dataset
 pipeline, while the bridge has one explicit, reviewable label contract and
-portable server CLI. Reserving ID 19 reconciles the existing 19-trainable-class
-RELLIS implementation with the approved fixed IDs `20..23` without silently
-shifting label indices. Full GOOSE materialization prevents selection-policy
-changes from silently omitting source frames.
+portable server CLI. Contiguous IDs avoid an unused decoder channel and match
+the actual 19-trainable-class RELLIS implementation plus four GOOSE additions.
+Full GOOSE materialization prevents selection-policy changes from silently
+omitting source frames.

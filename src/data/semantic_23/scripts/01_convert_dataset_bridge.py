@@ -16,8 +16,7 @@ import yaml
 from PIL import Image
 
 
-TARGET_IDS = set(range(24)) | {255}
-RESERVED_TARGET_ID = 19
+TARGET_IDS = set(range(23)) | {255}
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg")
 
 
@@ -33,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     tool_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(
         description=(
-            "Bridge one validated dataset source into the ADOM Semantic24 ID space. "
+            "Bridge one validated dataset source into the ADOM Semantic23 ID space. "
             "Every GOOSE input pair is materialized after remapping."
         )
     )
@@ -71,20 +70,18 @@ def load_config(path: Path) -> dict[str, Any]:
         config = yaml.safe_load(file)
     if not isinstance(config, dict):
         raise ValueError(f"Invalid YAML root: {path}")
-    if int(config.get("num_classes", -1)) != 24:
-        raise ValueError("num_classes must be 24")
+    if int(config.get("num_classes", -1)) != 23:
+        raise ValueError("num_classes must be 23")
     if int(config.get("ignore_index", -1)) != 255:
         raise ValueError("ignore_index must be 255")
     target_classes = {int(key): str(value) for key, value in config["target_classes"].items()}
     if set(target_classes) != TARGET_IDS:
-        raise ValueError("target_classes must contain IDs 0..23 and 255")
-    expected_new = {20: "snow", 21: "animal", 22: "artifact", 23: "cobble"}
+        raise ValueError("target_classes must contain IDs 0..22 and 255")
+    expected_new = {19: "snow", 20: "animal", 21: "artifact", 22: "cobble"}
     if {key: target_classes[key] for key in expected_new} != expected_new:
         raise ValueError(
-            "New target classes must be snow=20, animal=21, artifact=22, cobble=23"
+            "New target classes must be snow=19, animal=20, artifact=21, cobble=22"
         )
-    if target_classes[RESERVED_TARGET_ID] != "reserved":
-        raise ValueError("Target ID 19 must remain reserved")
     return config
 
 
@@ -103,7 +100,7 @@ def load_mapping(config: dict[str, Any], dataset: str) -> dict[int, int]:
         source_id = int(source_key)
         target_id = int(entry["target_id"])
         use = bool(entry.get("use", target_id != 255))
-        if target_id not in TARGET_IDS or target_id == RESERVED_TARGET_ID:
+        if target_id not in TARGET_IDS:
             raise ValueError(f"Invalid target ID {target_id}: {dataset}/{source_id}")
         if not use and target_id != 255:
             raise ValueError(f"use=false must map to 255: {dataset}/{source_id}")
@@ -282,8 +279,8 @@ def remap_mask(source_mask: np.ndarray, mapping: dict[int, int], dataset: str, p
         target[source_mask == source_id] = target_id
     output_ids = {int(value) for value in np.unique(target)}
     invalid = sorted(output_ids - TARGET_IDS)
-    if invalid or RESERVED_TARGET_ID in output_ids:
-        raise ValueError(f"Invalid target IDs after remapping {path}: {invalid or [19]}")
+    if invalid:
+        raise ValueError(f"Invalid target IDs after remapping {path}: {invalid}")
     return target
 
 
@@ -398,7 +395,7 @@ def main() -> None:
             "materialized": str(keep).lower(),
             "processing_reason": reason,
         }
-        for target_id in range(24):
+        for target_id in range(23):
             row[f"target_{target_id:02d}_pixels"] = counts.get(target_id, 0)
             row[f"target_{target_id:02d}_percent"] = f"{counts.get(target_id, 0) * 100.0 / total_pixels:.10f}"
         row["ignore_255_pixels"] = counts.get(255, 0)
@@ -452,7 +449,7 @@ def main() -> None:
             "frame_count": target_frames[target_id],
             "pixel_count": target_pixels[target_id],
         }
-        for target_id in range(24)
+        for target_id in range(23)
     ]
     write_csv(output_root / "metadata" / "manifest.csv", manifest_rows, ["sample_key", "source", "output_split", "image_path", "mask_path"])
     write_csv(
@@ -466,8 +463,7 @@ def main() -> None:
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "dataset": args.dataset,
         "mapping_version": config["mapping_version"],
-        "num_classes": 24,
-        "reserved_target_id": 19,
+        "num_classes": 23,
         "ignore_index": 255,
         "input_samples": len(samples),
         "materialized_samples": len(manifest_rows),
@@ -479,7 +475,7 @@ def main() -> None:
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"Semantic24 bridge completed: {output_root}")
+    print(f"Semantic23 bridge completed: {output_root}")
 
 
 if __name__ == "__main__":

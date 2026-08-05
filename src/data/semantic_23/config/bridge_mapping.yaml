@@ -1,13 +1,11 @@
-dataset_name: adom_semantic24_rellis_rugd_ycor_goose_v1
+dataset_name: adom_semantic23_rellis_rugd_ycor_goose_v1
 mapping_version: v1.0
-num_classes: 24
+num_classes: 23
 ignore_index: 255
 reduce_zero_label: false
 
-# RELLIS-3D has 19 trainable semantic classes (0..18) plus void. ID 19 is
-# deliberately reserved so the approved new IDs remain snow=20, animal=21,
-# artifact=22. GOOSE cobble is added as cobble=23. No source is allowed to
-# produce reserved ID 19.
+# RELLIS-3D has 19 trainable semantic classes (0..18) plus void. New classes
+# continue directly from ID 18: snow=19, animal=20, artifact=21, cobble=22.
 target_classes:
   0: dirt
   1: grass
@@ -28,11 +26,10 @@ target_classes:
   16: puddle
   17: mud
   18: rubble
-  19: reserved
-  20: snow
-  21: animal
-  22: artifact
-  23: cobble
+  19: snow
+  20: animal
+  21: artifact
+  22: cobble
   255: ignore
 
 rellis:
@@ -108,8 +105,8 @@ goose:
   source_to_target:
     0: {source_class: undefined, target_class: ignore, target_id: 255, use: false}
     1: {source_class: traffic_cone, target_class: ignore, target_id: 255, use: false}
-    2: {source_class: snow, target_class: snow, target_id: 20, use: true}
-    3: {source_class: cobble, target_class: cobble, target_id: 23, use: true}
+    2: {source_class: snow, target_class: snow, target_id: 19, use: true}
+    3: {source_class: cobble, target_class: cobble, target_id: 22, use: true}
     4: {source_class: obstacle, target_class: object, target_id: 7, use: true}
     5: {source_class: leaves, target_class: ignore, target_id: 255, use: false}
     6: {source_class: street_light, target_class: ignore, target_id: 255, use: false}
@@ -125,7 +122,7 @@ goose:
     16: {source_class: forest, target_class: ignore, target_id: 255, use: false}
     17: {source_class: bush, target_class: bush, target_id: 13, use: true}
     18: {source_class: moss, target_class: dirt, target_id: 0, use: true}
-    19: {source_class: traffic_light, target_class: artifact, target_id: 22, use: true}
+    19: {source_class: traffic_light, target_class: artifact, target_id: 21, use: true}
     20: {source_class: motorcycle, target_class: vehicle, target_id: 6, use: true}
     21: {source_class: sidewalk, target_class: ignore, target_id: 255, use: false}
     22: {source_class: curb, target_class: ignore, target_id: 255, use: false}
@@ -139,7 +136,7 @@ goose:
     30: {source_class: crops, target_class: bush, target_id: 13, use: true}
     31: {source_class: soil, target_class: dirt, target_id: 0, use: true}
     32: {source_class: rider, target_class: person, target_id: 11, use: true}
-    33: {source_class: animal, target_class: animal, target_id: 21, use: true}
+    33: {source_class: animal, target_class: animal, target_id: 20, use: true}
     34: {source_class: truck, target_class: vehicle, target_id: 6, use: true}
     35: {source_class: on_rails, target_class: ignore, target_id: 255, use: false}
     36: {source_class: caravan, target_class: vehicle, target_id: 6, use: true}
@@ -152,8 +149,8 @@ goose:
     43: {source_class: bridge, target_class: ignore, target_id: 255, use: false}
     44: {source_class: tunnel, target_class: ignore, target_id: 255, use: false}
     45: {source_class: pole, target_class: pole, target_id: 3, use: true}
-    46: {source_class: traffic_sign, target_class: artifact, target_id: 22, use: true}
-    47: {source_class: misc_sign, target_class: artifact, target_id: 22, use: true}
+    46: {source_class: traffic_sign, target_class: artifact, target_id: 21, use: true}
+    47: {source_class: misc_sign, target_class: artifact, target_id: 21, use: true}
     48: {source_class: barrier_tape, target_class: ignore, target_id: 255, use: false}
     49: {source_class: kick_scooter, target_class: ignore, target_id: 255, use: false}
     50: {source_class: low_grass, target_class: grass, target_id: 1, use: true}

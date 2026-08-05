@@ -50,9 +50,11 @@ i2cdetect -y -r 7
 Address `40` must appear. Do not scan guessed buses while other sensitive I2C
 devices are connected.
 
-## Safe dry run
+## Hardware-output test
 
-Keep the LiPo disconnected. Terminal 1 on the Jetson:
+Keep the LiPo disconnected and lift the wheels before starting. The control node
+always initializes the PCA9685 and writes PWM; there is no software-only mode.
+Terminal 1 on the Jetson:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -69,7 +71,7 @@ ros2 run adom_control keyboard_teleop --ros-args \
   --params-file ~/ADOM/ros2_ws/src/adom_control/config/vehicle.yaml
 ```
 
-Terminal 3 can inspect the calculated output without touching hardware:
+Terminal 3 can inspect the PWM values being written to the hardware:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -104,10 +106,10 @@ colcon build --symlink-install --packages-select adom_control
 source install/setup.bash
 ```
 
-Only after the E-stop and watchdog pass, set `dry_run: false` in `vehicle.yaml`,
-rebuild, reconnect the signal, and start the control node before powering the
-ESC. If `board.I2C()` cannot open the bus, verify Jetson header pinmux with
-Jetson-IO rather than hard-coding a different Linux bus in the node.
+Only after the E-stop and watchdog pass, reconnect the signal and start the
+control node before powering the ESC. If `board.I2C()` cannot open the bus,
+verify Jetson header pinmux with Jetson-IO rather than hard-coding a different
+Linux bus in the node.
 
 ## Why the full F1TENTH repository is not installed
 

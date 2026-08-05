@@ -16,7 +16,6 @@ class Pca9685Control(Node):
     def __init__(self):
         super().__init__("pca9685_control")
         defaults = {
-            "dry_run": True,
             "wheelbase_m": 0.33,
             "max_speed_mps": 0.3,
             "max_reverse_speed_mps": 0.0,
@@ -62,9 +61,6 @@ class Pca9685Control(Node):
         self.create_timer(1.0 / float(self.p["command_rate_hz"]), self._update)
 
     def _initialize_hardware(self):
-        if self.p["dry_run"]:
-            self.get_logger().warning("dry_run=true: PCA9685 hardware writes are disabled")
-            return
         try:
             import board
             from adafruit_pca9685 import PCA9685
@@ -141,13 +137,12 @@ class Pca9685Control(Node):
         self._write(float(self.p["esc_neutral_us"]), float(self.p["steering_center_us"]))
 
     def _write(self, esc_us, steering_us):
-        if self._pca is not None:
-            self._pca.channels[int(self.p["esc_channel"])].duty_cycle = (
-                self._pulse_to_duty(esc_us)
-            )
-            self._pca.channels[int(self.p["steering_channel"])].duty_cycle = (
-                self._pulse_to_duty(steering_us)
-            )
+        self._pca.channels[int(self.p["esc_channel"])].duty_cycle = (
+            self._pulse_to_duty(esc_us)
+        )
+        self._pca.channels[int(self.p["steering_channel"])].duty_cycle = (
+            self._pulse_to_duty(steering_us)
+        )
         msg = Float64MultiArray()
         msg.data = [float(esc_us), float(steering_us)]
         self._pwm_state.publish(msg)

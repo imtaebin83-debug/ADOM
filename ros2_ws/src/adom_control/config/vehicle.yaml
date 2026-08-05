@@ -1,8 +1,5 @@
 pca9685_control:
   ros__parameters:
-    # Keep true until wheels-off-ground calibration and E-stop tests pass.
-    dry_run: true
-
     wheelbase_m: 0.33
     # Nominal open-loop command range; this is not measured vehicle speed.
     max_speed_mps: 0.30

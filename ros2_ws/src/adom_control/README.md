@@ -1,8 +1,8 @@
 # adom_control
 
 F1TENTH 호환 `/drive` (`AckermannDriveStamped`)를 PCA9685 CH0/CH1 PWM으로
-출력한다. 8BitDo Ultimate C 2.4G 게임패드와 SSH 키보드 조종을 지원하며,
-기본값은 하드웨어에 PWM을 쓰지 않는 `dry_run: true`다.
+출력한다. 8BitDo Ultimate C 2.4G 게임패드와 SSH 키보드 조종을 지원한다.
+PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출력한다.
 
 ## 게임패드 조작
 
@@ -82,8 +82,8 @@ colcon build --symlink-install --packages-select adom_control
 source install/setup.bash
 ```
 
-LiPo를 분리한 상태에서 게임패드, 모드 선택기, PCA9685 드라이버를 한 번에
-dry-run으로 실행한다.
+LiPo를 분리하고 바퀴를 지면에서 띄운 상태에서 게임패드, 모드 선택기,
+PCA9685 드라이버를 한 번에 실행한다.
 
 ```bash
 ros2 launch adom_control gamepad_control.launch.py
@@ -139,16 +139,10 @@ gamepad_control:
 3. 조향 center/left/right 기계 한계를 측정한다.
 4. XL-5 neutral/arming 및 최소 전진 PWM을 측정한다.
 5. `B` 정지, 게임패드 연결 해제, 자율 명령 중단 시 중립을 확인한다.
-6. 그 뒤 `vehicle.yaml`의 `dry_run`을 `false`로 바꾸고 다시 빌드한다.
+6. 물리적 전원 차단 수단을 준비한 뒤 LiPo를 연결한다.
 
-설정을 영구 변경하지 않고 실제 PCA9685 PWM을 활성화하려면 모든 바퀴를 띄우고
-물리적 전원 차단 수단을 준비한 다음 다음처럼 명시적으로 실행한다.
-
-```bash
-ros2 launch adom_control gamepad_control.launch.py dry_run:=false
-```
-
-하드웨어 모드에는 `adafruit-circuitpython-pca9685`가 필요하다. 엔코더가 없는
+실행에는 `adafruit-circuitpython-pca9685`가 필요하며 PCA9685를 초기화하지
+못하면 노드는 즉시 오류로 종료된다. 엔코더가 없는
 open-loop throttle이므로 명령의 `m/s` 값은 실제 측정 속도를 보장하지 않는다.
 소프트웨어 정지는 물리적인 LiPo/ESC 차단 장치를 대체하지 않는다.
 

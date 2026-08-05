@@ -16,7 +16,6 @@ def generate_launch_description():
             DeclareLaunchArgument("config", default_value=default_config),
             DeclareLaunchArgument("device_id", default_value="0"),
             DeclareLaunchArgument("start_pca9685", default_value="true"),
-            DeclareLaunchArgument("dry_run", default_value="true"),
             Node(
                 package="joy",
                 executable="joy_node",
@@ -43,14 +42,7 @@ def generate_launch_description():
                 package="adom_control",
                 executable="pca9685_control",
                 name="pca9685_control",
-                parameters=[
-                    LaunchConfiguration("config"),
-                    {
-                        "dry_run": ParameterValue(
-                            LaunchConfiguration("dry_run"), value_type=bool
-                        )
-                    },
-                ],
+                parameters=[LaunchConfiguration("config")],
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("start_pca9685")),
             ),

@@ -1,0 +1,15 @@
+rtk_waypoint_executor:
+  ros__parameters:
+    from_ll_service: /fromLL
+    navigate_action: /navigate_to_pose
+    fix_topic: /fix
+    global_odometry_topic: /odometry/global
+    gps_odometry_topic: /odometry/gps
+    startup_timeout_sec: 60.0
+    goal_timeout_sec: 120.0
+    fix_timeout_sec: 2.0
+    require_valid_fix: true
+    cancel_on_fix_loss: true
+    stop_on_failure: true
+    loop: false
+    start_index: 0

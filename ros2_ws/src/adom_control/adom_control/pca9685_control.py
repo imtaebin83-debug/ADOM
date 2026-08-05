@@ -2,6 +2,7 @@ import math
 import threading
 
 import rclpy
+from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from std_msgs.msg import Bool, Float64MultiArray
@@ -17,21 +18,24 @@ class Pca9685Control(Node):
         defaults = {
             "dry_run": True,
             "wheelbase_m": 0.33,
-            "max_speed_mps": 1.2,
-            "max_reverse_speed_mps": 0.3,
+            "max_speed_mps": 0.3,
+            "max_reverse_speed_mps": 0.0,
             "max_steering_angle_rad": 0.45,
             "command_rate_hz": 50.0,
             "command_timeout_sec": 0.25,
+            "drive_topic": "/drive",
+            "cmd_vel_topic": "/cmd_vel",
+            "enable_cmd_vel": False,
             "i2c_address": 0x40,
             "pwm_frequency_hz": 50.0,
             "esc_channel": 0,
             "steering_channel": 1,
             "esc_neutral_us": 1500.0,
-            "esc_forward_max_us": 1900.0,
-            "esc_reverse_max_us": 1100.0,
+            "esc_forward_max_us": 1600.0,
+            "esc_reverse_max_us": 1400.0,
             "steering_center_us": 1500.0,
-            "steering_left_us": 1100.0,
-            "steering_right_us": 1900.0,
+            "steering_left_us": 1300.0,
+            "steering_right_us": 1700.0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -39,11 +43,19 @@ class Pca9685Control(Node):
         self._lock = threading.Lock()
         self._last_command_ns = None
         self._linear = 0.0
-        self._angular = 0.0
+        self._steering = 0.0
         self._estop = False
         self._pca = None
-        self._pwm_state = self.create_publisher(Float64MultiArray, "/adom/control/pwm_us", 10)
-        self.create_subscription(Twist, "/cmd_vel", self._on_cmd_vel, 10)
+        self._pwm_state = self.create_publisher(
+            Float64MultiArray, "/adom/control/pwm_us", 10
+        )
+        self.create_subscription(
+            AckermannDriveStamped, str(self.p["drive_topic"]), self._on_drive, 10
+        )
+        if self.p["enable_cmd_vel"]:
+            self.create_subscription(
+                Twist, str(self.p["cmd_vel_topic"]), self._on_cmd_vel, 10
+            )
         self.create_subscription(Bool, "/emergency_stop", self._on_estop, 10)
         self._initialize_hardware()
         self._write_neutral()
@@ -63,9 +75,22 @@ class Pca9685Control(Node):
             raise
 
     def _on_cmd_vel(self, msg):
+        linear = float(msg.linear.x)
+        angular = float(msg.angular.z)
+        steering = (
+            0.0
+            if abs(linear) < 1e-3
+            else math.atan(float(self.p["wheelbase_m"]) * angular / linear)
+        )
         with self._lock:
-            self._linear = float(msg.linear.x)
-            self._angular = float(msg.angular.z)
+            self._linear = linear
+            self._steering = steering
+            self._last_command_ns = self.get_clock().now().nanoseconds
+
+    def _on_drive(self, msg):
+        with self._lock:
+            self._linear = float(msg.drive.speed)
+            self._steering = float(msg.drive.steering_angle)
             self._last_command_ns = self.get_clock().now().nanoseconds
 
     def _on_estop(self, msg):
@@ -75,14 +100,21 @@ class Pca9685Control(Node):
     def _update(self):
         now_ns = self.get_clock().now().nanoseconds
         with self._lock:
-            age = math.inf if self._last_command_ns is None else (now_ns - self._last_command_ns) / 1e9
-            linear, angular, estop = self._linear, self._angular, self._estop
+            age = (
+                math.inf
+                if self._last_command_ns is None
+                else (now_ns - self._last_command_ns) / 1e9
+            )
+            linear, steering, estop = self._linear, self._steering, self._estop
         if estop or age > float(self.p["command_timeout_sec"]):
             self._write_neutral()
             return
 
-        linear = clamp(linear, -float(self.p["max_reverse_speed_mps"]), float(self.p["max_speed_mps"]))
-        steering = 0.0 if abs(linear) < 1e-3 else math.atan(float(self.p["wheelbase_m"]) * angular / linear)
+        linear = clamp(
+            linear,
+            -float(self.p["max_reverse_speed_mps"]),
+            float(self.p["max_speed_mps"]),
+        )
         steering = clamp(
             steering,
             -float(self.p["max_steering_angle_rad"]),
@@ -110,8 +142,12 @@ class Pca9685Control(Node):
 
     def _write(self, esc_us, steering_us):
         if self._pca is not None:
-            self._pca.channels[int(self.p["esc_channel"])].duty_cycle = self._pulse_to_duty(esc_us)
-            self._pca.channels[int(self.p["steering_channel"])].duty_cycle = self._pulse_to_duty(steering_us)
+            self._pca.channels[int(self.p["esc_channel"])].duty_cycle = (
+                self._pulse_to_duty(esc_us)
+            )
+            self._pca.channels[int(self.p["steering_channel"])].duty_cycle = (
+                self._pulse_to_duty(steering_us)
+            )
         msg = Float64MultiArray()
         msg.data = [float(esc_us), float(steering_us)]
         self._pwm_state.publish(msg)

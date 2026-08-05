@@ -4,12 +4,18 @@ pca9685_control:
     dry_run: true
 
     wheelbase_m: 0.33
-    max_speed_mps: 1.20
-    max_reverse_speed_mps: 0.30
+    # Nominal open-loop command range; this is not measured vehicle speed.
+    max_speed_mps: 0.30
+    # Disabled until the XL-5 brake/reverse sequence is tested on this vehicle.
+    max_reverse_speed_mps: 0.0
     max_steering_angle_rad: 0.45
 
     command_rate_hz: 50.0
     command_timeout_sec: 0.25
+    drive_topic: /drive
+    cmd_vel_topic: /cmd_vel
+    # Keep false during teleop; add a proper command mux before enabling both sources.
+    enable_cmd_vel: false
 
     i2c_address: 64       # 0x40
     pwm_frequency_hz: 50.0
@@ -18,8 +24,50 @@ pca9685_control:
 
     # Placeholder calibration values: measure with the vehicle lifted.
     esc_neutral_us: 1500.0
-    esc_forward_max_us: 1900.0
-    esc_reverse_max_us: 1100.0
+    esc_forward_max_us: 1600.0
+    esc_reverse_max_us: 1400.0
     steering_center_us: 1500.0
-    steering_left_us: 1100.0
-    steering_right_us: 1900.0
+    steering_left_us: 1300.0
+    steering_right_us: 1700.0
+
+keyboard_teleop:
+  ros__parameters:
+    drive_topic: /drive
+    estop_topic: /emergency_stop
+    publish_rate_hz: 20.0
+    key_timeout_sec: 0.35
+    speed_step_mps: 0.05
+    steering_step_rad: 0.05
+    max_forward_speed_mps: 0.30
+    max_reverse_speed_mps: 0.0
+    max_steering_angle_rad: 0.35
+
+gamepad_control:
+  ros__parameters:
+    joy_topic: /joy
+    output_drive_topic: /drive
+
+    # Nav2 publishes Twist on /cmd_vel. For a F1TENTH Ackermann planner, use
+    # autonomous_input_type: ackermann and publish to /drive/autonomous.
+    autonomous_input_type: twist
+    autonomous_cmd_vel_topic: /cmd_vel
+    autonomous_drive_topic: /drive/autonomous
+    mode_topic: /adom/control/mode
+
+    # Default Linux X-input layout. Verify with `ros2 topic echo /joy`.
+    right_stick_x_axis: 3
+    left_stick_y_axis: 1
+    manual_button: 2       # X
+    autonomous_button: 0   # A
+    stop_button: 1         # B
+    steering_axis_scale: 1.0
+    throttle_axis_scale: 1.0
+    stick_deadzone: 0.10
+
+    max_forward_speed_mps: 0.30
+    max_reverse_speed_mps: 0.0
+    max_steering_angle_rad: 0.35
+    wheelbase_m: 0.33
+    joy_timeout_sec: 0.50
+    autonomous_timeout_sec: 0.25
+    publish_rate_hz: 50.0

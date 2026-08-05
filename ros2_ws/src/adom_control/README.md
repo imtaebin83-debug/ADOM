@@ -1,17 +1,149 @@
 # adom_control
 
-Nav2의 `/cmd_vel`을 bicycle model로 조향각에 변환하고 PCA9685 CH0/CH1 PWM으로
-출력한다. 기본값은 `dry_run: true`다.
+F1TENTH 호환 `/drive` (`AckermannDriveStamped`)를 PCA9685 CH0/CH1 PWM으로
+출력한다. 8BitDo Ultimate C 2.4G 게임패드와 SSH 키보드 조종을 지원하며,
+기본값은 하드웨어에 PWM을 쓰지 않는 `dry_run: true`다.
 
-실차 투입 전 순서:
+## 게임패드 조작
 
-1. LiPo를 분리하고 I2C 인식 확인
-2. 바퀴를 지면에서 띄움
-3. ESC neutral/arming 범위 측정
-4. servo center/left/right 기계 한계 측정
-5. `/emergency_stop`과 0.25 s watchdog 검증
-6. 저속 제한으로 시작
+- `X`: 매뉴얼 모드
+- `A`: 자율주행 모드
+- `B`: 정지 모드(소프트웨어 정지)
+- 왼쪽 스틱(LTS) 상/하: 전진/가속 조절
+- 오른쪽 스틱(RTS) 좌/우: 조향
 
-하드웨어 모드에는 `adafruit-circuitpython-pca9685`가 필요하다. 현재 속도 제어는
-엔코더가 없는 open-loop throttle 제어이며 실제 m/s를 보장하지 않는다.
+프로그램은 항상 `stopped` 모드로 시작한다. `X`를 누른 뒤 두 스틱을 한 번
+중앙에 놓아야 매뉴얼 입력이 활성화된다. 매뉴얼 모드에서 게임패드 메시지가
+0.5초 끊기면 중립을 출력한다. `A`를 누르면 매뉴얼 명령을 즉시 버리고 새
+자율주행 명령을 기다리며, 자율주행 명령도 0.25초 끊기면 중립이 된다.
 
+현재 모드는 다음 토픽에서 확인한다.
+
+```bash
+ros2 topic echo /adom/control/mode
+```
+
+## Jetson에서 컨트롤러 연결 확인
+
+2.4G USB 수신기를 Jetson에 연결하고 컨트롤러를 켠다. Ultimate C는 X-input과
+D-input 모드를 지원한다. 기본 YAML은 일반적인 Linux X-input 배열을 사용하지만
+커널/연결 모드에 따라 축과 버튼 번호가 달라질 수 있으므로 실차 구동 전에 반드시
+확인한다.
+
+컨트롤러 전원이 꺼진 상태에서 `X + Home`으로 켜면 X-input, `B + Home`으로
+켜면 D-input 모드가 선택되고 마지막 모드가 저장된다. 먼저 X-input을 시험하고
+Jetson에서 장치가 나타나지 않으면 D-input으로 다시 연결한다.
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ADOM/ros2_ws/install/setup.bash
+
+lsusb
+ls -l /dev/input/js* /dev/input/event* 2>/dev/null
+ros2 run joy joy_node
+```
+
+`/dev/input` 권한 오류가 발생하면 다음 명령 후 로그아웃하고 다시 SSH로 접속한다.
+
+```bash
+sudo usermod -aG input "$USER"
+```
+
+다른 터미널에서 다음 명령을 실행하고 LTS 세로, RTS 가로, `X`, `A`, `B`를
+하나씩 움직이거나 누른다.
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic echo /joy
+```
+
+기본 매핑은 다음과 같다.
+
+| 입력 | YAML 파라미터 | 기본 인덱스 |
+|---|---|---:|
+| RTS 좌/우 | `right_stick_x_axis` | 3 |
+| LTS 상/하 | `left_stick_y_axis` | 1 |
+| X / 매뉴얼 | `manual_button` | 2 |
+| A / 자율주행 | `autonomous_button` | 0 |
+| B / 정지 | `stop_button` | 1 |
+
+실제 `/joy` 배열과 다르면 `config/vehicle.yaml`의 `gamepad_control` 항목만
+수정한다. 스틱 방향이 반대면 `steering_axis_scale` 또는
+`throttle_axis_scale`을 `-1.0`으로 바꾼다. 확인이 끝나면 테스트용
+`joy_node`를 `Ctrl-C`로 종료한다. launch 파일이 자체적으로 `joy_node`를
+실행하므로 두 개를 동시에 띄우지 않는다.
+
+## 빌드 및 ROS 2 활성화
+
+```bash
+cd ~/ADOM/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install --packages-select adom_control
+source install/setup.bash
+```
+
+LiPo를 분리한 상태에서 게임패드, 모드 선택기, PCA9685 드라이버를 한 번에
+dry-run으로 실행한다.
+
+```bash
+ros2 launch adom_control gamepad_control.launch.py
+```
+
+다른 터미널에서 최종 명령과 계산된 PWM을 확인한다.
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ADOM/ros2_ws/install/setup.bash
+ros2 topic echo /drive
+ros2 topic echo /adom/control/pwm_us
+```
+
+USB 게임패드가 `/dev/input/js1`로 잡히는 등 장치 번호가 0이 아니면 다음처럼
+실행한다.
+
+```bash
+ros2 launch adom_control gamepad_control.launch.py device_id:=1
+```
+
+이미 `vehicle.launch.py`가 `pca9685_control`을 실행 중이라면 중복 실행을 막는다.
+
+```bash
+ros2 launch adom_control gamepad_control.launch.py start_pca9685:=false
+```
+
+키보드 `keyboard_teleop`은 `/drive`에 직접 명령을 보내므로 게임패드 launch와
+동시에 실행하지 않는다.
+
+## 자율주행 입력 연결
+
+기본 설정은 Nav2가 발행하는 `/cmd_vel` (`Twist`)을 자율주행 입력으로 받는다.
+이 명령은 `A`를 눌러 자율주행 모드에 들어간 동안에만 `/drive`로 전달된다.
+
+F1TENTH 형식의 planner가 `AckermannDriveStamped`를 출력한다면
+`vehicle.yaml`을 다음처럼 변경하고 `/drive/autonomous`로 발행한다.
+
+```yaml
+gamepad_control:
+  ros__parameters:
+    autonomous_input_type: ackermann
+    autonomous_drive_topic: /drive/autonomous
+```
+
+`pca9685_control.enable_cmd_vel`은 `false`로 유지해야 한다. `/cmd_vel`을 PWM
+노드에 직접 연결하면 게임패드 모드 선택기를 우회하게 된다.
+
+## 실차 활성화 전 점검
+
+1. LiPo를 분리하고 I2C 주소 `0x40` 인식을 확인한다.
+2. 바퀴를 지면에서 띄운다.
+3. 조향 center/left/right 기계 한계를 측정한다.
+4. XL-5 neutral/arming 및 최소 전진 PWM을 측정한다.
+5. `B` 정지, 게임패드 연결 해제, 자율 명령 중단 시 중립을 확인한다.
+6. 그 뒤 `vehicle.yaml`의 `dry_run`을 `false`로 바꾸고 다시 빌드한다.
+
+하드웨어 모드에는 `adafruit-circuitpython-pca9685`가 필요하다. 엔코더가 없는
+open-loop throttle이므로 명령의 `m/s` 값은 실제 측정 속도를 보장하지 않는다.
+소프트웨어 정지는 물리적인 LiPo/ESC 차단 장치를 대체하지 않는다.
+
+Jetson 설치, I2C 배선 및 PWM 캘리브레이션 상세 절차는
+`docs/setup-guides/jetson-console-control.md`를 참고한다.

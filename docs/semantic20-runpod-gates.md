@@ -1,5 +1,13 @@
 # Semantic20 RunPod gates
 
+## Terminal paste constraint
+
+RunPod `tmux` terminals must receive only short command blocks. Keep each pasted
+block compact (normally no more than about 10 lines). Build longer scripts with
+one short `cat > file <<'BASH'` block followed by multiple short
+`cat >> file <<'BASH'` blocks. Run syntax checks and execution as separate
+commands. Never provide one large heredoc for direct terminal paste.
+
 Use the processed Network Volume directory as `--dataset`, or omit that option
 and set `ADOM_DATA_ROOT`. Never point the command at the Git-tracked preprocessing
 recipe directories because they intentionally do not contain images and masks.

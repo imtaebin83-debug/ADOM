@@ -16,10 +16,11 @@
 - [x] RunPod A100 80GB runtime/image preflight와 E0/E1 전체 dataset contract를 통과한다.
 - [x] Gate 0: E0 SegFormer B0 micro-batch probe를 `16/1` effective batch 16으로 통과한다.
 - [ ] 학습 중 `tqdm` 진행률 표시를 구현한다.
-- [ ] Gate 1: E0 B0 50-update smoke를 통과한다.
-- [ ] Gate 2: E0 B0 500-update mini-run과 W&B/validation을 통과한다.
-- [ ] Gate 3: checkpoint 및 optimizer/scheduler resume을 검증한다.
-- [ ] 위 gate 결과 검토 후에만 E0 B0 full run을 시작한다.
+- [x] Gate 1: E0 B0 50-update smoke를 통과한다.
+- [x] Gate 2: E0 B0 500-update mini-run과 W&B/validation을 통과한다.
+- [x] Gate 3: checkpoint 및 optimizer/scheduler resume을 검증한다.
+- [x] 위 gate 결과와 full 직전 artifact/config/runtime 점검을 모두 통과한 뒤
+  E0 B0 full run 시작을 승인한다.
 
 ## 범위와 담당 구분
 

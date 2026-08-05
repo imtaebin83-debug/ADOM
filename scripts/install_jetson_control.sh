@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 ROS_DISTRO_NAME="${ROS_DISTRO:-jazzy}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,7 +11,10 @@ if [[ ! -r "/opt/ros/${ROS_DISTRO_NAME}/setup.bash" ]]; then
   exit 1
 fi
 
+# ROS setup files may read optional variables that are intentionally unset.
+# Enable nounset only after the environment has been loaded.
 source "/opt/ros/${ROS_DISTRO_NAME}/setup.bash"
+set -u
 
 source /etc/os-release
 if [[ "${ROS_DISTRO_NAME}" == "jazzy" && "${VERSION_CODENAME:-}" != "noble" ]]; then
@@ -33,16 +36,17 @@ sudo apt-get install -y \
 CONTROL_VENV="${REPO_DIR}/.venv-control"
 python3 -m venv --system-site-packages "${CONTROL_VENV}"
 source "${CONTROL_VENV}/bin/activate"
-python3 -m pip install --upgrade pip
+python3 -m pip install --upgrade pip setuptools wheel
 python3 -m pip install \
   adafruit-blinka \
-  adafruit-circuitpython-pca9685
+  adafruit-circuitpython-pca9685 \
+  colcon-common-extensions
 
 sudo usermod -aG i2c "${USER}"
 sudo usermod -aG input "${USER}"
 
 cd "${WORKSPACE_DIR}"
-colcon build --symlink-install --packages-select adom_control
+"${CONTROL_VENV}/bin/colcon" build --symlink-install --packages-select adom_control
 
 echo
 echo "Control package installed. Log out and reconnect so i2c/input groups apply."

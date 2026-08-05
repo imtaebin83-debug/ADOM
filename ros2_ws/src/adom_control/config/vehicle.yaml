@@ -9,6 +9,8 @@ pca9685_control:
 
     command_rate_hz: 50.0
     command_timeout_sec: 0.25
+    # Hold a valid neutral pulse while the XL-5 boots and arms.
+    esc_arm_duration_sec: 3.0
     drive_topic: /drive
     cmd_vel_topic: /cmd_vel
     # Keep false during teleop; add a proper command mux before enabling both sources.
@@ -42,9 +44,9 @@ gamepad_control:
     mode_topic: /adom/control/mode
 
     # Default Linux X-input layout. Verify with `ros2 topic echo /joy`.
-    right_stick_x_axis: 3
+    right_stick_x_axis: 2
     left_stick_y_axis: 1
-    manual_button: 2       # X
+    manual_button: 3       # X
     autonomous_button: 0   # A
     stop_button: 1         # B
     steering_axis_scale: 1.0

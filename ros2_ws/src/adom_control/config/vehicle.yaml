@@ -5,7 +5,8 @@ pca9685_control:
     max_speed_mps: 0.30
     # Disabled until the XL-5 brake/reverse sequence is tested on this vehicle.
     max_reverse_speed_mps: 0.0
-    max_steering_angle_rad: 0.45
+    # User-facing angle settings use degrees; ROS messages remain in radians.
+    max_steering_angle_deg: 25.7831
 
     command_rate_hz: 50.0
     command_timeout_sec: 0.25
@@ -55,7 +56,7 @@ gamepad_control:
 
     max_forward_speed_mps: 0.30
     max_reverse_speed_mps: 0.0
-    max_steering_angle_rad: 0.35
+    max_steering_angle_deg: 20.0535
     wheelbase_m: 0.33
     joy_timeout_sec: 0.50
     autonomous_timeout_sec: 0.25

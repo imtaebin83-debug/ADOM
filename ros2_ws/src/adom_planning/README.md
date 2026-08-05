@@ -9,8 +9,9 @@ Nav2 설정과 RTK waypoint 데이터 계약을 관리한다.
 - RTK input: `/fix`, 변환 결과는 `navsat_transform_node`의 map 좌표
 - Sequential executor: `/fromLL` 변환 후 `/navigate_to_pose` goal을 하나씩 전송
 
-단일 안테나 RTK는 heading을 주지 않는다. `heading: null`이면 executor가 다음 waypoint
-방향을 map 좌표계에서 계산한다. 긴 GPS route는 40 m rolling global costmap에 한 번에
+단일 안테나 RTK는 heading을 주지 않는다. `heading_deg: null`이면 executor가 다음 waypoint
+방향을 map 좌표계에서 계산한다. 명시적인 `heading_deg`는 ENU degree 단위로 0°가 동쪽,
++90°가 북쪽이다. 긴 GPS route는 40 m rolling global costmap에 한 번에
 넣지 않고 가까운 waypoint를 순차 전송한다. 제자리 회전은 Ackermann 차량에서 불가능하므로
 controller와 recovery에서 비활성화한다.
 

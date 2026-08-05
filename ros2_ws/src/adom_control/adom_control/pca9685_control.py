@@ -20,7 +20,7 @@ class Pca9685Control(Node):
             "wheelbase_m": 0.33,
             "max_speed_mps": 0.3,
             "max_reverse_speed_mps": 0.0,
-            "max_steering_angle_rad": 0.45,
+            "max_steering_angle_deg": 25.7831,
             "command_rate_hz": 50.0,
             "command_timeout_sec": 0.25,
             "drive_topic": "/drive",
@@ -87,7 +87,9 @@ class Pca9685Control(Node):
         steering = (
             0.0
             if abs(linear) < 1e-3
-            else math.atan(float(self.p["wheelbase_m"]) * angular / linear)
+            else math.degrees(
+                math.atan(float(self.p["wheelbase_m"]) * angular / linear)
+            )
         )
         with self._lock:
             self._linear = linear
@@ -97,7 +99,7 @@ class Pca9685Control(Node):
     def _on_drive(self, msg):
         with self._lock:
             self._linear = float(msg.drive.speed)
-            self._steering = float(msg.drive.steering_angle)
+            self._steering = math.degrees(float(msg.drive.steering_angle))
             self._last_command_ns = self.get_clock().now().nanoseconds
 
     def _on_estop(self, msg):
@@ -124,8 +126,8 @@ class Pca9685Control(Node):
         )
         steering = clamp(
             steering,
-            -float(self.p["max_steering_angle_rad"]),
-            float(self.p["max_steering_angle_rad"]),
+            -float(self.p["max_steering_angle_deg"]),
+            float(self.p["max_steering_angle_deg"]),
         )
         self._write(self._speed_to_pwm(linear), self._steering_to_pwm(steering))
 
@@ -137,12 +139,16 @@ class Pca9685Control(Node):
         ratio = abs(speed) / max(float(self.p["max_reverse_speed_mps"]), 1e-6)
         return neutral + ratio * (float(self.p["esc_reverse_max_us"]) - neutral)
 
-    def _steering_to_pwm(self, angle):
+    def _steering_to_pwm(self, angle_deg):
         center = float(self.p["steering_center_us"])
-        maximum = float(self.p["max_steering_angle_rad"])
-        if angle >= 0.0:
-            return center + angle / maximum * (float(self.p["steering_left_us"]) - center)
-        return center + (-angle) / maximum * (float(self.p["steering_right_us"]) - center)
+        maximum = float(self.p["max_steering_angle_deg"])
+        if angle_deg >= 0.0:
+            return center + angle_deg / maximum * (
+                float(self.p["steering_left_us"]) - center
+            )
+        return center + (-angle_deg) / maximum * (
+            float(self.p["steering_right_us"]) - center
+        )
 
     def _write_neutral(self):
         self._write(float(self.p["esc_neutral_us"]), float(self.p["steering_center_us"]))

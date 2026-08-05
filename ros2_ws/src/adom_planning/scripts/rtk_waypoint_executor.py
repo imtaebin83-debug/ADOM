@@ -109,16 +109,16 @@ class SequentialGpsWaypointExecutor(Node):
                 raise ValueError(f"invalid coordinates at waypoint {index}") from exc
             if not -90.0 <= latitude <= 90.0 or not -180.0 <= longitude <= 180.0:
                 raise ValueError(f"coordinates out of range at waypoint {index}")
-            heading = item.get("heading")
-            heading = None if heading is None else float(heading)
-            if heading is not None and not math.isfinite(heading):
-                raise ValueError(f"invalid heading at waypoint {index}")
+            heading_deg = item.get("heading_deg")
+            heading_deg = None if heading_deg is None else float(heading_deg)
+            if heading_deg is not None and not math.isfinite(heading_deg):
+                raise ValueError(f"invalid heading_deg at waypoint {index}")
             normalized.append(
                 {
                     "latitude": latitude,
                     "longitude": longitude,
                     "altitude": altitude,
-                    "heading": heading,
+                    "heading_deg": heading_deg,
                 }
             )
         return frame_id, normalized
@@ -208,38 +208,43 @@ class SequentialGpsWaypointExecutor(Node):
         self._convert_next()
 
     def _finish_conversion(self):
-        self._headings = []
+        self._heading_degs = []
         for index, item in enumerate(self._raw_waypoints):
-            if item["heading"] is not None:
-                heading = item["heading"]
+            if item["heading_deg"] is not None:
+                heading_deg = item["heading_deg"]
             elif index + 1 < len(self._converted):
                 current = self._converted[index]
                 following = self._converted[index + 1]
-                heading = math.atan2(following[1] - current[1], following[0] - current[0])
-            elif self._headings:
-                heading = self._headings[-1]
+                heading_deg = math.degrees(
+                    math.atan2(
+                        following[1] - current[1], following[0] - current[0]
+                    )
+                )
+            elif self._heading_degs:
+                heading_deg = self._heading_degs[-1]
             else:
-                heading = 0.0
-            self._headings.append(heading)
+                heading_deg = 0.0
+            self._heading_degs.append(heading_deg)
         self._phase = "READY"
         self._publish_status(f"converted {len(self._converted)} waypoints; waiting for Nav2")
 
     def _send_current_goal(self):
         x, y, z = self._converted[self._current_index]
-        heading = self._headings[self._current_index]
+        heading_deg = self._heading_degs[self._current_index]
+        heading_rad = math.radians(heading_deg)
         goal = NavigateToPose.Goal()
         goal.pose.header.frame_id = self._frame_id
         goal.pose.header.stamp = self.get_clock().now().to_msg()
         goal.pose.pose.position.x = x
         goal.pose.pose.position.y = y
         goal.pose.pose.position.z = z
-        goal.pose.pose.orientation.z = math.sin(heading / 2.0)
-        goal.pose.pose.orientation.w = math.cos(heading / 2.0)
+        goal.pose.pose.orientation.z = math.sin(heading_rad / 2.0)
+        goal.pose.pose.orientation.w = math.cos(heading_rad / 2.0)
         self._phase = "SENDING"
         self._publish_index()
         self._publish_status(
             f"sending waypoint {self._current_index + 1}/{len(self._converted)}: "
-            f"x={x:.3f}, y={y:.3f}, heading={heading:.3f}"
+            f"x={x:.3f}, y={y:.3f}, heading_deg={heading_deg:.3f}"
         )
         future = self._navigate.send_goal_async(goal, feedback_callback=self._on_feedback)
         future.add_done_callback(self._on_goal_response)

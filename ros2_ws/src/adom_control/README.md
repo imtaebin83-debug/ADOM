@@ -73,6 +73,10 @@ ros2 topic echo /joy
 `joy_node`를 `Ctrl-C`로 종료한다. launch 파일이 자체적으로 `joy_node`를
 실행하므로 두 개를 동시에 띄우지 않는다.
 
+`vehicle.yaml`의 조향각 설정(`*_deg`)은 degree 단위다. ROS 표준 메시지인
+`AckermannDrive.steering_angle`과 `Twist.angular.z`는 radian 단위를 유지하며,
+제어 노드가 메시지 경계에서 자동으로 변환한다.
+
 ## 빌드 및 ROS 2 활성화
 
 ```bash

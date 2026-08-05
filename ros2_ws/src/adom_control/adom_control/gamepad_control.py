@@ -41,7 +41,7 @@ class GamepadControl(Node):
             "stick_deadzone": 0.10,
             "max_forward_speed_mps": 0.30,
             "max_reverse_speed_mps": 0.0,
-            "max_steering_angle_rad": 0.35,
+            "max_steering_angle_deg": 20.0535,
             "wheelbase_m": 0.33,
             "joy_timeout_sec": 0.50,
             "autonomous_timeout_sec": 0.25,
@@ -157,9 +157,9 @@ class GamepadControl(Node):
 
             if self._mode == "manual" and self._manual_armed:
                 self._manual_steering = clamp(
-                    steering_axis * float(self.p["max_steering_angle_rad"]),
-                    -float(self.p["max_steering_angle_rad"]),
-                    float(self.p["max_steering_angle_rad"]),
+                    steering_axis * float(self.p["max_steering_angle_deg"]),
+                    -float(self.p["max_steering_angle_deg"]),
+                    float(self.p["max_steering_angle_deg"]),
                 )
                 if throttle_axis >= 0.0:
                     self._manual_speed = (
@@ -192,12 +192,16 @@ class GamepadControl(Node):
         steering = (
             0.0
             if abs(speed) < 1e-3
-            else math.atan(float(self.p["wheelbase_m"]) * float(msg.angular.z) / speed)
+            else math.degrees(
+                math.atan(float(self.p["wheelbase_m"]) * float(msg.angular.z) / speed)
+            )
         )
         self._store_auto(speed, steering)
 
     def _on_auto_drive(self, msg):
-        self._store_auto(float(msg.drive.speed), float(msg.drive.steering_angle))
+        self._store_auto(
+            float(msg.drive.speed), math.degrees(float(msg.drive.steering_angle))
+        )
 
     def _store_auto(self, speed, steering):
         with self._lock:
@@ -208,8 +212,8 @@ class GamepadControl(Node):
             )
             self._auto_steering = clamp(
                 steering,
-                -float(self.p["max_steering_angle_rad"]),
-                float(self.p["max_steering_angle_rad"]),
+                -float(self.p["max_steering_angle_deg"]),
+                float(self.p["max_steering_angle_deg"]),
             )
             self._last_auto_ns = self.get_clock().now().nanoseconds
 
@@ -243,7 +247,8 @@ class GamepadControl(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = "base_link"
         msg.drive.speed = float(speed)
-        msg.drive.steering_angle = float(steering)
+        # AckermannDrive follows the ROS convention and carries radians on the wire.
+        msg.drive.steering_angle = math.radians(float(steering))
         self._drive_pub.publish(msg)
 
     def _publish_mode(self):

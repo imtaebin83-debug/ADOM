@@ -48,30 +48,22 @@ i2cdetect -y -r 7
 ```
 
 Address `40` must appear. Do not scan guessed buses while other sensitive I2C
-devices are connected.
+devices are connected. Set the detected number in
+`ros2_ws/src/adom_control/config/vehicle.yaml` as `i2c_bus` before building.
 
-## Hardware-output test
+## Gamepad hardware-output test
 
 Keep the LiPo disconnected and lift the wheels before starting. The control node
 always initializes the PCA9685 and writes PWM; there is no software-only mode.
-Terminal 1 on the Jetson:
+Start the gamepad, mode selector, and PCA9685 output together:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
-ros2 launch adom_control control.launch.py
+ros2 launch adom_control gamepad_control.launch.py
 ```
 
-Terminal 2 (a second `ssh -t` session):
-
-```bash
-source /opt/ros/jazzy/setup.bash
-source ~/ADOM/ros2_ws/install/setup.bash
-ros2 run adom_control keyboard_teleop --ros-args \
-  --params-file ~/ADOM/ros2_ws/src/adom_control/config/vehicle.yaml
-```
-
-Terminal 3 can inspect the PWM values being written to the hardware:
+A second terminal can inspect the PWM values being written to the hardware:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -79,10 +71,9 @@ source ~/ADOM/ros2_ws/install/setup.bash
 ros2 topic echo /adom/control/pwm_us
 ```
 
-Keys are `w/s` for throttle, `a/d` for steering, `c` to center, Space or `x`
-for E-stop, `r` to release E-stop, and `q` to E-stop and quit. Throttle returns
-to neutral unless `w` or `s` is pressed repeatedly. The output node also has a
-0.25 s command watchdog, so loss of SSH or the teleop process commands neutral.
+Press `X`, return both sticks to center once to arm manual control, then use the
+right stick for steering and the left stick for throttle. `B` selects stopped
+mode. Loss of gamepad messages commands neutral.
 
 ## Hardware calibration
 
@@ -106,10 +97,11 @@ colcon build --symlink-install --packages-select adom_control
 source install/setup.bash
 ```
 
-Only after the E-stop and watchdog pass, reconnect the signal and start the
-control node before powering the ESC. If `board.I2C()` cannot open the bus,
-verify Jetson header pinmux with Jetson-IO rather than hard-coding a different
-Linux bus in the node.
+Only after the stop mode and watchdog pass, reconnect the signal and start the
+control node before powering the ESC. Set `i2c_bus` in `vehicle.yaml` to the
+40-pin-header bus reported by `i2cdetect -l`. If that bus cannot be opened or
+does not contain address `0x40`, verify wiring, group access, and Jetson header
+pinmux with Jetson-IO.
 
 ## Why the full F1TENTH repository is not installed
 

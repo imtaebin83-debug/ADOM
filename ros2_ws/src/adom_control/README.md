@@ -1,7 +1,7 @@
 # adom_control
 
 F1TENTH 호환 `/drive` (`AckermannDriveStamped`)를 PCA9685 CH0/CH1 PWM으로
-출력한다. 8BitDo Ultimate C 2.4G 게임패드와 SSH 키보드 조종을 지원한다.
+출력한다. 8BitDo Ultimate C 2.4G 게임패드의 매뉴얼/자율 모드 전환을 지원한다.
 PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출력한다.
 
 ## 게임패드 조작
@@ -111,9 +111,6 @@ ros2 launch adom_control gamepad_control.launch.py device_id:=1
 ros2 launch adom_control gamepad_control.launch.py start_pca9685:=false
 ```
 
-키보드 `keyboard_teleop`은 `/drive`에 직접 명령을 보내므로 게임패드 launch와
-동시에 실행하지 않는다.
-
 ## 자율주행 입력 연결
 
 기본 설정은 Nav2가 발행하는 `/cmd_vel` (`Twist`)을 자율주행 입력으로 받는다.
@@ -141,8 +138,10 @@ gamepad_control:
 5. `B` 정지, 게임패드 연결 해제, 자율 명령 중단 시 중립을 확인한다.
 6. 물리적 전원 차단 수단을 준비한 뒤 LiPo를 연결한다.
 
-실행에는 `adafruit-circuitpython-pca9685`가 필요하며 PCA9685를 초기화하지
-못하면 노드는 즉시 오류로 종료된다. 엔코더가 없는
+PCA9685는 Ubuntu의 `python3-smbus`를 통해 `/dev/i2c-N`에 직접 접근한다.
+`config/vehicle.yaml`의 `i2c_bus`는 `i2cdetect -l`에서 확인한 40핀 헤더 버스와
+일치해야 하며, 주소 `0x40` 또는 장치 권한을 확인하지 못하면 노드는 즉시 오류로
+종료된다. 엔코더가 없는
 open-loop throttle이므로 명령의 `m/s` 값은 실제 측정 속도를 보장하지 않는다.
 소프트웨어 정지는 물리적인 LiPo/ESC 차단 장치를 대체하지 않는다.
 

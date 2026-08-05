@@ -2,6 +2,7 @@ import math
 import threading
 
 import rclpy
+from adom_control.pca9685_smbus import LinuxPca9685
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
@@ -25,6 +26,7 @@ class Pca9685Control(Node):
             "drive_topic": "/drive",
             "cmd_vel_topic": "/cmd_vel",
             "enable_cmd_vel": False,
+            "i2c_bus": 7,
             "i2c_address": 0x40,
             "pwm_frequency_hz": 50.0,
             "esc_channel": 0,
@@ -62,12 +64,21 @@ class Pca9685Control(Node):
 
     def _initialize_hardware(self):
         try:
-            import board
-            from adafruit_pca9685 import PCA9685
-            self._pca = PCA9685(board.I2C(), address=int(self.p["i2c_address"]))
-            self._pca.frequency = int(self.p["pwm_frequency_hz"])
+            self._pca = LinuxPca9685(
+                bus_number=int(self.p["i2c_bus"]),
+                address=int(self.p["i2c_address"]),
+                frequency_hz=float(self.p["pwm_frequency_hz"]),
+            )
+            self.get_logger().info(
+                "PCA9685 ready on /dev/i2c-%d at 0x%02x"
+                % (int(self.p["i2c_bus"]), int(self.p["i2c_address"]))
+            )
         except Exception as exc:
-            self.get_logger().fatal(f"PCA9685 initialization failed: {exc}")
+            self.get_logger().fatal(
+                "PCA9685 initialization failed on /dev/i2c-%d address 0x%02x: %s. "
+                "Check `i2cdetect -l`, `sudo i2cdetect -y -r BUS`, wiring, and i2c group access."
+                % (int(self.p["i2c_bus"]), int(self.p["i2c_address"]), exc)
+            )
             raise
 
     def _on_cmd_vel(self, msg):
@@ -137,25 +148,17 @@ class Pca9685Control(Node):
         self._write(float(self.p["esc_neutral_us"]), float(self.p["steering_center_us"]))
 
     def _write(self, esc_us, steering_us):
-        self._pca.channels[int(self.p["esc_channel"])].duty_cycle = (
-            self._pulse_to_duty(esc_us)
-        )
-        self._pca.channels[int(self.p["steering_channel"])].duty_cycle = (
-            self._pulse_to_duty(steering_us)
-        )
+        self._pca.set_pulse_us(int(self.p["esc_channel"]), esc_us)
+        self._pca.set_pulse_us(int(self.p["steering_channel"]), steering_us)
         msg = Float64MultiArray()
         msg.data = [float(esc_us), float(steering_us)]
         self._pwm_state.publish(msg)
-
-    def _pulse_to_duty(self, pulse_us):
-        duty = pulse_us * float(self.p["pwm_frequency_hz"]) * 65535.0 / 1_000_000.0
-        return int(clamp(round(duty), 0, 65535))
 
     def destroy_node(self):
         try:
             self._write_neutral()
             if self._pca is not None:
-                self._pca.deinit()
+                self._pca.close()
         finally:
             super().destroy_node()
 

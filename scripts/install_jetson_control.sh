@@ -28,25 +28,16 @@ sudo apt-get install -y \
   "ros-${ROS_DISTRO_NAME}-joy" \
   i2c-tools \
   python3-colcon-common-extensions \
-  python3-pip \
   python3-rosdep \
-  python3-smbus \
-  python3-venv
-
-CONTROL_VENV="${REPO_DIR}/.venv-control"
-python3 -m venv --system-site-packages "${CONTROL_VENV}"
-source "${CONTROL_VENV}/bin/activate"
-python3 -m pip install --upgrade pip setuptools wheel
-python3 -m pip install \
-  adafruit-blinka \
-  adafruit-circuitpython-pca9685 \
-  colcon-common-extensions
+  python3-smbus
 
 sudo usermod -aG i2c "${USER}"
 sudo usermod -aG input "${USER}"
 
 cd "${WORKSPACE_DIR}"
-"${CONTROL_VENV}/bin/colcon" build --symlink-install --packages-select adom_control
+# Remove the entry point left by versions that still shipped keyboard teleop.
+rm -f "${WORKSPACE_DIR}/install/adom_control/lib/adom_control/keyboard_teleop"
+colcon build --symlink-install --packages-select adom_control
 
 echo
 echo "Control package installed. Log out and reconnect so i2c/input groups apply."

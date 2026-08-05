@@ -14,6 +14,8 @@ pca9685_control:
     # Keep false during teleop; add a proper command mux before enabling both sources.
     enable_cmd_vel: false
 
+    # Jetson Orin Nano 40-pin header bus. Confirm with `i2cdetect -l`.
+    i2c_bus: 7
     i2c_address: 64       # 0x40
     pwm_frequency_hz: 50.0
     esc_channel: 0
@@ -26,18 +28,6 @@ pca9685_control:
     steering_center_us: 1500.0
     steering_left_us: 1300.0
     steering_right_us: 1700.0
-
-keyboard_teleop:
-  ros__parameters:
-    drive_topic: /drive
-    estop_topic: /emergency_stop
-    publish_rate_hz: 20.0
-    key_timeout_sec: 0.35
-    speed_step_mps: 0.05
-    steering_step_rad: 0.05
-    max_forward_speed_mps: 0.30
-    max_reverse_speed_mps: 0.0
-    max_steering_angle_rad: 0.35
 
 gamepad_control:
   ros__parameters:

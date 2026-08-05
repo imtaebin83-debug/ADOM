@@ -17,12 +17,11 @@ setup(
     zip_safe=True,
     maintainer="ADOM Team",
     maintainer_email="adom@example.com",
-    description="Ackermann keyboard teleop and PCA9685 PWM control for ADOM.",
+    description="Gamepad/Ackermann control and PCA9685 PWM output for ADOM.",
     license="MIT",
     entry_points={
         "console_scripts": [
             "pca9685_control = adom_control.pca9685_control:main",
-            "keyboard_teleop = adom_control.keyboard_teleop:main",
             "gamepad_control = adom_control.gamepad_control:main",
         ]
     },

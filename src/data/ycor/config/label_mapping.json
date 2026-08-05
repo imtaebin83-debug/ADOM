@@ -1,0 +1,107 @@
+{
+  "source_dataset": "Yamaha-CMU Off-Road Dataset (YCOR)",
+  "target_classes": {
+    "0": "paved_low_cost",
+    "1": "natural_low_cost",
+    "2": "medium_cost",
+    "3": "high_cost_or_obstacle",
+    "255": "ignore"
+  },
+  "source_palette_rgb": [
+    {
+      "source_name": "background_or_unlabelled",
+      "rgb": [
+        255,
+        255,
+        255
+      ],
+      "source_index_if_indexed": 0,
+      "target_id": 255
+    },
+    {
+      "source_name": "high_vegetation",
+      "rgb": [
+        40,
+        80,
+        0
+      ],
+      "source_index_if_indexed": 1,
+      "target_id": 3
+    },
+    {
+      "source_name": "traversable_grass",
+      "rgb": [
+        128,
+        255,
+        0
+      ],
+      "source_index_if_indexed": 2,
+      "target_id": 1
+    },
+    {
+      "source_name": "smooth_trail",
+      "rgb": [
+        178,
+        176,
+        153
+      ],
+      "source_index_if_indexed": 3,
+      "target_id": 1
+    },
+    {
+      "source_name": "obstacle",
+      "rgb": [
+        255,
+        0,
+        0
+      ],
+      "source_index_if_indexed": 4,
+      "target_id": 3
+    },
+    {
+      "source_name": "sky",
+      "rgb": [
+        1,
+        88,
+        255
+      ],
+      "source_index_if_indexed": 5,
+      "target_id": 255
+    },
+    {
+      "source_name": "rough_trail",
+      "rgb": [
+        156,
+        76,
+        30
+      ],
+      "source_index_if_indexed": 6,
+      "target_id": 2
+    },
+    {
+      "source_name": "puddle",
+      "rgb": [
+        255,
+        0,
+        128
+      ],
+      "source_index_if_indexed": 7,
+      "target_id": 2
+    },
+    {
+      "source_name": "non_traversable_low_vegetation",
+      "rgb": [
+        0,
+        160,
+        0
+      ],
+      "source_index_if_indexed": 8,
+      "target_id": 3
+    }
+  ],
+  "notes": {
+    "class_0_absence": "YCOR has no paved/asphalt class, so target ID 0 may not appear.",
+    "puddle": "Mapped to medium cost. Change target_id to 3 for a more conservative policy.",
+    "official_split": "Keep source train and valid splits. No official test split is created."
+  }
+}

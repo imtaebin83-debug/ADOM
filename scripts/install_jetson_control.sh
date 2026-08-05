@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROS_DISTRO_NAME="${ROS_DISTRO:-humble}"
+ROS_DISTRO_NAME="${ROS_DISTRO:-jazzy}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_DIR="${REPO_DIR}/ros2_ws"
@@ -13,6 +13,12 @@ fi
 
 source "/opt/ros/${ROS_DISTRO_NAME}/setup.bash"
 
+source /etc/os-release
+if [[ "${ROS_DISTRO_NAME}" == "jazzy" && "${VERSION_CODENAME:-}" != "noble" ]]; then
+  echo "ROS 2 Jazzy control requires Ubuntu 24.04 (noble)." >&2
+  exit 1
+fi
+
 sudo apt-get update
 sudo apt-get install -y \
   "ros-${ROS_DISTRO_NAME}-ackermann-msgs" \
@@ -21,9 +27,14 @@ sudo apt-get install -y \
   python3-colcon-common-extensions \
   python3-pip \
   python3-rosdep \
-  python3-smbus
+  python3-smbus \
+  python3-venv
 
-python3 -m pip install --user \
+CONTROL_VENV="${REPO_DIR}/.venv-control"
+python3 -m venv --system-site-packages "${CONTROL_VENV}"
+source "${CONTROL_VENV}/bin/activate"
+python3 -m pip install --upgrade pip
+python3 -m pip install \
   adafruit-blinka \
   adafruit-circuitpython-pca9685
 

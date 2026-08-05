@@ -7,7 +7,7 @@
 - Python 3.10+
 - Git
 - CUDA-capable GPU for training experiments
-- Ubuntu 22.04 + ROS2 Humble for ROS integration work
+- Ubuntu 24.04 + ROS 2 Jazzy for ROS integration work
 - Jetson Orin Nano 8GB for deployment validation
 
 ## Clone

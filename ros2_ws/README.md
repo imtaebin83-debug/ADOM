@@ -1,6 +1,6 @@
 # ROS2 Workspace
 
-ROS2 Humble integration code lives here as part of the mono repo.
+ROS 2 Jazzy integration code lives here as part of the mono repo.
 
 권장 원칙:
 

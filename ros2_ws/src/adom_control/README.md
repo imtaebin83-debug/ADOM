@@ -35,7 +35,7 @@ D-input 모드를 지원한다. 기본 YAML은 일반적인 Linux X-input 배열
 Jetson에서 장치가 나타나지 않으면 D-input으로 다시 연결한다.
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
 
 lsusb
@@ -53,7 +53,7 @@ sudo usermod -aG input "$USER"
 하나씩 움직이거나 누른다.
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 ros2 topic echo /joy
 ```
 
@@ -77,7 +77,7 @@ ros2 topic echo /joy
 
 ```bash
 cd ~/ADOM/ros2_ws
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install --packages-select adom_control
 source install/setup.bash
 ```
@@ -92,7 +92,7 @@ ros2 launch adom_control gamepad_control.launch.py
 다른 터미널에서 최종 명령과 계산된 PWM을 확인한다.
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
 ros2 topic echo /drive
 ros2 topic echo /adom/control/pwm_us

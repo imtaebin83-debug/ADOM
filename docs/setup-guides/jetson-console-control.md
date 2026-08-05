@@ -6,7 +6,7 @@ the PCA9685 required by this vehicle.
 
 ## Assumptions
 
-- Jetson runs JetPack based on Ubuntu 22.04 and ROS 2 Humble.
+- Jetson runs JetPack 7.2 based on Ubuntu 24.04 and ROS 2 Jazzy.
 - PCA9685 logic `VCC` is connected to Jetson 3.3 V. Do not connect 6 V to VCC.
 - XL-5 BEC powers only the PCA9685 `V+` servo rail.
 - Jetson, PCA9685, ESC, and servo have a common ground.
@@ -35,7 +35,7 @@ Reconnect after group membership is changed:
 
 ```bash
 ssh -t jetson@JETSON_IP
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
 i2cdetect -l
 ```
@@ -55,7 +55,7 @@ devices are connected.
 Keep the LiPo disconnected. Terminal 1 on the Jetson:
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
 ros2 launch adom_control control.launch.py
 ```
@@ -63,7 +63,7 @@ ros2 launch adom_control control.launch.py
 Terminal 2 (a second `ssh -t` session):
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
 ros2 run adom_control keyboard_teleop --ros-args \
   --params-file ~/ADOM/ros2_ws/src/adom_control/config/vehicle.yaml
@@ -72,7 +72,7 @@ ros2 run adom_control keyboard_teleop --ros-args \
 Terminal 3 can inspect the calculated output without touching hardware:
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source ~/ADOM/ros2_ws/install/setup.bash
 ros2 topic echo /adom/control/pwm_us
 ```

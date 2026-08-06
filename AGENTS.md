@@ -22,3 +22,14 @@
 
 - For Python/config/data changes, run the relevant tests and `python scripts/check_git_artifacts.py`. The CI baseline is `python -m unittest discover -s tests -v`.
 - Report the commands run, their results, and any checks not run. For Docker or training-image changes, keep the immutable Git-SHA image and `/opt/adom` code versus `/workspace` data/output boundary intact.
+
+## Pull requests
+
+- Write every PR body bilingually in Korean and English. For each major section,
+  provide the Korean explanation first and the corresponding English explanation
+  immediately after it; do not maintain two PRs or two conflicting descriptions.
+- When the requested work is complete and required checks pass, open or convert the
+  PR to Ready for review so it can be merged. Use Draft only when the user explicitly
+  requests it or when required work/checks remain incomplete, and state the reason.
+- Keep the PR body current when follow-up commits change validation results, known
+  limitations, or merge readiness.

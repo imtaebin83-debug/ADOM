@@ -84,6 +84,7 @@ calibration.cache
 # Local secrets and machine-specific configs
 *.local.yaml
 *.local.yml
+.claude/settings.local.json
 *.pem
 *.key
 

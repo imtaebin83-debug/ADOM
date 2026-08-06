@@ -17,6 +17,24 @@ RunPod, Docker, dataset, training 및 배포 과정에서 재현된 오류와 �
 - 수정 내용, 회귀 테스트 및 운영 복구 절차
 - 남아 있는 검증 항목
 
+## ERR-2026-08-06-008: code-smoke가 프로젝트 의존성을 설치하지 않음
+
+- 상태: 수정 및 PR CI 검증 완료
+- 환경: GitHub Actions `Code smoke tests`, PR #29, Python 3.10
+- 증상: test collection 중
+  `src/data/semantic_20/scripts/01_convert_bridge_sources.py`의 `import yaml`에서
+  `ModuleNotFoundError: No module named 'yaml'`로 실패했다.
+- 경로 판정: traceback의 `…/work/ADOM/ADOM/...`은 GitHub Actions의 정상적인
+  `<workspace>/<repository>` checkout 구조이며 오류 원인이 아니다.
+- 원인: `PyYAML`은 `pyproject.toml`과 Docker requirements에 이미 선언되어 있었지만,
+  code-smoke workflow가 `numpy`와 `Pillow`만 수동 설치하고 프로젝트 자체는 설치하지
+  않았다. 새 preprocessing test가 converter를 collection 단계에서 import하면서 잠재된
+  CI 의존성 drift가 드러났다.
+- 수정: commit `53cc030`에서 수동 의존성 목록 대신
+  `python -m pip install --editable .`로 프로젝트의 선언된 의존성을 설치하도록 변경했다.
+- [x] 기존 PR에 후속 commit push
+- [x] GitHub Actions code-smoke 통과 확인
+
 ## ERR-2026-08-05-007: best checkpoint에 resume state를 요구한 점검 오류
 
 - 상태: 점검 조건 수정

@@ -188,12 +188,15 @@ configs/datasets/
 
 ## 권장 실행 순서
 
-1. 현재 Semantic20 B0 probe/smoke/mini/resume gate를 먼저 통과시킨다.
-2. FR-001과 FR-002를 하나의 별도 refactor branch에서 수행한다.
-3. Docker image와 wheel에서 canonical resource parity를 검증한다.
-4. FR-003의 legacy 제거 후보를 목록화하고 팀원 승인을 받는다.
-5. Cost ontology 결정 후 FR-004와 FR-006을 함께 정리한다.
-6. FR-005의 미추적 코드 소유권 확인 후 MMSeg package를 통합한다.
+1. 현재 Semantic20 B0 full과 canonical test를 완료하고 결과·artifact를 보존한다.
+2. B0/B2의 통제 비교가 목적이면 동일한 immutable image와 데이터 계약으로 B2 gate와
+   full을 먼저 수행한다. B2 사이에 폴더 이동이나 학습 로직 변경을 넣지 않는다.
+3. root `AGENTS.md`에 저장소 불변 조건과 정리 안전 규칙을 짧게 기록한다.
+4. FR-001과 FR-002를 하나의 별도 refactor branch에서 수행한다.
+5. Docker image와 wheel에서 canonical resource parity를 검증한다.
+6. FR-003의 legacy 제거 후보를 목록화하고 팀원 승인을 받는다.
+7. Cost ontology 결정 후 FR-004와 FR-006을 함께 정리한다.
+8. FR-005의 미추적 코드 소유권 확인 후 MMSeg package를 통합한다.
 
 ## 변경 기록
 
@@ -204,3 +207,10 @@ configs/datasets/
   보류했다.
 - top-level `src/data`의 packaging은 현재 Docker readiness를 위한 호환 단계이며,
   장기적으로 FR-001 구조로 통합하는 방향을 제안했다.
+
+### 2026-08-06
+
+- B0 full 직후 B2 비교 실험이 예정되어 있어, 구조 변경보다 동일 image·dataset·seed의
+  비교 조건 보존을 우선하도록 실행 순서를 갱신했다.
+- 미추적 `src/adom_mmseg`와 5-class mapping은 Phase 2 Cost Map 초기 구현일 가능성이
+  확인되어, 소유권과 실험 목적을 확인하기 전에는 불필요 파일로 분류하지 않는다.

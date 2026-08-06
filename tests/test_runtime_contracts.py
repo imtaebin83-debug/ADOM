@@ -81,10 +81,10 @@ class RuntimeContractTests(unittest.TestCase):
             root = Path(directory)
             with self.assertRaises(RuntimeError):
                 resolve_single_best_checkpoint(root)
-            first = root / "best_mIoU_iter_500.pth"
+            first = root / "best_clean_selection_iter_500.pth"
             first.touch()
             self.assertEqual(resolve_single_best_checkpoint(root), first.resolve())
-            (root / "best_mIoU_iter_1000.pth").touch()
+            (root / "best_clean_selection_iter_1000.pth").touch()
             with self.assertRaises(RuntimeError):
                 resolve_single_best_checkpoint(root)
 

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
+import io
 import os
 import re
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
 from adom.data.semantic20 import resource_path
+from adom.runtime import semantic20_cycle
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +81,65 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
                 500 * accumulative,
             )
 
+    def test_clean_v1_loss_seed_and_determinism_contract(self) -> None:
+        model = _execute_env_config(
+            CONFIG_ROOT / "_base_" / "models" / "segformer_b0.py"
+        )
+        self.assertTrue(model["model"]["decode_head"]["loss_decode"]["avg_non_ignore"])
+        with patch.dict(
+            os.environ,
+            {"ADOM_SEED": "43", "ADOM_DETERMINISTIC": "true"},
+            clear=False,
+        ):
+            runtime = _execute_env_config(
+                CONFIG_ROOT / "_base_" / "semantic_default_runtime.py"
+            )
+        self.assertEqual(runtime["randomness"], {"seed": 43, "deterministic": True})
+        self.assertFalse(runtime["env_cfg"]["cudnn_benchmark"])
+        self.assertIsNone(runtime["default_hooks"]["checkpoint"]["save_best"])
+
+    def test_e2_configs_preserve_b0_b2_stage_matrix(self) -> None:
+        for model in ("b0", "b2"):
+            for stage in ("stage1", "stage2"):
+                path = CONFIG_ROOT / f"segformer_{model}_{stage}_e2_combined_goose.py"
+                self.assertTrue(path.is_file())
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("e2_combined_goose.py", source)
+                self.assertIn(f"segformer_{model}.py", source)
+
+    def test_canonical_test_requires_explicit_unlock_and_final_model(self) -> None:
+        cycle_source = inspect.getsource(semantic20_cycle)
+        hooks_source = (REPO_ROOT / "src" / "adom" / "mmseg" / "hooks.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("ADOM_CANONICAL_TEST_UNLOCK", cycle_source)
+        self.assertIn("class CanonicalTestLockHook", hooks_source)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            semantic20_cycle.main(
+                [
+                    "--experiment",
+                    "e0",
+                    "--output",
+                    "unused",
+                    "--models",
+                    "b0",
+                    "--run-test",
+                ]
+            )
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            semantic20_cycle.main(
+                [
+                    "--experiment",
+                    "e0",
+                    "--output",
+                    "unused",
+                    "--models",
+                    "b0",
+                    "--final-test-model",
+                    "b0",
+                ]
+            )
+
     def test_short_smoke_schedule_is_valid(self) -> None:
         with patch.dict(
             os.environ,
@@ -137,7 +200,7 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
 
 @unittest.skipUnless(HAS_MMENGINE, "MMEngine config import runs in training image")
 class Semantic20ConfigImportTests(unittest.TestCase):
-    def test_all_e0_e1_b0_b2_stage_configs_import(self) -> None:
+    def test_all_e0_e1_e2_b0_b2_stage_configs_import(self) -> None:
         from mmengine.config import Config
 
         with tempfile.TemporaryDirectory() as directory, patch.dict(
@@ -150,7 +213,7 @@ class Semantic20ConfigImportTests(unittest.TestCase):
             },
             clear=False,
         ):
-            for experiment in ("e0_rellis", "e1_combined"):
+            for experiment in ("e0_rellis", "e1_combined", "e2_combined_goose"):
                 for model in ("b0", "b2"):
                     for stage in ("stage1", "stage2"):
                         config = Config.fromfile(
@@ -160,8 +223,10 @@ class Semantic20ConfigImportTests(unittest.TestCase):
                         )
                         self.assertEqual(config.model.decode_head.num_classes, 19)
                         self.assertEqual(config.model.decode_head.ignore_index, 255)
+                        self.assertTrue(config.model.decode_head.loss_decode.avg_non_ignore)
+                        self.assertTrue(config.randomness.deterministic)
                         self.assertFalse(config.train_dataloader.dataset.get("reduce_zero_label", False))
-                        if experiment == "e1_combined":
+                        if experiment in {"e1_combined", "e2_combined_goose"}:
                             self.assertEqual(
                                 config.train_dataloader.dataset.manifest,
                                 "manifest.csv",

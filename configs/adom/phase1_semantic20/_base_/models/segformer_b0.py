@@ -46,6 +46,7 @@ model = dict(
         loss_decode=dict(
             type="CrossEntropyLoss",
             use_sigmoid=False,
+            avg_non_ignore=True,
             loss_weight=1.0,
         ),
     ),

@@ -80,6 +80,15 @@ val_evaluator = [
         type="AdomSemantic20Metric",
         ignore_index=255,
         output_dir=metric_output_dir,
+        evaluation_split="val",
     ),
 ]
-test_evaluator = val_evaluator
+test_evaluator = [
+    dict(type="IoUMetric", iou_metrics=["mIoU"]),
+    dict(
+        type="AdomSemantic20Metric",
+        ignore_index=255,
+        output_dir=metric_output_dir,
+        evaluation_split="test",
+    ),
+]

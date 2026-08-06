@@ -40,7 +40,7 @@ class MMSegIntegrationTests(unittest.TestCase):
     def test_semantic20_training_configs_load(self) -> None:
         from mmengine.config import Config
 
-        for experiment in ("e0_rellis", "e1_combined"):
+        for experiment in ("e0_rellis", "e1_combined", "e2_combined_goose"):
             for model in ("b0", "b2"):
                 for stage in ("stage1", "stage2"):
                     path = (
@@ -53,6 +53,7 @@ class MMSegIntegrationTests(unittest.TestCase):
                     config = Config.fromfile(path)
                     self.assertEqual(config.model.decode_head.num_classes, 19)
                     self.assertEqual(config.model.decode_head.ignore_index, 255)
+                    self.assertTrue(config.model.decode_head.loss_decode.avg_non_ignore)
 
     def test_semantic20_wandb_backend_respects_mode(self) -> None:
         from mmengine.config import Config

@@ -14,5 +14,14 @@ dependencies = [
   "tqdm>=4.60",
 ]
 
+[project.scripts]
+adom-semantic20-preprocess = "adom.data.semantic20:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"data.rellis" = ["config/*.yaml", "splits/*.txt"]
+"data.rugd" = ["config/*.json", "splits/*.txt"]
+"data.semantic_20" = ["config/*.yaml"]
+"data.ycor" = ["config/*.json"]

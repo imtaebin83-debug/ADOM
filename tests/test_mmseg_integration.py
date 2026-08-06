@@ -6,6 +6,7 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +53,30 @@ class MMSegIntegrationTests(unittest.TestCase):
                     config = Config.fromfile(path)
                     self.assertEqual(config.model.decode_head.num_classes, 19)
                     self.assertEqual(config.model.decode_head.ignore_index, 255)
+
+    def test_semantic20_wandb_backend_respects_mode(self) -> None:
+        from mmengine.config import Config
+
+        path = (
+            REPO_ROOT
+            / "configs"
+            / "adom"
+            / "phase1_semantic20"
+            / "segformer_b0_stage1_e0_rellis.py"
+        )
+        with patch.dict("os.environ", {"WANDB_MODE": "disabled"}):
+            disabled = Config.fromfile(path)
+        disabled_backends = {
+            backend["type"] for backend in disabled.visualizer.vis_backends
+        }
+        self.assertNotIn("WandbVisBackend", disabled_backends)
+        self.assertIn("TensorboardVisBackend", disabled_backends)
+        self.assertIn("LocalVisBackend", disabled_backends)
+
+        with patch.dict("os.environ", {"WANDB_MODE": "online"}):
+            online = Config.fromfile(path)
+        online_backends = {backend["type"] for backend in online.visualizer.vis_backends}
+        self.assertIn("WandbVisBackend", online_backends)
 
     def test_manifest_dataset_registration(self) -> None:
         import numpy as np

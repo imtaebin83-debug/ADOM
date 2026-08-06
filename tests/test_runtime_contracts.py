@@ -13,6 +13,7 @@ from adom.runtime.artifacts import _git_sha, write_export_metadata
 from adom.runtime.checkpoints import resolve_single_best_checkpoint
 from adom.runtime.cycle import (
     _bounded_wandb_id,
+    _bounded_wandb_tag,
     _resumable_checkpoint,
     _tracking_env,
 )
@@ -114,6 +115,33 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertEqual(env["WANDB_RUN_ID"], "phase1-baseline-b2-stage2")
         self.assertIn("model:b2", env["WANDB_TAGS"])
         self.assertLessEqual(len(_bounded_wandb_id("x" * 200)), 64)
+
+    def test_wandb_extra_tag_is_stable_and_bounded(self) -> None:
+        short = "extra:runpod+a100"
+        self.assertEqual(_bounded_wandb_tag(short), short)
+
+        long = "extra:" + "+".join(["phase1", "semantic20"] * 20)
+        bounded = _bounded_wandb_tag(long)
+        self.assertEqual(len(bounded), 64)
+        self.assertEqual(bounded, _bounded_wandb_tag(long))
+        self.assertNotEqual(bounded, _bounded_wandb_tag(long + "+e1"))
+
+        env = _tracking_env(
+            {
+                "WANDB_TAGS": (
+                    "runpod,a100,phase1,semantic20,e0,b0,experiment:e0,seed:42"
+                )
+            },
+            output_root=Path(
+                "/workspace/adom/runs/semantic20/e0/"
+                "20260805T064732Z-4b3d33603c29-b0-smoke"
+            ),
+            model="b0",
+            phase="e0-stage1-smoke",
+            job_type="training",
+        )
+        self.assertLessEqual(len(env["WANDB_EXTRA_TAG"]), 64)
+        self.assertTrue(env["WANDB_EXTRA_TAG"].startswith("extra:"))
 
     def test_image_revision_precedes_git_checkout(self) -> None:
         with patch.dict("os.environ", {"ADOM_GIT_SHA": "image-sha"}):

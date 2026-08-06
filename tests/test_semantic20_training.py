@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import importlib.util
 import os
 import re
@@ -8,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+from adom.data.semantic20 import resource_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -110,32 +111,28 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
                 ).is_file()
             )
 
-    def test_e1_manifest_covers_all_main_splits_and_mixed_image_suffixes(self) -> None:
-        package = (
-            REPO_ROOT
-            / "study"
-            / "gahyung"
-            / "Datasets_Repo"
-            / "ADOM-Semantic20"
-            / "adom_semantic20_rellis_rugd_ycor_v1"
-        )
-        with (package / "manifest.csv").open(
-            "r", encoding="utf-8-sig", newline=""
-        ) as handle:
-            rows = list(csv.DictReader(handle))
-        manifest = {row["sample_key"]: row for row in rows}
-        self.assertEqual(len(manifest), len(rows))
-        for split in ("train", "val", "test"):
-            keys = [
+    def test_canonical_semantic20_resources_are_packaged(self) -> None:
+        expected_counts = {"train": 4435, "val": 900, "test": 899}
+        for split, expected in expected_counts.items():
+            values = [
                 line.strip()
-                for line in (package / "splits" / f"{split}.txt")
-                .read_text(encoding="utf-8")
+                for line in resource_path("rellis", "splits", f"{split}.txt")
+                .read_text(encoding="utf-8-sig")
                 .splitlines()
                 if line.strip()
             ]
-            self.assertTrue(set(keys).issubset(manifest))
-        suffixes = {Path(row["image_path"]).suffix for row in rows}
-        self.assertEqual(suffixes, {".jpg", ".png"})
+            self.assertEqual(len(values), expected)
+            self.assertEqual(len(values), len(set(values)))
+        self.assertTrue(resource_path("rugd", "config", "label_mapping.json").is_file())
+        self.assertTrue(
+            resource_path("semantic_20", "config", "bridge_mapping.yaml").is_file()
+        )
+
+    def test_runtime_has_no_legacy_study_dependency(self) -> None:
+        source = (REPO_ROOT / "src" / "adom" / "runtime" / "semantic20_cycle.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn(' / "study"', source)
 
 
 @unittest.skipUnless(HAS_MMENGINE, "MMEngine config import runs in training image")

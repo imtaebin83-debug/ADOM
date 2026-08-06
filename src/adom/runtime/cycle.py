@@ -37,6 +37,15 @@ def _bounded_wandb_id(value: str) -> str:
     return f"{normalized[:55]}-{digest}"
 
 
+def _bounded_wandb_tag(value: str) -> str:
+    """Keep a human-readable W&B tag within its 64-character limit."""
+    normalized = value.strip() or "adom"
+    if len(normalized) <= 64:
+        return normalized
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:8]
+    return f"{normalized[:55]}-{digest}"
+
+
 def _tracking_env(
     base_env: dict[str, str],
     *,
@@ -59,6 +68,9 @@ def _tracking_env(
     tags = [item.strip() for item in env.get("WANDB_TAGS", "").split(",")]
     tags.extend((f"model:{model}", f"phase:{phase}"))
     env["WANDB_TAGS"] = ",".join(dict.fromkeys(item for item in tags if item))
+    env["WANDB_EXTRA_TAG"] = _bounded_wandb_tag(
+        "extra:" + env.get("WANDB_TAGS", "runpod").replace(",", "+")
+    )
     return env
 
 

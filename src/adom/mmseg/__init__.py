@@ -3,6 +3,8 @@
 from .dataset import AdomCost4Dataset, AdomSemantic20Dataset
 from .hooks import (
     BackboneAuditHook,
+    CanonicalTestLockHook,
+    ConstrainedCheckpointSelectionHook,
     FiniteLossHook,
     FreezeBackboneHook,
     MetricArtifactHook,
@@ -15,6 +17,8 @@ __all__ = [
     "AdomSafetyMetric",
     "AdomSemantic20Metric",
     "BackboneAuditHook",
+    "CanonicalTestLockHook",
+    "ConstrainedCheckpointSelectionHook",
     "FiniteLossHook",
     "FreezeBackboneHook",
     "MetricArtifactHook",

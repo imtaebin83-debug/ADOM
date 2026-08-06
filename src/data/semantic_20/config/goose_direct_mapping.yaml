@@ -1,0 +1,75 @@
+dataset_name: adom_semantic20_goose_direct_v1
+mapping_version: v1.0
+input_contract: goose_native_64_class
+num_classes: 19
+ignore_index: 255
+reduce_zero_label: false
+
+# Clean Baseline v1 uses only direct Semantic20 correspondences. Conditional,
+# no-match, platform, and invalid labels remain ignore=255. Semantic23 classes
+# and the broader PR #27 mapping are deliberately outside Phase 1.
+source_to_target:
+  0: {source_class: undefined, target_class: ignore, target_id: 255, use: false}
+  1: {source_class: traffic_cone, target_class: ignore, target_id: 255, use: false}
+  2: {source_class: snow, target_class: ignore, target_id: 255, use: false}
+  3: {source_class: cobble, target_class: ignore, target_id: 255, use: false}
+  4: {source_class: obstacle, target_class: object, target_id: 7, use: true}
+  5: {source_class: leaves, target_class: ignore, target_id: 255, use: false}
+  6: {source_class: street_light, target_class: ignore, target_id: 255, use: false}
+  7: {source_class: bikeway, target_class: ignore, target_id: 255, use: false}
+  8: {source_class: ego_vehicle, target_class: ignore, target_id: 255, use: false}
+  9: {source_class: pedestrian_crossing, target_class: ignore, target_id: 255, use: false}
+  10: {source_class: road_block, target_class: barrier, target_id: 15, use: true}
+  11: {source_class: road_marking, target_class: ignore, target_id: 255, use: false}
+  12: {source_class: car, target_class: vehicle, target_id: 6, use: true}
+  13: {source_class: bicycle, target_class: ignore, target_id: 255, use: false}
+  14: {source_class: person, target_class: person, target_id: 11, use: true}
+  15: {source_class: bus, target_class: vehicle, target_id: 6, use: true}
+  16: {source_class: forest, target_class: ignore, target_id: 255, use: false}
+  17: {source_class: bush, target_class: bush, target_id: 13, use: true}
+  18: {source_class: moss, target_class: ignore, target_id: 255, use: false}
+  19: {source_class: traffic_light, target_class: ignore, target_id: 255, use: false}
+  20: {source_class: motorcycle, target_class: vehicle, target_id: 6, use: true}
+  21: {source_class: sidewalk, target_class: ignore, target_id: 255, use: false}
+  22: {source_class: curb, target_class: ignore, target_id: 255, use: false}
+  23: {source_class: asphalt, target_class: asphalt, target_id: 8, use: true}
+  24: {source_class: gravel, target_class: ignore, target_id: 255, use: false}
+  25: {source_class: boom_barrier, target_class: barrier, target_id: 15, use: true}
+  26: {source_class: rail_track, target_class: ignore, target_id: 255, use: false}
+  27: {source_class: tree_crown, target_class: tree, target_id: 2, use: true}
+  28: {source_class: tree_trunk, target_class: tree, target_id: 2, use: true}
+  29: {source_class: debris, target_class: ignore, target_id: 255, use: false}
+  30: {source_class: crops, target_class: ignore, target_id: 255, use: false}
+  31: {source_class: soil, target_class: dirt, target_id: 0, use: true}
+  32: {source_class: rider, target_class: person, target_id: 11, use: true}
+  33: {source_class: animal, target_class: ignore, target_id: 255, use: false}
+  34: {source_class: truck, target_class: vehicle, target_id: 6, use: true}
+  35: {source_class: on_rails, target_class: ignore, target_id: 255, use: false}
+  36: {source_class: caravan, target_class: vehicle, target_id: 6, use: true}
+  37: {source_class: trailer, target_class: vehicle, target_id: 6, use: true}
+  38: {source_class: building, target_class: building, target_id: 9, use: true}
+  39: {source_class: wall, target_class: ignore, target_id: 255, use: false}
+  40: {source_class: rock, target_class: ignore, target_id: 255, use: false}
+  41: {source_class: fence, target_class: fence, target_id: 12, use: true}
+  42: {source_class: guard_rail, target_class: ignore, target_id: 255, use: false}
+  43: {source_class: bridge, target_class: ignore, target_id: 255, use: false}
+  44: {source_class: tunnel, target_class: ignore, target_id: 255, use: false}
+  45: {source_class: pole, target_class: pole, target_id: 3, use: true}
+  46: {source_class: traffic_sign, target_class: ignore, target_id: 255, use: false}
+  47: {source_class: misc_sign, target_class: ignore, target_id: 255, use: false}
+  48: {source_class: barrier_tape, target_class: ignore, target_id: 255, use: false}
+  49: {source_class: kick_scooter, target_class: ignore, target_id: 255, use: false}
+  50: {source_class: low_grass, target_class: grass, target_id: 1, use: true}
+  51: {source_class: high_grass, target_class: ignore, target_id: 255, use: false}
+  52: {source_class: scenery_vegetation, target_class: ignore, target_id: 255, use: false}
+  53: {source_class: sky, target_class: sky, target_id: 5, use: true}
+  54: {source_class: water, target_class: ignore, target_id: 255, use: false}
+  55: {source_class: wire, target_class: ignore, target_id: 255, use: false}
+  56: {source_class: outlier, target_class: ignore, target_id: 255, use: false}
+  57: {source_class: heavy_machinery, target_class: vehicle, target_id: 6, use: true}
+  58: {source_class: container, target_class: ignore, target_id: 255, use: false}
+  59: {source_class: hedge, target_class: ignore, target_id: 255, use: false}
+  60: {source_class: barrel, target_class: object, target_id: 7, use: true}
+  61: {source_class: pipe, target_class: object, target_id: 7, use: true}
+  62: {source_class: tree_root, target_class: ignore, target_id: 255, use: false}
+  63: {source_class: military_vehicle, target_class: vehicle, target_id: 6, use: true}

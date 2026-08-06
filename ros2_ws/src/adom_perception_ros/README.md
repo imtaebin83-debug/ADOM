@@ -10,11 +10,16 @@
 /adom/perception/status         std_msgs/String (JSON)
 ```
 
-ROS 환경에서 이 저장소의 Python package와 고정 OpenMMLab 환경을 먼저 설치한 뒤 실행한다.
+ROS 환경에서 이 저장소의 Python package와 고정 OpenMMLab 환경을 먼저 설치한 뒤
+실행한다. 아래 명령은 저장소 루트에서 실행하며, checkout 경로를 특정 사용자 홈에
+고정하지 않는다.
 
 ```bash
-python3 -m pip install -e /home/myungsub/ADOM
+export ADOM_REPO="$(git rev-parse --show-toplevel)"
+export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/export/segformer_b0_640x384_rellis3d.py"
+export ADOM_CHECKPOINT="<CHECKPOINT_PATH>"
+python3 -m pip install -e "$ADOM_REPO"
 ros2 launch adom_perception_ros perception.launch.py \
-  model_config:=/home/myungsub/ADOM/configs/adom/export/segformer_b0_640x384_rellis3d.py \
-  checkpoint:=/absolute/path/to/best_mIoU.pth device:=cuda:0
+  model_config:="$ADOM_MODEL_CONFIG" \
+  checkpoint:="$ADOM_CHECKPOINT" device:=cuda:0
 ```

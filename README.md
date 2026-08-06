@@ -4,6 +4,10 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 
 **ADOM** is a research project focused on camera-based foundation model domain adaptation and on-board perception technology for MUM-T (Manned-Unmanned Teaming) in mountainous off-road environments.
 
+> 현재 범위, 담당자, 성공 기준의 유일한 기준은
+> [ADOM_CONTEXT.md](ADOM_CONTEXT.md)다. 작업을 시작하기 전에 이 문서와
+> [프로젝트 상태판](docs/status/README.md)을 먼저 확인한다.
+
 ## Project Goal
 
 이 레포는 산악/비정형 오프로드 환경에서 카메라 기반 인지 모델을 학습, 경량화, 온보드 배치하고 최종적으로 ROS2 기반 주행 파이프라인과 연결하는 것을 목표로 합니다.
@@ -15,9 +19,12 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 - **Model optimization**: Jetson Orin Nano 8GB 온보드 구동을 위한 후속 TensorRT 최적화
 - **Perception to control**: semantic costmap, ROS2 Nav2, high-level vehicle control 연동
 
-## Initial Scope
+## Current Operating Focus
 
-1차 목표는 **SegFormer-B0/B2 파인튜닝에 따른 정확도 향상 입증**입니다. FPS 최적화와 FP16/INT8 양자화는 정확도 benchmark 이후의 후속 단계이며, end-to-end 자율주행 demo도 그 뒤에 진행합니다.
+현재 D-5 집중연구기간의 목표는 SegFormer-B0를 Jetson Orin Nano에 배포하고,
+ZED 2i RGB 인지가 RC Car의 안전 정지로 이어지는 end-to-end PoC를 재현하는 것이다.
+연구용 Clean Semantic20 비교와 Semantic23, depth/costmap, 웹 자동화는 보존하되
+발표 시연 파이프라인이 안정화된 뒤 재개한다.
 
 초기 benchmark 필수 metric:
 
@@ -54,6 +61,9 @@ MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 카메
 
 ## Key Docs
 
+- [Current Source of Truth](ADOM_CONTEXT.md)
+- [Docs hub and collaboration workflow](docs/README.md)
+- [Project status dashboard](docs/status/README.md)
 - [Repo structure decision](docs/decision-records/0001-repo-structure.md)
 - [Initial benchmark decision](docs/decision-records/0002-initial-benchmark-scope.md)
 - [Benchmark protocol](docs/metrics/benchmark-protocol.md)

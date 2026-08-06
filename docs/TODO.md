@@ -1,9 +1,12 @@
-# TODO: Phase 1 Semantic20 전처리 안정화
+# TODO: Phase 1 Semantic20 전처리·학습 안정화
 
 > 아래 상세 내용은 안정화 과정에서 발견한 결함과 완료 조건을 보존한 기록이다.
 > 실제 진행 여부는 이 체크리스트를 기준으로 한다.
+> 현재 P0는 D-5 RC Car PoC이며, Clean v1 후속 실험은 발표 파이프라인 안정화까지
+> 일시 중지한다. 프로젝트 우선순위는 [`docs/status/README.md`](status/README.md)를
+> 따른다.
 
-## 진행 현황 (2026-08-05)
+## 진행 현황 (2026-08-06)
 
 - [x] 공식 RUGD RGB mask와 indexed mask 입력을 모두 지원한다.
 - [x] unknown RGB, pair/크기, dtype/channel, target ID를 fail-fast 검증한다.
@@ -21,6 +24,47 @@
 - [x] Gate 3: checkpoint 및 optimizer/scheduler resume을 검증한다.
 - [x] 위 gate 결과와 full 직전 artifact/config/runtime 점검을 모두 통과한 뒤
   E0 B0 full run 시작을 승인한다.
+- [x] E0 B0 full Stage 1/2와 canonical test를 완료한다.
+- [x] W&B 결과를 검토하고 B2 비교 실험 진행을 승인한다.
+- [x] 동일 image SHA와 데이터 계약으로 E0 B2 probe/smoke/mini/resume/full을 완료했다.
+- [x] B0/B2 canonical test의 동일 클래스 표를 작성했다. 다중 seed 비교는 별도 미완료다.
+
+## P0: E0 B2 통제 비교
+
+- B0 기준 image Git SHA는
+  `5c50bfdf2900596bcd447ed6c44ce7924bf10453`이다.
+- B2에서도 dataset digest, split, seed 42, CE loss, optimizer, Stage 1/2 schedule과
+  best-checkpoint test 정책을 유지한다.
+- B2는 `16/1`, `8/2`, `4/4` 순서의 자동 micro-batch probe부터 실행한다.
+- 단일 seed의 B2 차이가 2%p 미만이면 불확실, 2~4%p이면 seed 반복 필요,
+  4%p 초과이면 유의미한 개선 후보로 판정한다. 이는 B0 500-update run 간 관찰된
+  약 2.17%p 변동을 이용한 운영 기준이며 통계적 유의성 기준은 아니다.
+- 최종 연구 주장에는 최소 3개 seed의 평균과 표준편차를 사용한다.
+
+## P0: Phase 1 평가 계약 보강
+
+B0 best Stage 2 validation은 6,000 update에서 `mIoU=51.07`이었고 canonical test는
+`aAcc=89.78`, `mIoU=43.35`, `mAcc=67.22`였다. 학습은 정상이지만 canonical
+validation/test에 일부 희소 클래스 GT가 없어 Phase 1 목표를 충분히 평가하지 못한다.
+
+- [ ] train/val/test의 클래스별 image 수와 pixel support를 고정 artifact로 남긴다.
+- [ ] GT가 존재하는 고정 클래스 집합의 `supported-class mIoU`를 추가한다.
+- [ ] GT가 없는 클래스의 false-positive pixel/image rate를 별도 보고한다.
+- [ ] pole, water, log 등 목표 희소 클래스의 macro IoU/Recall을 정의한다.
+- [ ] 학습에 사용되지 않는 고정 rare-class challenge validation set을 확정한다.
+- [ ] test의 `test_metrics.json`과 `confusion_matrix.json`을 W&B summary/artifact로
+  업로드한다.
+- [ ] test set으로 recipe를 반복 조정하지 않고 validation으로 선택한 최종 모델만
+  canonical test에서 평가한다.
+
+## P1: B2 이후 학습 recipe 후보
+
+- [ ] B0의 6k 최고점과 40k 최종 하락을 근거로 18~20k 상한 또는 early stopping을
+  검토한다.
+- [ ] CE baseline 뒤 capped class-weighted CE를 첫 loss ablation으로 수행한다.
+- [ ] 이후 CE+Lovasz 또는 Focal을 한 번에 하나씩 비교한다.
+- [ ] pole 같은 소형·가느다란 클래스에는 class-aware crop sampling과 입력 해상도
+  ablation을 loss 변경과 분리해 수행한다.
 
 ## 범위와 담당 구분
 

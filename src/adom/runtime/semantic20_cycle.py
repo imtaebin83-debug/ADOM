@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -16,6 +17,11 @@ from PIL import Image
 
 from adom.data.io import write_json
 from adom.data.semantic20 import resource_path
+from adom.evaluation_semantic20 import (
+    SEMANTIC20_CLASSES,
+    TEST_SUPPORTED11,
+    VAL_SUPPORTED13,
+)
 from adom.runtime.checkpoints import resolve_single_best_checkpoint
 from adom.runtime.cycle import (
     CONFIG_ROOT,
@@ -37,6 +43,9 @@ EXPECTED_SPLIT_COUNTS = {
     "e0": {"train": 4435, "val": 900, "test": 899},
     "e1": {"train": 9868, "val": 900, "test": 899},
 }
+PRODUCTION_CANONICAL_EVAL_COUNTS = {"val": 900, "test": 899}
+CANONICAL_EVAL_COUNTS = PRODUCTION_CANONICAL_EVAL_COUNTS.copy()
+COMBINED_EXPERIMENTS = {"e1", "e2"}
 EXPECTED_E1_MANIFEST_COUNT = 14421
 EXPECTED_E1_MAIN_SOURCE_COUNTS = Counter(
     {"rellis3d": 6234, "rugd": 4779, "ycor": 654}
@@ -64,12 +73,20 @@ def _rellis_key(value: str) -> str:
     return value.removeprefix("rellis3d/")
 
 
-def _validate_semantic20_pair(image: Path, mask: Path, key: str) -> None:
+def _validate_semantic20_pair(
+    image: Path,
+    mask: Path,
+    key: str,
+) -> dict[str, Any]:
     if not image.is_file() or not mask.is_file():
         raise FileNotFoundError(f"Missing dataset pair: {image}, {mask}")
     with Image.open(image) as image_file:
         image_file.load()
         image_size = image_file.size
+        image_digest = hashlib.sha256()
+        image_digest.update(image_file.mode.encode("ascii"))
+        image_digest.update(str(image_size).encode("ascii"))
+        image_digest.update(image_file.tobytes())
     with Image.open(mask) as mask_file:
         mask_file.load()
         mask_mode = mask_file.mode
@@ -89,6 +106,94 @@ def _validate_semantic20_pair(image: Path, mask: Path, key: str) -> None:
     invalid_ids = {int(value) for value in np.unique(mask_array)} - ALLOWED_TARGET_IDS
     if invalid_ids:
         raise RuntimeError(f"Invalid Semantic20 target IDs for {key}: {sorted(invalid_ids)}")
+    valid = mask_array != 255
+    valid_values = mask_array[valid]
+    pixel_counts = np.bincount(valid_values, minlength=19).astype(np.int64)
+    digest = hashlib.sha256()
+    digest.update(mask_array.tobytes())
+    return {
+        "total_pixels": int(mask_array.size),
+        "non_ignore_pixels": int(valid_values.size),
+        "pixel_counts": pixel_counts.tolist(),
+        "image_presence": (pixel_counts > 0).astype(np.int64).tolist(),
+        "image_sha256": image_digest.hexdigest(),
+        "mask_sha256": digest.hexdigest(),
+    }
+
+
+def _support_payload(
+    splits: dict[str, list[str]],
+    pair_audits: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    def aggregate(keys: list[str]) -> dict[str, Any]:
+        pixels = np.zeros(19, dtype=np.int64)
+        images = np.zeros(19, dtype=np.int64)
+        total_pixels = 0
+        non_ignore_pixels = 0
+        for key in keys:
+            audit = pair_audits[key]
+            pixels += np.asarray(audit["pixel_counts"], dtype=np.int64)
+            images += np.asarray(audit["image_presence"], dtype=np.int64)
+            total_pixels += int(audit["total_pixels"])
+            non_ignore_pixels += int(audit["non_ignore_pixels"])
+        return {
+            "sample_count": len(keys),
+            "total_pixels": total_pixels,
+            "non_ignore_pixels": non_ignore_pixels,
+            "classes": [
+                {
+                    "id": index,
+                    "name": name,
+                    "pixels": int(pixels[index]),
+                    "images": int(images[index]),
+                    "pixel_share_non_ignore": (
+                        float(pixels[index] / non_ignore_pixels)
+                        if non_ignore_pixels
+                        else 0.0
+                    ),
+                    "image_share": (
+                        float(images[index] / len(keys)) if keys else 0.0
+                    ),
+                }
+                for index, name in enumerate(SEMANTIC20_CLASSES)
+            ],
+        }
+
+    by_split = {split: aggregate(keys) for split, keys in splits.items()}
+    by_source_split: dict[str, dict[str, Any]] = {}
+    for split, keys in splits.items():
+        source_keys: dict[str, list[str]] = {}
+        for key in keys:
+            source = key.split("/", 1)[0] if "/" in key else "rellis3d"
+            source_keys.setdefault(source, []).append(key)
+        for source, values in source_keys.items():
+            by_source_split[f"{source}/{split}"] = aggregate(values)
+    return {
+        "schema_version": "semantic20-support-v1",
+        "by_split": by_split,
+        "by_source_split": by_source_split,
+    }
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _mapping_digests(experiment: str) -> dict[str, str]:
+    paths = [
+        resource_path("rellis", "config", "class_mapping.yaml")
+        if experiment == "e0"
+        else resource_path("semantic_20", "config", "bridge_mapping.yaml")
+    ]
+    if experiment == "e2":
+        paths.append(
+            resource_path("semantic_20", "config", "goose_direct_mapping.yaml")
+        )
+    return {path.name: _file_sha256(path) for path in paths}
 
 
 def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str, Any]:
@@ -104,10 +209,21 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         for split in ("train", "val", "test")
     }
     actual_counts = {key: len(value) for key, value in actual.items()}
-    if actual_counts != EXPECTED_SPLIT_COUNTS[experiment]:
+    if experiment in EXPECTED_SPLIT_COUNTS and (
+        actual_counts != EXPECTED_SPLIT_COUNTS[experiment]
+    ):
         raise RuntimeError(
             f"{experiment} split counts differ from the Semantic20 contract: "
             f"actual={actual_counts}, expected={EXPECTED_SPLIT_COUNTS[experiment]}"
+        )
+    if experiment == "e2" and (
+        actual_counts["val"] != CANONICAL_EVAL_COUNTS["val"]
+        or actual_counts["test"] != CANONICAL_EVAL_COUNTS["test"]
+        or actual_counts["train"] <= EXPECTED_SPLIT_COUNTS["e1"]["train"]
+    ):
+        raise RuntimeError(
+            "E2 must keep canonical RELLIS val/test and add GOOSE train samples: "
+            f"{actual_counts}"
         )
     all_keys = [key for values in actual.values() for key in values]
     if len(all_keys) != len(set(all_keys)):
@@ -119,9 +235,11 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
                 f"{experiment} {split} is not the canonical RELLIS {split} split"
             )
         if any(not value.startswith("rellis3d/") for value in actual[split]) and (
-            experiment == "e1"
+            experiment in COMBINED_EXPERIMENTS
         ):
-            raise RuntimeError(f"E1 {split} must contain RELLIS samples only")
+            raise RuntimeError(
+                f"{experiment.upper()} {split} must contain RELLIS samples only"
+            )
     if experiment == "e0":
         if [_rellis_key(value) for value in actual["train"]] != expected["train"]:
             raise RuntimeError("E0 train is not the canonical RELLIS train split")
@@ -132,22 +250,37 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
             if value.startswith("rellis3d/")
         ]
         if rellis_train != expected["train"]:
-            raise RuntimeError("E1 does not contain the canonical RELLIS train split")
+            raise RuntimeError(
+                f"{experiment.upper()} does not contain the canonical RELLIS train split"
+            )
         sources = {value.split("/", 1)[0] for value in actual["train"]}
-        if not {"rellis3d", "rugd", "ycor"}.issubset(sources):
-            raise RuntimeError("E1 train must contain RELLIS, RUGD, and YCOR")
+        required_sources = {"rellis3d", "rugd", "ycor"}
+        if experiment == "e2":
+            required_sources.add("goose")
+        if sources != required_sources:
+            raise RuntimeError(
+                f"{experiment.upper()} train sources must be "
+                f"{sorted(required_sources)}, got {sorted(sources)}"
+            )
 
-    manifest_rows: dict[str, tuple[str, str]] = {}
-    if experiment == "e1":
+    manifest_rows: dict[str, dict[str, str]] = {}
+    manifest_path: Path | None = None
+    if experiment in COMBINED_EXPERIMENTS:
         final_check_path = dataset_root / "results" / "final_check.json"
         if not final_check_path.is_file():
-            raise FileNotFoundError(f"E1 final check is missing: {final_check_path}")
+            raise FileNotFoundError(
+                f"{experiment.upper()} final check is missing: {final_check_path}"
+            )
         final_check = json.loads(final_check_path.read_text(encoding="utf-8-sig"))
         if str(final_check.get("status", "")).upper() != "PASS":
-            raise RuntimeError(f"E1 final check is not PASS: {final_check_path}")
+            raise RuntimeError(
+                f"{experiment.upper()} final check is not PASS: {final_check_path}"
+            )
         manifest_path = dataset_root / "manifest.csv"
         if not manifest_path.is_file():
-            raise FileNotFoundError(f"E1 manifest is missing: {manifest_path}")
+            raise FileNotFoundError(
+                f"{experiment.upper()} manifest is missing: {manifest_path}"
+            )
         with manifest_path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
             required = {"sample_key", "image_path", "mask_path"}
@@ -159,29 +292,55 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
             for row in reader:
                 key = row["sample_key"]
                 if key in manifest_rows:
-                    raise RuntimeError(f"Duplicate E1 manifest sample: {key}")
-                manifest_rows[key] = (row["image_path"], row["mask_path"])
-        if len(manifest_rows) != EXPECTED_E1_MANIFEST_COUNT:
+                    raise RuntimeError(
+                        f"Duplicate {experiment.upper()} manifest sample: {key}"
+                    )
+                manifest_rows[key] = {
+                    "image_path": row["image_path"],
+                    "mask_path": row["mask_path"],
+                }
+        if experiment == "e1" and len(manifest_rows) != EXPECTED_E1_MANIFEST_COUNT:
             raise RuntimeError(
                 "E1 manifest count differs from contract: "
                 f"{len(manifest_rows)} != {EXPECTED_E1_MANIFEST_COUNT}"
             )
+        manifest_sources = Counter(key.split("/", 1)[0] for key in manifest_rows)
+        if experiment == "e2":
+            required_manifest_sources = {"rellis3d", "rugd", "ycor", "goose"}
+            if set(manifest_sources) != required_manifest_sources:
+                raise RuntimeError(
+                    "E2 manifest must contain exactly RELLIS, RUGD, YCOR, and GOOSE: "
+                    f"{dict(manifest_sources)}"
+                )
+            for source, expected_count in EXPECTED_E1_MANIFEST_SOURCE_COUNTS.items():
+                if manifest_sources[source] != expected_count:
+                    raise RuntimeError(
+                        f"E2 changed the existing {source} manifest count: "
+                        f"{manifest_sources[source]} != {expected_count}"
+                    )
+            if manifest_sources["goose"] <= 0:
+                raise RuntimeError("E2 manifest contains no GOOSE samples")
 
     # Check every pair before paying for GPU time. E1 must use manifest paths
     # because RUGD images are PNG while RELLIS and YCOR images are JPEG.
     main_source_counts: Counter[str] = Counter()
+    pair_audits: dict[str, dict[str, Any]] = {}
     verified_pairs = 0
-    if experiment == "e1":
+    if experiment in COMBINED_EXPERIMENTS:
         manifest_source_counts: Counter[str] = Counter()
-        for key, (image_relpath, mask_relpath) in manifest_rows.items():
-            image = (dataset_root / image_relpath).resolve()
-            mask = (dataset_root / mask_relpath).resolve()
+        for key, row in manifest_rows.items():
+            image = (dataset_root / row["image_path"]).resolve()
+            mask = (dataset_root / row["mask_path"]).resolve()
             if dataset_root.resolve() not in image.parents or dataset_root.resolve() not in mask.parents:
-                raise RuntimeError(f"E1 manifest path escapes dataset root: {key}")
-            _validate_semantic20_pair(image, mask, key)
+                raise RuntimeError(
+                    f"{experiment.upper()} manifest path escapes dataset root: {key}"
+                )
+            pair_audits[key] = _validate_semantic20_pair(image, mask, key)
             manifest_source_counts[key.split("/", 1)[0]] += 1
             verified_pairs += 1
-        if manifest_source_counts != EXPECTED_E1_MANIFEST_SOURCE_COUNTS:
+        if experiment == "e1" and (
+            manifest_source_counts != EXPECTED_E1_MANIFEST_SOURCE_COUNTS
+        ):
             raise RuntimeError(
                 "E1 manifest source counts differ from contract: "
                 f"{dict(manifest_source_counts)}"
@@ -189,14 +348,16 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
 
     for split, keys in actual.items():
         for key in keys:
-            if experiment == "e1":
+            if experiment in COMBINED_EXPERIMENTS:
                 if key not in manifest_rows:
-                    raise RuntimeError(f"E1 split sample is absent from manifest: {key}")
+                    raise RuntimeError(
+                        f"{experiment.upper()} split sample is absent from manifest: {key}"
+                    )
                 main_source_counts[key.split("/", 1)[0]] += 1
             else:
                 image = dataset_root / "images" / f"{key}.jpg"
                 mask = dataset_root / "masks" / f"{key}.png"
-                _validate_semantic20_pair(image, mask, key)
+                pair_audits[key] = _validate_semantic20_pair(image, mask, key)
                 verified_pairs += 1
 
     if experiment == "e1" and main_source_counts != EXPECTED_E1_MAIN_SOURCE_COUNTS:
@@ -204,10 +365,55 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         raise RuntimeError(
             f"E1 main split source counts differ from contract: {dict(main_source_counts)}"
         )
+    if experiment == "e2":
+        for source, expected_count in EXPECTED_E1_MAIN_SOURCE_COUNTS.items():
+            if main_source_counts[source] != expected_count:
+                raise RuntimeError(
+                    f"E2 changed the existing {source} main split count: "
+                    f"{main_source_counts[source]} != {expected_count}"
+                )
+        if main_source_counts["goose"] <= 0:
+            raise RuntimeError("E2 main train contains no GOOSE samples")
 
     digest = hashlib.sha256()
     for split in ("train", "val", "test"):
         digest.update(("\n".join(actual[split]) + "\n").encode("utf-8"))
+    image_dataset_digest = hashlib.sha256()
+    mask_dataset_digest = hashlib.sha256()
+    content_dataset_digest = hashlib.sha256()
+    for key in sorted(pair_audits):
+        key_bytes = key.encode("utf-8")
+        image_sha = pair_audits[key]["image_sha256"].encode("ascii")
+        mask_sha = pair_audits[key]["mask_sha256"].encode("ascii")
+        image_dataset_digest.update(key_bytes)
+        image_dataset_digest.update(image_sha)
+        mask_dataset_digest.update(key_bytes)
+        mask_dataset_digest.update(mask_sha)
+        content_dataset_digest.update(key_bytes)
+        content_dataset_digest.update(image_sha)
+        content_dataset_digest.update(mask_sha)
+    support = _support_payload(actual, pair_audits)
+    production_reference = all(
+        len(expected[split]) == PRODUCTION_CANONICAL_EVAL_COUNTS[split]
+        for split in ("val", "test")
+    )
+    if production_reference:
+        for split, expected_names in (
+            ("val", VAL_SUPPORTED13),
+            ("test", TEST_SUPPORTED11),
+        ):
+            actual_names = {
+                row["name"]
+                for row in support["by_split"][split]["classes"]
+                if row["pixels"] > 0
+            }
+            if actual_names != set(expected_names):
+                raise RuntimeError(
+                    f"Canonical {split} class support changed: "
+                    f"missing={sorted(set(expected_names) - actual_names)}, "
+                    f"unexpected={sorted(actual_names - set(expected_names))}"
+                )
+    mapping_digests = _mapping_digests(experiment)
     return {
         "experiment": experiment,
         "num_classes": 19,
@@ -215,12 +421,22 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         "split_counts": actual_counts,
         "verified_pairs": verified_pairs,
         "split_contract_sha256": digest.hexdigest(),
+        "manifest_sha256": _file_sha256(manifest_path) if manifest_path else None,
+        "dataset_images_sha256": image_dataset_digest.hexdigest(),
+        "dataset_masks_sha256": mask_dataset_digest.hexdigest(),
+        "dataset_content_sha256": content_dataset_digest.hexdigest(),
+        "mapping_sha256": mapping_digests,
+        "class_support": support,
         "validation_test_policy": "canonical RELLIS-only",
     }
 
 
 def _config(model: str, stage: str, experiment: str) -> Path:
-    suffix = "e0_rellis" if experiment == "e0" else "e1_combined"
+    suffix = {
+        "e0": "e0_rellis",
+        "e1": "e1_combined",
+        "e2": "e2_combined_goose",
+    }[experiment]
     return CONFIG_DIR / f"segformer_{model}_{stage}_{suffix}.py"
 
 
@@ -334,6 +550,12 @@ def _train_stage(
     load_from: Path | None = None,
 ) -> Path | None:
     work_dir = output_root / model / stage
+    work_dir.mkdir(parents=True, exist_ok=True)
+    for filename in ("dataset_contract.json", "class_support.json"):
+        source = output_root / filename
+        destination = work_dir / filename
+        if source.is_file() and not destination.is_file():
+            shutil.copy2(source, destination)
     audit_name = (
         "backbone_freeze_check.json"
         if stage == "stage1"
@@ -366,7 +588,11 @@ def _train_stage(
         state,
         name=f"{model}_{stage}",
         command=command,
-        artifacts=[work_dir / audit_name],
+        artifacts=(
+            [work_dir / audit_name]
+            if gate == "smoke"
+            else [work_dir / audit_name, work_dir / "checkpoint_selection.json"]
+        ),
         env=stage_env,
         resume=resume,
     )
@@ -471,14 +697,25 @@ def run_cycle(args: argparse.Namespace) -> None:
     state = CycleState(output_root / "status.json", args.resume)
     dataset_contract = validate_semantic20_dataset(dataset_root, args.experiment)
     write_json(output_root / "dataset_contract.json", dataset_contract)
+    write_json(output_root / "class_support.json", dataset_contract["class_support"])
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(REPO_ROOT / "src") + os.pathsep + env.get(
         "PYTHONPATH", ""
     )
     env["ADOM_DATA_ROOT"] = dataset_root.as_posix()
+    env["ADOM_SEED"] = str(args.seed)
+    env["ADOM_DETERMINISTIC"] = "true"
     tags = [item for item in env.get("WANDB_TAGS", "").split(",") if item]
-    tags.extend(("phase1", "semantic20", f"experiment:{args.experiment}", "seed:42"))
+    tags.extend(
+        (
+            "phase1",
+            "semantic20",
+            "clean-v1",
+            f"experiment:{args.experiment}",
+            f"seed:{args.seed}",
+        )
+    )
     env["WANDB_TAGS"] = ",".join(dict.fromkeys(tags))
 
     models = [item.strip().lower() for item in args.models.split(",") if item.strip()]
@@ -517,10 +754,16 @@ def run_cycle(args: argparse.Namespace) -> None:
     state.value.update(
         {
             "experiment": args.experiment,
+            "seed": args.seed,
             "gate": args.gate,
             "dataset_root": str(dataset_root),
             "optimizer_update_domain": True,
             "export": "independent/not part of Phase 1 training cycle",
+            "test_policy": {
+                "locked_by_default": True,
+                "run_test": bool(args.run_test),
+                "final_test_model": args.final_test_model,
+            },
             "wandb": {
                 key: env.get(key)
                 for key in ("WANDB_PROJECT", "WANDB_ENTITY", "WANDB_RUN_GROUP", "WANDB_TAGS")
@@ -594,10 +837,13 @@ def run_cycle(args: argparse.Namespace) -> None:
             load_from=stage1_best,
         )
         if stage2_best is None:
-            raise RuntimeError("Full test requires a Stage 2 best checkpoint")
+            raise RuntimeError("Full training requires a Stage 2 selected checkpoint")
+        if not args.run_test or model != args.final_test_model:
+            continue
         test_dir = output_root / model / "test"
         test_env = dict(model_env)
         test_env["ADOM_METRIC_OUTPUT_DIR"] = test_dir.as_posix()
+        test_env["ADOM_CANONICAL_TEST_UNLOCK"] = "final-model-confirmed"
         test_env["ADOM_EXPERIMENT_TAG"] = f"experiment:{args.experiment}"
         test_env["ADOM_MODEL_TAG"] = f"model:{model}"
         test_env["ADOM_PHASE_TAG"] = "phase:test"
@@ -626,16 +872,22 @@ def run_cycle(args: argparse.Namespace) -> None:
 
     summary_models: list[dict[str, Any]] = []
     for model in models:
+        selection_path = output_root / model / "stage2" / "checkpoint_selection.json"
+        model_summary: dict[str, Any] = {"model": model}
+        if selection_path.is_file():
+            selection = json.loads(selection_path.read_text(encoding="utf-8"))
+            model_summary["validation_selection"] = selection.get("selected", {})
         metric_path = output_root / model / "test" / "test_metrics.json"
         if metric_path.is_file():
             metric_value = json.loads(metric_path.read_text(encoding="utf-8"))
-            summary_models.append(
-                {"model": model, "metrics": metric_value.get("metrics", {})}
-            )
+            model_summary["test_metrics"] = metric_value.get("metrics", {})
+        if len(model_summary) > 1:
+            summary_models.append(model_summary)
     write_json(
         output_root / "summary.json",
         {
             "experiment": args.experiment,
+            "seed": args.seed,
             "gate": args.gate,
             "optimizer_update_domain": True,
             "dataset_contract": dataset_contract,
@@ -649,10 +901,10 @@ def run_cycle(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Run Phase 1 Semantic20 SegFormer optimizer-update gates"
+        description="Run Clean v1 E0/E1/E2 Semantic20 SegFormer gates"
     )
     parser.add_argument("--dataset", type=Path)
-    parser.add_argument("--experiment", choices=("e0", "e1"), required=True)
+    parser.add_argument("--experiment", choices=("e0", "e1", "e2"), required=True)
     parser.add_argument("--models", default="b0,b2")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument(
@@ -663,6 +915,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-batch-probe", action="store_true")
     parser.add_argument("--micro-batch", type=int)
+    parser.add_argument("--seed", type=int, choices=(42, 43, 44), default=42)
+    parser.add_argument(
+        "--run-test",
+        action="store_true",
+        help="Unlock canonical test for the one final model named by --final-test-model.",
+    )
+    parser.add_argument("--final-test-model", choices=("b0", "b2"))
     parser.add_argument(
         "--expected-image-sha",
         help="Require ADOM_GIT_SHA inside the immutable Docker image to match.",
@@ -673,6 +932,15 @@ def main(argv: list[str] | None = None) -> None:
         help="Compatibility flag; export is already independent from this training cycle",
     )
     args = parser.parse_args(argv)
+    if args.run_test != bool(args.final_test_model):
+        parser.error("--run-test and --final-test-model must be provided together")
+    if args.run_test and args.gate != "full":
+        parser.error("canonical test can only run with --gate full")
+    requested_models = {
+        item.strip().lower() for item in args.models.split(",") if item.strip()
+    }
+    if args.final_test_model and args.final_test_model not in requested_models:
+        parser.error("--final-test-model must be included in --models")
     if args.dataset is None:
         value = os.getenv("ADOM_DATA_ROOT")
         if not value:

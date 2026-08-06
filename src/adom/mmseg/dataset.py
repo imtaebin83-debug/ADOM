@@ -7,28 +7,7 @@ from typing import Any
 from mmseg.datasets import BaseSegDataset
 from mmseg.registry import DATASETS
 
-
-SEMANTIC20_CLASSES = (
-    "dirt",
-    "grass",
-    "tree",
-    "pole",
-    "water",
-    "sky",
-    "vehicle",
-    "object",
-    "asphalt",
-    "building",
-    "log",
-    "person",
-    "fence",
-    "bush",
-    "concrete",
-    "barrier",
-    "puddle",
-    "mud",
-    "rubble",
-)
+from adom.evaluation_semantic20 import SEMANTIC20_CLASSES
 
 SEMANTIC20_PALETTE = [
     [108, 64, 20],

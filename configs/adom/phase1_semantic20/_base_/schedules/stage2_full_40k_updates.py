@@ -62,7 +62,9 @@ train_cfg = dict(
 val_cfg = dict(type="ValLoop")
 test_cfg = dict(type="TestLoop")
 custom_hooks = [
+    dict(type="CanonicalTestLockHook"),
     dict(type="BackboneAuditHook"),
     dict(type="FiniteLossHook"),
     dict(type="MetricArtifactHook"),
+    dict(type="ConstrainedCheckpointSelectionHook", tolerance_pp=1.0),
 ]

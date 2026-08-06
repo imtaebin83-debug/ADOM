@@ -320,6 +320,67 @@ class Semantic20DatasetContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "not PASS"):
                     semantic20_cycle.validate_semantic20_dataset(root, "e1")
 
+    def test_e2_contract_adds_goose_and_keeps_rellis_eval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "e2"
+            reference = Path(directory) / "reference"
+            (root / "splits").mkdir(parents=True)
+            (root / "results").mkdir()
+            reference.mkdir()
+            (root / "_SUCCESS").write_text("PASS\n", encoding="utf-8")
+            (root / "results" / "final_check.json").write_text(
+                json.dumps({"status": "PASS"}), encoding="utf-8"
+            )
+            splits = {
+                "train": ["rellis3d/a", "rugd/b", "ycor/c", "goose/d"],
+                "val": ["rellis3d/e"],
+                "test": ["rellis3d/f"],
+            }
+            references = {"train": ["a"], "val": ["e"], "test": ["f"]}
+            rows = []
+            for split, keys in splits.items():
+                (root / "splits" / f"{split}.txt").write_text(
+                    "\n".join(keys), encoding="utf-8"
+                )
+                (reference / f"{split}.txt").write_text(
+                    "\n".join(references[split]), encoding="utf-8"
+                )
+                for key in keys:
+                    image_rel, mask_rel = self._write_pair(root, key)
+                    rows.append((key, image_rel, mask_rel))
+            (root / "manifest.csv").write_text(
+                "sample_key,image_path,mask_path\n"
+                + "".join(f"{key},{image},{mask}\n" for key, image, mask in rows),
+                encoding="utf-8",
+            )
+            with patch.object(
+                semantic20_cycle, "REFERENCE_SPLITS", reference
+            ), patch.dict(
+                semantic20_cycle.EXPECTED_SPLIT_COUNTS,
+                {"e1": {"train": 3, "val": 1, "test": 1}},
+                clear=False,
+            ), patch.dict(
+                semantic20_cycle.CANONICAL_EVAL_COUNTS,
+                {"val": 1, "test": 1},
+                clear=True,
+            ), patch.object(
+                semantic20_cycle,
+                "EXPECTED_E1_MAIN_SOURCE_COUNTS",
+                Counter({"rellis3d": 3, "rugd": 1, "ycor": 1}),
+            ), patch.object(
+                semantic20_cycle,
+                "EXPECTED_E1_MANIFEST_SOURCE_COUNTS",
+                Counter({"rellis3d": 3, "rugd": 1, "ycor": 1}),
+            ):
+                report = semantic20_cycle.validate_semantic20_dataset(root, "e2")
+            self.assertEqual(report["split_counts"]["train"], 4)
+            self.assertEqual(
+                report["class_support"]["by_source_split"]["goose/train"]
+                ["sample_count"],
+                1,
+            )
+            self.assertIn("goose_direct_mapping.yaml", report["mapping_sha256"])
+
 
 if __name__ == "__main__":
     unittest.main()

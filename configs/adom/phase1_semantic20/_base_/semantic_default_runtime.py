@@ -1,6 +1,11 @@
 default_scope = "mmseg"
+runtime_seed = int("{{$ADOM_SEED:42}}")
+runtime_deterministic = "{{$ADOM_DETERMINISTIC:true}}".strip().lower()
+if runtime_deterministic not in {"true", "false", "1", "0"}:
+    raise ValueError("ADOM_DETERMINISTIC must be true/false or 1/0")
+runtime_deterministic = runtime_deterministic in {"true", "1"}
 env_cfg = dict(
-    cudnn_benchmark=True,
+    cudnn_benchmark=not runtime_deterministic,
     mp_cfg=dict(mp_start_method="fork", opencv_num_threads=0),
     dist_cfg=dict(backend="nccl"),
 )
@@ -41,7 +46,7 @@ log_processor = dict(by_epoch=False)
 log_level = "INFO"
 load_from = None
 resume = False
-randomness = dict(seed=42, deterministic=False)
+randomness = dict(seed=runtime_seed, deterministic=runtime_deterministic)
 
 runtime_accumulative_counts = int("{{$ADOM_ACCUMULATIVE_COUNTS:1}}")
 runtime_checkpoint_updates = int(
@@ -59,8 +64,8 @@ default_hooks = dict(
         save_last=True,
         save_optimizer=True,
         save_param_scheduler=True,
-        save_best="mIoU",
-        rule="greater",
+        # Clean v1 selection is handled by ConstrainedCheckpointSelectionHook.
+        save_best=None,
     ),
     sampler_seed=dict(type="DistSamplerSeedHook"),
     visualization=dict(type="SegVisualizationHook"),

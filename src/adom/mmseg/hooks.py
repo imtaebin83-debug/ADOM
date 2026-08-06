@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
 from mmengine.hooks import Hook
 from mmseg.registry import HOOKS
+
+from adom.evaluation_semantic20 import select_constrained_checkpoint
+
+
+CANONICAL_TEST_UNLOCK_TOKEN = "final-model-confirmed"
 
 
 def _unwrap_model(model: Any) -> Any:
@@ -33,6 +40,69 @@ def _write_audit(runner: Any, filename: str, payload: dict[str, Any]) -> None:
     )
 
 
+def _metric_value(metrics: dict[str, Any], suffix: str) -> float:
+    matches = [value for key, value in metrics.items() if key.endswith(suffix)]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"Expected one validation metric ending with {suffix!r}, "
+            f"found {[key for key in metrics if key.endswith(suffix)]}"
+        )
+    return float(matches[0])
+
+
+def _replace_link_or_copy(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        destination.unlink()
+    try:
+        os.link(source, destination)
+    except OSError:
+        shutil.copy2(source, destination)
+
+
+def _publish_wandb(
+    runner: Any,
+    *,
+    summary_prefix: str,
+    metrics: dict[str, Any] | None = None,
+    files: tuple[str, ...] = (),
+) -> None:
+    """Best-effort W&B persistence without making tracking a training gate."""
+
+    try:
+        import wandb
+    except ImportError:
+        return
+    if wandb.run is None:
+        return
+    try:
+        if metrics:
+            for key, value in metrics.items():
+                wandb.run.summary[f"{summary_prefix}/{key}"] = float(value)
+        root = Path(runner.work_dir)
+        for filename in files:
+            path = root / filename
+            if path.is_file():
+                wandb.save(str(path), base_path=str(root), policy="now")
+    except Exception as error:  # pragma: no cover - depends on remote service state
+        runner.logger.warning("W&B audit artifact upload failed: %s", error)
+
+
+@HOOKS.register_module()
+class CanonicalTestLockHook(Hook):
+    """Reject canonical test execution unless the orchestrator unlocks it."""
+
+    priority = "HIGHEST"
+
+    def before_test(self, runner: Any) -> None:
+        if os.getenv("ADOM_CANONICAL_TEST_UNLOCK") != CANONICAL_TEST_UNLOCK_TOKEN:
+            raise RuntimeError(
+                "Canonical test is locked. Select the final model using validation "
+                "and run it through semantic20_cycle --run-test "
+                "--final-test-model <b0|b2>."
+            )
+
+
 @HOOKS.register_module()
 class MetricArtifactHook(Hook):
     """Persist final validation and test metrics as machine-readable JSON."""
@@ -50,6 +120,25 @@ class MetricArtifactHook(Hook):
                 "metrics": {key: float(value) for key, value in metrics.items()},
             }
             _write_audit(runner, "val_metrics.json", payload)
+            history_path = Path(runner.work_dir) / "val_history.jsonl"
+            with history_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, sort_keys=True) + "\n")
+            _write_audit(
+                runner,
+                f"val_metrics_iter_{int(runner.iter)}.json",
+                payload,
+            )
+            _publish_wandb(
+                runner,
+                summary_prefix="clean_v1/val",
+                metrics=metrics,
+                files=(
+                    "val_metrics.json",
+                    "val_history.jsonl",
+                    "dataset_contract.json",
+                    "class_support.json",
+                ),
+            )
 
     def after_test_epoch(
         self,
@@ -62,6 +151,138 @@ class MetricArtifactHook(Hook):
                 "metrics": {key: float(value) for key, value in metrics.items()},
             }
             _write_audit(runner, "test_metrics.json", payload)
+            _publish_wandb(
+                runner,
+                summary_prefix="clean_v1/test",
+                metrics=metrics,
+                files=(
+                    "test_metrics.json",
+                    "confusion_matrix.json",
+                    "semantic20_metrics.json",
+                ),
+            )
+
+
+@HOOKS.register_module()
+class ConstrainedCheckpointSelectionHook(Hook):
+    """Persist the approved overall-noninferior, rare-risk-best checkpoint."""
+
+    priority = "LOWEST"
+
+    def __init__(self, tolerance_pp: float = 1.0) -> None:
+        self.tolerance_pp = float(tolerance_pp)
+        self.records: list[dict[str, Any]] = []
+
+    def before_train(self, runner: Any) -> None:
+        history_path = Path(runner.work_dir) / "checkpoint_selection_history.json"
+        if history_path.is_file():
+            payload = json.loads(history_path.read_text(encoding="utf-8"))
+            self.records = list(payload.get("records", []))
+
+    def after_val_epoch(
+        self,
+        runner: Any,
+        metrics: dict[str, Any] | None = None,
+    ) -> None:
+        if not metrics or getattr(runner, "rank", 0) != 0:
+            return
+        iteration = int(runner.iter)
+        record = {
+            "iteration": iteration,
+            "overall_miou": _metric_value(metrics, "mIoU/ValSupported13"),
+            "rare_risk_miou": _metric_value(metrics, "mIoU/RareRisk4"),
+            "metrics": {key: float(value) for key, value in metrics.items()},
+        }
+        self.records = [
+            previous
+            for previous in self.records
+            if int(previous["iteration"]) != iteration
+        ]
+        self.records.append(record)
+        self.records.sort(key=lambda value: int(value["iteration"]))
+
+        best_overall = max(value["overall_miou"] for value in self.records)
+        threshold = best_overall - self.tolerance_pp
+        candidate_root = Path(runner.work_dir) / "selection_candidates"
+        candidate_root.mkdir(parents=True, exist_ok=True)
+        candidate_path = candidate_root / f"iter_{iteration}.pth"
+        if record["overall_miou"] >= threshold and not candidate_path.is_file():
+            runner.save_checkpoint(
+                str(candidate_root),
+                candidate_path.name,
+                save_optimizer=False,
+                save_param_scheduler=False,
+                meta={
+                    "iter": iteration,
+                    "epoch": int(runner.epoch),
+                    "iteration": iteration,
+                    "selection_metrics": {
+                        "ValSupported13_mIoU": record["overall_miou"],
+                        "RareRisk4_mIoU": record["rare_risk_miou"],
+                    },
+                },
+                by_epoch=False,
+            )
+
+        eligible_iterations = {
+            int(value["iteration"])
+            for value in self.records
+            if value["overall_miou"] >= threshold
+        }
+        for path in candidate_root.glob("iter_*.pth"):
+            try:
+                stored_iteration = int(path.stem.removeprefix("iter_"))
+            except ValueError:
+                continue
+            if stored_iteration not in eligible_iterations:
+                path.unlink()
+
+        selectable = [
+            value
+            for value in self.records
+            if int(value["iteration"]) in eligible_iterations
+            and (candidate_root / f"iter_{int(value['iteration'])}.pth").is_file()
+        ]
+        selected = select_constrained_checkpoint(
+            selectable,
+            tolerance_pp=self.tolerance_pp,
+        )
+        selected_candidate = candidate_root / f"iter_{int(selected['iteration'])}.pth"
+        stable_path = Path(runner.work_dir) / (
+            f"best_clean_selection_iter_{int(selected['iteration'])}.pth"
+        )
+        previous = list(Path(runner.work_dir).glob("best_clean_selection_iter_*.pth"))
+        if not stable_path.is_file():
+            for path in previous:
+                path.unlink()
+            _replace_link_or_copy(selected_candidate, stable_path)
+
+        payload = {
+            "schema_version": "semantic20-clean-v1",
+            "rule": (
+                "max RareRisk4 mIoU among checkpoints within "
+                f"{self.tolerance_pp:.1f}pp of best ValSupported13 mIoU"
+            ),
+            "best_overall_miou": best_overall,
+            "eligibility_threshold": threshold,
+            "selected": {
+                **selected,
+                "checkpoint": str(stable_path.resolve()),
+            },
+            "records": self.records,
+        }
+        _write_audit(runner, "checkpoint_selection.json", payload)
+        _write_audit(runner, "checkpoint_selection_history.json", payload)
+        _publish_wandb(
+            runner,
+            summary_prefix="clean_v1/selection",
+            metrics={
+                "iteration": int(selected["iteration"]),
+                "ValSupported13_mIoU": selected["overall_miou"],
+                "RareRisk4_mIoU": selected["rare_risk_miou"],
+            },
+            files=("checkpoint_selection.json", "checkpoint_selection_history.json"),
+        )
 
 
 @HOOKS.register_module()

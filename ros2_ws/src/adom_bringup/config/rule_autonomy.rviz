@@ -1,0 +1,138 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Semantic Costmap1
+        - /Rule Path1
+    Tree Height: 600
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Enabled: true
+      Name: Ground Grid
+      Plane: XY
+      Plane Cell Count: 20
+      Cell Size: 1
+      Color: 120; 120; 120
+      Alpha: 0.5
+    - Class: rviz_default_plugins/RobotModel
+      Enabled: true
+      Name: ADOM Vehicle
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+      Frame Timeout: 15
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: ZED Registered Cloud
+      Alpha: 0.35
+      Size (Pixels): 2
+      Style: Points
+      Topic:
+        Value: /zed/zed_node/point_cloud/cloud_registered
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+    - Class: rviz_default_plugins/Odometry
+      Enabled: true
+      Name: Local VIO EKF
+      Keep: 100
+      Position Tolerance: 0.05
+      Angle Tolerance: 0.05
+      Topic:
+        Value: /odometry/local
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+    - Class: rviz_default_plugins/Odometry
+      Enabled: true
+      Name: Global RTK EKF
+      Keep: 100
+      Position Tolerance: 0.10
+      Angle Tolerance: 0.05
+      Topic:
+        Value: /odometry/global
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+    - Class: rviz_default_plugins/Map
+      Enabled: true
+      Name: Semantic Costmap
+      Alpha: 0.75
+      Color Scheme: costmap
+      Draw Behind: false
+      Topic:
+        Value: /adom/navigation/semantic_costmap
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Rule Path
+      Topic:
+        Value: /adom/navigation/rule_path
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Segmentation Overlay
+      Normalize Range: true
+      Topic:
+        Value: /adom/perception/overlay
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+    - Class: rviz_default_plugins/Image
+      Enabled: false
+      Name: Semantic Mask
+      Normalize Range: true
+      Topic:
+        Value: /adom/perception/semantic_mask
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+  Enabled: true
+  Global Options:
+    Background Color: 35; 35; 35
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Top Down
+      Angle: 0
+      Scale: 35
+      Target Frame: base_link
+      X: 3
+      Y: 0
+    Saved: ~
+Window Geometry:
+  Height: 900
+  Width: 1400
+  X: 50
+  Y: 50

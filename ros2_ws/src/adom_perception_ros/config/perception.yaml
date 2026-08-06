@@ -1,9 +1,12 @@
 adom_perception:
   ros__parameters:
     image_topic: /zed/zed_node/rgb/color/rect/image
-    depth_topic: /zed/zed_node/depth/depth_registered
     mask_topic: /adom/perception/semantic_mask
-    model_path: ""
-    input_width: 640
-    input_height: 384
-    target_fps: 30.0
+    confidence_topic: /adom/perception/confidence
+    overlay_topic: /adom/perception/overlay
+    status_topic: /adom/perception/status
+    config_path: ""
+    checkpoint_path: ""
+    device: cuda:0
+    target_fps: 15.0
+    overlay_alpha: 0.45

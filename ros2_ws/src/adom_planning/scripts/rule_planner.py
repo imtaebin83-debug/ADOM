@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import math
+
+from geometry_msgs.msg import Point, Twist
+from nav_msgs.msg import OccupancyGrid
+import numpy as np
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+from visualization_msgs.msg import Marker
+
+from adom.autonomy import CostmapConfig, PlannerConfig, plan_corridor
+
+
+class RulePlannerNode(Node):
+    def __init__(self) -> None:
+        super().__init__("rule_planner")
+        defaults = {
+            "costmap_topic": "/adom/navigation/semantic_costmap",
+            "cmd_vel_topic": "/cmd_vel",
+            "path_marker_topic": "/adom/navigation/rule_path",
+            "status_topic": "/adom/navigation/rule_status",
+            "publish_rate_hz": 20.0,
+            "costmap_timeout_sec": 0.20,
+            "max_source_age_sec": 0.40,
+            "wheelbase_m": 0.33,
+            "max_steering_deg": 20.0,
+            "steering_step_deg": 4.0,
+            "lookahead_m": 3.0,
+            "path_step_m": 0.10,
+            "corridor_half_width_m": 0.18,
+            "unknown_cost": 70.0,
+            "lethal_cost": 90,
+            "stop_distance_m": 0.75,
+            "max_speed_mps": 0.25,
+            "min_speed_mps": 0.08,
+            "steering_penalty": 8.0,
+        }
+        for name, value in defaults.items():
+            self.declare_parameter(name, value)
+        self.p = {name: self.get_parameter(name).value for name in defaults}
+        if float(self.p["max_speed_mps"]) > 0.30:
+            raise ValueError(
+                "rule planner max_speed_mps must not exceed ADOM's 0.30 m/s limit"
+            )
+        self._planner = PlannerConfig(
+            wheelbase_m=float(self.p["wheelbase_m"]),
+            max_steering_deg=float(self.p["max_steering_deg"]),
+            steering_step_deg=float(self.p["steering_step_deg"]),
+            lookahead_m=float(self.p["lookahead_m"]),
+            path_step_m=float(self.p["path_step_m"]),
+            corridor_half_width_m=float(self.p["corridor_half_width_m"]),
+            unknown_cost=float(self.p["unknown_cost"]),
+            lethal_cost=int(self.p["lethal_cost"]),
+            stop_distance_m=float(self.p["stop_distance_m"]),
+            max_speed_mps=float(self.p["max_speed_mps"]),
+            min_speed_mps=float(self.p["min_speed_mps"]),
+            steering_penalty=float(self.p["steering_penalty"]),
+        )
+        self._grid: np.ndarray | None = None
+        self._costmap_config: CostmapConfig | None = None
+        self._frame_id = "base_link"
+        self._last_grid_ns: int | None = None
+        self._cmd_pub = self.create_publisher(Twist, str(self.p["cmd_vel_topic"]), 10)
+        self._marker_pub = self.create_publisher(
+            Marker, str(self.p["path_marker_topic"]), 10
+        )
+        self._status_pub = self.create_publisher(String, str(self.p["status_topic"]), 10)
+        self.create_subscription(
+            OccupancyGrid, str(self.p["costmap_topic"]), self._on_costmap, 1
+        )
+        self.create_timer(1.0 / float(self.p["publish_rate_hz"]), self._update)
+        self.get_logger().warning(
+            "Rule planner starts with zero command; gamepad A must arm autonomous control."
+        )
+
+    def _on_costmap(self, message: OccupancyGrid) -> None:
+        expected = int(message.info.width) * int(message.info.height)
+        if expected <= 0 or len(message.data) != expected:
+            self.get_logger().error("Rejected malformed semantic OccupancyGrid")
+            return
+        source_ns = int(message.header.stamp.sec) * 1_000_000_000 + int(
+            message.header.stamp.nanosec
+        )
+        now_ns = self.get_clock().now().nanoseconds
+        if source_ns > 0:
+            source_age = (now_ns - source_ns) / 1e9
+            if source_age > float(self.p["max_source_age_sec"]) or source_age < -0.10:
+                self.get_logger().warning(
+                    f"Rejected stale or future semantic costmap (age={source_age:.3f}s)"
+                )
+                return
+        resolution = float(message.info.resolution)
+        width_m = int(message.info.height) * resolution
+        length_m = int(message.info.width) * resolution
+        self._costmap_config = CostmapConfig(
+            resolution_m=resolution,
+            length_m=length_m,
+            width_m=width_m,
+            inflation_radius_m=0.0,
+        )
+        self._grid = np.asarray(message.data, dtype=np.int8).reshape(
+            int(message.info.height), int(message.info.width)
+        )
+        self._frame_id = message.header.frame_id or "base_link"
+        self._last_grid_ns = now_ns
+
+    def _publish_stop(self, reason: str) -> None:
+        self._cmd_pub.publish(Twist())
+        status = String()
+        status.data = json.dumps({"state": "stopped", "reason": reason}, sort_keys=True)
+        self._status_pub.publish(status)
+
+    def _publish_marker(self, path: np.ndarray, blocked: bool) -> None:
+        marker = Marker()
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.header.frame_id = self._frame_id
+        marker.ns = "adom_rule_path"
+        marker.id = 0
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = 0.05
+        marker.color.a = 1.0
+        marker.color.r = 1.0 if blocked else 0.1
+        marker.color.g = 0.1 if blocked else 1.0
+        marker.color.b = 0.1
+        marker.lifetime.sec = 0
+        marker.lifetime.nanosec = 200_000_000
+        marker.points = [Point(x=float(x), y=float(y), z=0.05) for x, y in path]
+        self._marker_pub.publish(marker)
+
+    def _update(self) -> None:
+        if (
+            self._grid is None
+            or self._costmap_config is None
+            or self._last_grid_ns is None
+        ):
+            self._publish_stop("no_costmap")
+            return
+        age = (self.get_clock().now().nanoseconds - self._last_grid_ns) / 1e9
+        if age > float(self.p["costmap_timeout_sec"]):
+            self._publish_stop("costmap_watchdog")
+            return
+        if not np.any(self._grid >= 0):
+            self._publish_stop("empty_costmap")
+            return
+        try:
+            plan = plan_corridor(self._grid, self._costmap_config, self._planner)
+        except Exception as error:
+            self.get_logger().error(f"Rule planning failed: {error}")
+            self._publish_stop("planner_error")
+            return
+
+        command = Twist()
+        command.linear.x = float(plan.speed_mps)
+        command.angular.z = (
+            0.0
+            if plan.speed_mps <= 0.0
+            else plan.speed_mps
+            * math.tan(plan.steering_rad)
+            / float(self.p["wheelbase_m"])
+        )
+        self._cmd_pub.publish(command)
+        self._publish_marker(plan.path_xy, plan.blocked)
+        status = String()
+        status.data = json.dumps(
+            {
+                "state": "blocked" if plan.blocked else "driving",
+                "speed_mps": round(plan.speed_mps, 3),
+                "steering_deg": round(math.degrees(plan.steering_rad), 2),
+                "score": round(plan.score, 2),
+                "costmap_age_sec": round(age, 3),
+            },
+            sort_keys=True,
+        )
+        self._status_pub.publish(status)
+
+    def destroy_node(self):
+        if rclpy.ok(context=self.context):
+            self._cmd_pub.publish(Twist())
+        return super().destroy_node()
+
+
+def main(args=None) -> None:
+    rclpy.init(args=args)
+    node = RulePlannerNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

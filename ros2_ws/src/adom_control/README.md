@@ -9,6 +9,7 @@ PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출�
 - `X`: 매뉴얼 모드
 - `A`: 자율주행 모드
 - `B`: 정지 모드(소프트웨어 정지)
+- `Y`: ZED/GPS rosbag 수집 시작/중지
 - 왼쪽 스틱(LTS) 상/하: 전진/가속 조절
 - 오른쪽 스틱(RTS) 좌/우: 조향
 
@@ -21,6 +22,27 @@ PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출�
 
 ```bash
 ros2 topic echo /adom/control/mode
+```
+
+## ZED 2i + GPS 데이터 수집
+
+`gamepad_control.launch.py`는 `data_recorder`도 기본 실행한다. Y 버튼을 한 번 누르면
+수집을 시작하고 다시 누르면 중지한다. 한 세션이 10 GB에 도달해도 자동으로
+중지한다. 결과는 기본적으로 `~/ADOM/data/captures/<시각>/`에 저장되며 이 경로는
+git에서 제외된다. ZED의 `/zed/**`, GPS `/fix`, `/joy`, `/drive`, 제어 모드를 함께
+기록한다. 상태는 다음 명령으로 확인한다.
+
+```bash
+ros2 topic echo /adom/recording/status
+```
+
+Y의 기본 `record_button`은 4이다. `/joy`에서 실제 Y 인덱스가 다르면
+`config/vehicle.yaml`의 `data_recorder.record_button`을 수정한 뒤 다시 빌드한다.
+저장소 위치가 `~/ADOM`이 아니면 launch 때 절대경로를 지정한다.
+
+```bash
+ros2 launch adom_control gamepad_control.launch.py \
+  capture_root:=/absolute/path/to/ADOM/data/captures
 ```
 
 ## Jetson에서 컨트롤러 연결 확인
@@ -49,7 +71,7 @@ ros2 run joy joy_node
 sudo usermod -aG input "$USER"
 ```
 
-다른 터미널에서 다음 명령을 실행하고 LTS 세로, RTS 가로, `X`, `A`, `B`를
+다른 터미널에서 다음 명령을 실행하고 LTS 세로, RTS 가로, `X`, `A`, `B`, `Y`를
 하나씩 움직이거나 누른다.
 
 ```bash
@@ -61,11 +83,12 @@ ros2 topic echo /joy
 
 | 입력 | YAML 파라미터 | 기본 인덱스 |
 |---|---|---:|
-| RTS 좌/우 | `right_stick_x_axis` | 3 |
+| RTS 좌/우 | `right_stick_x_axis` | 2 |
 | LTS 상/하 | `left_stick_y_axis` | 1 |
-| X / 매뉴얼 | `manual_button` | 2 |
+| X / 매뉴얼 | `manual_button` | 3 |
 | A / 자율주행 | `autonomous_button` | 0 |
 | B / 정지 | `stop_button` | 1 |
+| Y / 데이터 수집 | `record_button` | 4 |
 
 실제 `/joy` 배열과 다르면 `config/vehicle.yaml`의 `gamepad_control` 항목만
 수정한다. 스틱 방향이 반대면 `steering_axis_scale` 또는

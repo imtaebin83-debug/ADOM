@@ -23,6 +23,7 @@ setup(
         "console_scripts": [
             "pca9685_control = adom_control.pca9685_control:main",
             "gamepad_control = adom_control.gamepad_control:main",
+            "data_recorder = adom_control.data_recorder:main",
         ]
     },
 )

@@ -44,3 +44,19 @@ ros2 launch adom_planning sequential_gps.launch.py \
 변경해야 한다.
 
 차량 실측 후 `minimum_turning_radius`, footprint, 속도/가속도 제한을 수정한다.
+
+## Cost4 rule planning
+
+`rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는 여러
+Ackermann corridor를 평가한다. 가장 낮은 비용의 corridor를 `/cmd_vel`로 발행하며,
+가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.40초 이상 오래된 센서
+timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
+
+기본 최대 속도 0.25 m/s는 `adom_control`의 0.30 m/s 하드웨어 제한보다 낮다. `/cmd_vel`은
+gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로 전달되며 PCA9685에 직접
+연결하지 않는다.
+
+```bash
+ros2 launch adom_planning rule_planning.launch.py
+ros2 topic echo /adom/navigation/rule_status
+```

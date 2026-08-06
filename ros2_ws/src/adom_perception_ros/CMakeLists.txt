@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(adom_perception_ros)
 find_package(ament_cmake REQUIRED)
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/perception_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME adom_perception_node
+)
 ament_package()

@@ -2,11 +2,27 @@ semantic_costmap:
   ros__parameters:
     mask_topic: /adom/perception/semantic_mask
     depth_topic: /zed/zed_node/depth/depth_registered
-    output_frame: odom
-    max_projection_range_m: 12.0
-    update_rate_hz: 10.0
-    class_costs:
-      traversable: 0
-      low_cost: 40
-      high_cost: 180
-      obstacle: 254
+    camera_info_topic: /zed/zed_node/rgb/color/rect/camera_info
+    costmap_topic: /adom/navigation/semantic_costmap
+    status_topic: /adom/navigation/costmap_status
+    output_frame: base_link
+
+    resolution_m: 0.10
+    length_m: 8.0
+    width_m: 6.0
+    min_range_m: 0.30
+    max_range_m: 8.0
+    sample_stride: 4
+    min_height_m: -0.50
+    max_height_m: 1.50
+
+    # nav_msgs/OccupancyGrid values, ordered by ADOM Cost4 class ID.
+    # paved, natural, medium, high-cost/obstacle
+    class_costs: [0, 15, 60, 100]
+    # Preserve geometric collision safety even when a vertical object is misclassified.
+    geometric_obstacle_min_height_m: 0.10
+    inflation_radius_m: 0.25
+    inflation_min_cost: 60
+    depth_queue_size: 15
+    max_sync_error_sec: 0.35
+    transform_timeout_sec: 0.10

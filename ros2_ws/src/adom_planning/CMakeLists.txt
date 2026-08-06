@@ -6,4 +6,8 @@ install(PROGRAMS scripts/rtk_waypoint_executor.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME rtk_waypoint_executor
 )
+install(PROGRAMS scripts/rule_planner.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME rule_planner
+)
 ament_package()

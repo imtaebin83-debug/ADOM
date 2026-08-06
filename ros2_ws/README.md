@@ -15,8 +15,7 @@ ros2_ws/
 ├── src/
 │   ├── adom_perception_ros/
 │   ├── adom_costmap_ros/
-│   ├── adom_bringup/
-│   └── adom_msgs/
+│   └── adom_bringup/
 ├── build/      # ignored
 ├── install/    # ignored
 └── log/        # ignored

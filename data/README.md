@@ -9,6 +9,7 @@
 
 ```text
 data/
+├── captures/     # 실차 rosbag 세션 (Git 제외)
 ├── splits/       # Git 추적 가능, sample ID 또는 상대경로만 포함
 ├── manifests/    # Git 추적 가능, 개인 PC 절대경로 금지
 └── external/     # Git 제외, runtime dataset symlink

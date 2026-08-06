@@ -24,8 +24,7 @@ ROS2 node는 가능한 한 얇게 유지하고, 핵심 알고리즘은 `src/`의
 ros2_ws/src/
 ├── adom_perception_ros/
 ├── adom_costmap_ros/
-├── adom_bringup/
-└── adom_msgs/
+└── adom_bringup/
 ```
 
 아직 package skeleton은 만들지 않았습니다. 첫 ROS2 node의 입출력 topic과 message type이 정해지면 추가합니다.

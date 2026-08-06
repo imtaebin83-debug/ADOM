@@ -16,6 +16,8 @@ def generate_launch_description():
             DeclareLaunchArgument("config", default_value=default_config),
             DeclareLaunchArgument("device_id", default_value="0"),
             DeclareLaunchArgument("start_pca9685", default_value="true"),
+            DeclareLaunchArgument("start_data_recorder", default_value="true"),
+            DeclareLaunchArgument("capture_root", default_value=""),
             Node(
                 package="joy",
                 executable="joy_node",
@@ -45,6 +47,17 @@ def generate_launch_description():
                 parameters=[LaunchConfiguration("config")],
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("start_pca9685")),
+            ),
+            Node(
+                package="adom_control",
+                executable="data_recorder",
+                name="data_recorder",
+                parameters=[
+                    LaunchConfiguration("config"),
+                    {"capture_root": LaunchConfiguration("capture_root")},
+                ],
+                output="screen",
+                condition=IfCondition(LaunchConfiguration("start_data_recorder")),
             ),
         ]
     )

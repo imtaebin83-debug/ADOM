@@ -18,13 +18,20 @@ local/global EKF에 들어간다. gamepad control이 자율 모드로 승인한 
 - `base_link`에서 ZED optical frame까지 TF가 연결될 것
 - PCA9685 I2C/PWM과 조향/ESC pulse를 바퀴를 띄운 상태에서 보정할 것
 
-모든 터미널에서 다음 setup을 실행한다.
+저장소 루트에서 실제 checkpoint 위치를 지정한 뒤, 모든 터미널에서 다음 setup을
+실행한다. `ADOM_REPO`를 특정 팀원의 홈 디렉터리로 고정하지 않는다.
 
 ```bash
-cd /home/myungsub/ADOM/ros2_ws
+export ADOM_REPO="$(git rev-parse --show-toplevel)"
+export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/export/segformer_b0_640x384_rellis3d.py"
+export ADOM_CHECKPOINT="<CHECKPOINT_PATH>"
+cd "$ADOM_REPO/ros2_ws"
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ```
+
+새 터미널에서는 위 환경변수와 ROS setup을 다시 적용한다. checkpoint는 Git에
+커밋하지 않으며 `ADOM_CHECKPOINT`에는 해당 장비에서 읽을 수 있는 파일 경로를 넣는다.
 
 ## Recommended: three terminals
 
@@ -47,8 +54,8 @@ ros2 launch adom_bringup vehicle.launch.py \
 
 ```bash
 ros2 launch adom_bringup rule_autonomy.launch.py \
-  model_config:=/home/myungsub/ADOM/configs/adom/export/segformer_b0_640x384_rellis3d.py \
-  checkpoint:=/absolute/path/to/best_mIoU.pth \
+  model_config:="$ADOM_MODEL_CONFIG" \
+  checkpoint:="$ADOM_CHECKPOINT" \
   device:=cuda:0
 ```
 
@@ -91,8 +98,8 @@ ros2 launch adom_localization localization.launch.py
 
 ```bash
 ros2 launch adom_perception_ros perception.launch.py \
-  model_config:=/home/myungsub/ADOM/configs/adom/export/segformer_b0_640x384_rellis3d.py \
-  checkpoint:=/absolute/path/to/best_mIoU.pth device:=cuda:0
+  model_config:="$ADOM_MODEL_CONFIG" \
+  checkpoint:="$ADOM_CHECKPOINT" device:=cuda:0
 ```
 
 ### Terminal 3 — RGB/depth semantic costmap
@@ -116,7 +123,7 @@ ros2 launch adom_control gamepad_control.launch.py
 ### Terminal 6 — RViz monitoring only
 
 ```bash
-rviz2 -d /home/myungsub/ADOM/ros2_ws/install/adom_bringup/share/adom_bringup/config/rule_autonomy.rviz
+rviz2 -d "$(ros2 pkg prefix --share adom_bringup)/config/rule_autonomy.rviz"
 ```
 
 통합 launch가 이미 RViz를 실행한다면 Terminal 6은 필요 없다. 호스트 PC에서 RViz를

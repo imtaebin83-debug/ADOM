@@ -1,0 +1,128 @@
+dataset: RELLIS-3D
+mapping_name: adom_semantic_cost_5class_v1
+ignore_index: 255
+
+# ADOM treats the segmentation output as a semantic cost prior, not as a
+# vehicle-specific traversability verdict. Vehicle geometry, slope, depth, and
+# mission policy should be applied downstream in the costmap layer.
+classes:
+  - id: 0
+    name: paved_low_cost
+    color: [128, 64, 128]
+    cost_hint: 0.05
+    description: Paved or artificial stable surfaces.
+  - id: 1
+    name: natural_low_cost
+    color: [0, 180, 0]
+    cost_hint: 0.25
+    description: Natural off-road ground that is usually driveable.
+  - id: 2
+    name: medium_cost
+    color: [255, 190, 0]
+    cost_hint: 0.60
+    description: Terrain that may be driveable but requires caution or speed reduction.
+  - id: 3
+    name: high_cost_or_obstacle
+    color: [220, 20, 60]
+    cost_hint: 0.95
+    description: Obstacles, unsafe terrain, and areas that should be avoided by default.
+
+# Canonical RELLIS-3D raw ids plus official benchmark aliases:
+# 29 and 30 are mapped as grass, and 32 is mapped as water in the official
+# RELLIS HRNet benchmark mapping.
+raw_labels:
+  - raw_id: 0
+    name: void
+    meta_id: 255
+    reason: Unlabeled or invalid pixels; excluded from loss.
+  - raw_id: 1
+    name: dirt
+    meta_id: 1
+    reason: Natural bare ground; useful low-cost off-road prior for UGVs.
+  - raw_id: 3
+    name: grass
+    meta_id: 1
+    reason: Natural terrain; low-cost prior before vehicle-specific calibration.
+  - raw_id: 4
+    name: tree
+    meta_id: 3
+    reason: Fixed obstacle and collision risk.
+  - raw_id: 5
+    name: pole
+    meta_id: 3
+    reason: Fixed obstacle and collision risk.
+  - raw_id: 6
+    name: water
+    meta_id: 3
+    reason: RELLIS separates water from puddle; treat as high risk without depth.
+  - raw_id: 7
+    name: sky
+    meta_id: 255
+    reason: Not ground or obstacle support for the 2D costmap; excluded from loss.
+  - raw_id: 8
+    name: vehicle
+    meta_id: 3
+    reason: Dynamic or static obstacle.
+  - raw_id: 9
+    name: object
+    meta_id: 3
+    reason: Unknown obstacle; conservative high-cost prior.
+  - raw_id: 10
+    name: asphalt
+    meta_id: 0
+    reason: Paved stable surface.
+  - raw_id: 12
+    name: building
+    meta_id: 3
+    reason: Fixed structure and collision risk.
+  - raw_id: 15
+    name: log
+    meta_id: 3
+    reason: Height and shape are ambiguous from RGB; conservative obstacle prior.
+  - raw_id: 17
+    name: person
+    meta_id: 3
+    reason: Safety-critical dynamic obstacle.
+  - raw_id: 18
+    name: fence
+    meta_id: 3
+    reason: Fixed obstacle and entanglement risk.
+  - raw_id: 19
+    name: bush
+    meta_id: 2
+    reason: Potentially passable for large UGVs but occludes geometry and hazards.
+  - raw_id: 23
+    name: concrete
+    meta_id: 0
+    reason: Artificial stable surface.
+  - raw_id: 27
+    name: barrier
+    meta_id: 3
+    reason: Explicit blocking structure.
+  - raw_id: 29
+    name: grass_alias
+    canonical_name: grass
+    meta_id: 1
+    reason: Official RELLIS benchmark alias mapped to grass.
+  - raw_id: 30
+    name: grass_alias
+    canonical_name: grass
+    meta_id: 1
+    reason: Official RELLIS benchmark alias mapped to grass.
+  - raw_id: 31
+    name: puddle
+    meta_id: 2
+    reason: Shallow water is possible but depth and traction are uncertain.
+  - raw_id: 32
+    name: water_alias
+    canonical_name: water
+    meta_id: 3
+    reason: Official RELLIS benchmark alias mapped to water.
+  - raw_id: 33
+    name: mud
+    meta_id: 2
+    reason: Slip and sinkage risk; speed reduction and caution required.
+  - raw_id: 34
+    name: rubble
+    meta_id: 3
+    reason: Rollover, underbody strike, and tire damage risk.

@@ -14,7 +14,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "waypoint_file",
-            description="Absolute path to a WGS84 waypoint YAML file",
+            description="Path to a WGS84 waypoint YAML file",
         ),
         DeclareLaunchArgument("start_nav2", default_value="true"),
         DeclareLaunchArgument("use_sim_time", default_value="false"),

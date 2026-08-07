@@ -17,7 +17,7 @@ def generate_launch_description():
             DeclareLaunchArgument("device_id", default_value="0"),
             DeclareLaunchArgument("start_pca9685", default_value="true"),
             DeclareLaunchArgument("start_data_recorder", default_value="true"),
-            DeclareLaunchArgument("capture_root", default_value=""),
+            DeclareLaunchArgument("capture_root", default_value="data/captures"),
             Node(
                 package="joy",
                 executable="joy_node",

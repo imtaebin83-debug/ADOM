@@ -539,6 +539,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: 이 파일은 현재 계약만 유지하고, 실제 진행률은 `docs/status`, 결정 근거는
   decision record, AI 대화의 검토 흔적은 `docs/ai-collaboration`에 분리해야
   중복된 진실과 오래된 지시를 피할 수 있다.
+- **[2026-08-07] 실차 데이터 수집 rosbag을 ZED RGB 토픽으로 제한**
+  이유: D-5의 신규 데이터 목적은 RGB 기반 인지 학습이며, GNSS와 제어 입력까지
+  동기 수집하는 범위는 현재 PoC에 과하다. `data_collection.launch.py`는 GNSS를
+  시작하지 않고 recorder는 ZED의 `/rgb` 하위 토픽만 기록한다. capture 경로는
+  저장소 기준 상대경로를 기본으로 한다. 상세 근거는 decision record 0007을 따른다.
 
 ## 17. Primary References
 

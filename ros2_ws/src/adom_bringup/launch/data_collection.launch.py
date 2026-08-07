@@ -15,19 +15,20 @@ def include(package, launch_file, arguments):
 
 
 def generate_launch_description():
+    zed_config = PathJoinSubstitution(
+        [FindPackageShare("adom_sensors"), "config", "zed2i.yaml"]
+    )
     return LaunchDescription(
         [
-            DeclareLaunchArgument("use_zed", default_value="true"),
-            DeclareLaunchArgument("use_gnss", default_value="true"),
             DeclareLaunchArgument("device_id", default_value="0"),
             DeclareLaunchArgument("start_pca9685", default_value="true"),
-            DeclareLaunchArgument("capture_root", default_value=""),
+            DeclareLaunchArgument("capture_root", default_value="data/captures"),
             include(
-                "adom_sensors",
-                "sensors.launch.py",
+                "zed_wrapper",
+                "zed_camera.launch.py",
                 {
-                    "use_zed": LaunchConfiguration("use_zed"),
-                    "use_gnss": LaunchConfiguration("use_gnss"),
+                    "camera_model": "zed2i",
+                    "ros_params_override_path": zed_config,
                 },
             ),
             include(

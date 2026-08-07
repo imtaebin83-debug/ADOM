@@ -9,7 +9,7 @@ PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출�
 - `X`: 매뉴얼 모드
 - `A`: 자율주행 모드
 - `B`: 정지 모드(소프트웨어 정지)
-- `Y`: ZED/GPS rosbag 수집 시작/중지
+- `Y`: ZED 카메라 rosbag 수집 시작/중지
 - 왼쪽 스틱(LTS) 상/하: 전진/가속 조절
 - 오른쪽 스틱(RTS) 좌/우: 조향
 
@@ -24,13 +24,14 @@ PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출�
 ros2 topic echo /adom/control/mode
 ```
 
-## ZED 2i + GPS 데이터 수집
+## ZED 2i 카메라 데이터 수집
 
 `gamepad_control.launch.py`는 `data_recorder`도 기본 실행한다. Y 버튼을 한 번 누르면
 수집을 시작하고 다시 누르면 중지한다. 한 세션이 10 GB에 도달해도 자동으로
-중지한다. 결과는 기본적으로 `~/ADOM/data/captures/<시각>/`에 저장되며 이 경로는
-git에서 제외된다. ZED의 `/zed/**`, GPS `/fix`, `/joy`, `/drive`, 제어 모드를 함께
-기록한다. 상태는 다음 명령으로 확인한다.
+중지한다. 결과는 기본적으로 저장소 기준 `data/captures/<시각>/`에 저장되며 이 경로는
+git에서 제외된다. rosbag에는 ZED의 `/rgb` 하위 토픽만 기록하며 depth, point cloud,
+IMU, GPS `/fix`, `/joy`, `/drive`, 제어 모드는 기록하지 않는다. 상태는 다음
+명령으로 확인한다.
 
 ```bash
 ros2 topic echo /adom/recording/status
@@ -38,11 +39,11 @@ ros2 topic echo /adom/recording/status
 
 Y의 기본 `record_button`은 4이다. `/joy`에서 실제 Y 인덱스가 다르면
 `config/vehicle.yaml`의 `data_recorder.record_button`을 수정한 뒤 다시 빌드한다.
-저장소 위치가 `~/ADOM`이 아니면 launch 때 절대경로를 지정한다.
+다른 상대 저장 위치가 필요하면 저장소 루트에서 다음처럼 지정한다.
 
 ```bash
 ros2 launch adom_control gamepad_control.launch.py \
-  capture_root:=/absolute/path/to/ADOM/data/captures
+  capture_root:=data/alternate-captures
 ```
 
 ## Jetson에서 컨트롤러 연결 확인
@@ -58,7 +59,7 @@ Jetson에서 장치가 나타나지 않으면 D-input으로 다시 연결한다.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source ~/ADOM/ros2_ws/install/setup.bash
+source ros2_ws/install/setup.bash
 
 lsusb
 ls -l /dev/input/js* /dev/input/event* 2>/dev/null
@@ -103,7 +104,7 @@ ros2 topic echo /joy
 ## 빌드 및 ROS 2 활성화
 
 ```bash
-cd ~/ADOM/ros2_ws
+cd ros2_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install --packages-select adom_control
 source install/setup.bash
@@ -120,7 +121,7 @@ ros2 launch adom_control gamepad_control.launch.py
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source ~/ADOM/ros2_ws/install/setup.bash
+source ros2_ws/install/setup.bash
 ros2 topic echo /drive
 ros2 topic echo /adom/control/pwm_us
 ```

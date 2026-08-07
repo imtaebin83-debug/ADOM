@@ -21,7 +21,7 @@ Localization과 Nav2를 먼저 실행한 뒤 다음처럼 시작한다.
 
 ```bash
 ros2 launch adom_planning sequential_gps.launch.py \
-  waypoint_file:=/absolute/path/to/rtk_waypoints.yaml \
+  waypoint_file:=ros2_ws/src/adom_planning/config/rtk_waypoints.example.yaml \
   start_nav2:=false
 ```
 

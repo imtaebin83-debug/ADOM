@@ -13,7 +13,7 @@ from sensor_msgs.msg import Joy
 from std_msgs.msg import String
 
 
-DEFAULT_TOPIC_REGEX = r"^/(zed(/.*)?|fix|joy|drive|adom/control/mode)$"
+DEFAULT_TOPIC_REGEX = r"^/zed(/.*)?/rgb(/.*)?$"
 
 
 def directory_size(path):
@@ -40,7 +40,7 @@ class DataRecorder(Node):
         defaults = {
             "joy_topic": "/joy",
             "record_button": 4,
-            "capture_root": "",
+            "capture_root": "data/captures",
             "topic_regex": DEFAULT_TOPIC_REGEX,
             "max_size_gb": 10.0,
             "size_check_period_sec": 0.5,
@@ -52,12 +52,12 @@ class DataRecorder(Node):
         self.p = {name: self.get_parameter(name).value for name in defaults}
         self._validate_parameters()
 
-        configured_root = str(self.p["capture_root"]).strip()
-        repo_root = Path(os.environ.get("ADOM_REPO_ROOT", Path.home() / "ADOM"))
+        configured_root = Path(str(self.p["capture_root"]).strip() or "data/captures")
+        repo_root = Path(os.environ.get("ADOM_REPO_ROOT", "."))
         self._capture_root = (
-            Path(configured_root).expanduser()
-            if configured_root
-            else repo_root / "data" / "captures"
+            configured_root
+            if configured_root.is_absolute()
+            else repo_root / configured_root
         ).resolve()
         self._capture_root.mkdir(parents=True, exist_ok=True)
 

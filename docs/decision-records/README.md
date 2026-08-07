@@ -30,6 +30,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0004](0004-runpod-mlops-policy.md) | RunPod MLOps policy | Accepted | 학습 인프라 기준 |
 | [0005](0005-semantic20-segformer.md) | Semantic20 SegFormer baseline | Accepted | 연구 baseline; D-5에는 B0 E0 사용 |
 | [0006](0006-d5-poc-pivot.md) | D-5 live stop PoC pivot | Accepted | 현재 발표 범위 |
+| [0007](0007-camera-only-data-collection.md) | Camera-only data collection | Accepted | rosbag은 ZED RGB 토픽만 기록 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

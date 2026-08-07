@@ -33,11 +33,13 @@ ros2 bag play "<ROSBAG_DIRECTORY>" --clock
 
 ## 실차 데이터 수집
 
-ZED 2i, GNSS, 게임패드 제어와 10 GB 제한 recorder를 한 번에 실행한다.
+ZED 2i, 게임패드 제어와 10 GB 제한 recorder를 한 번에 실행한다. 이 수집
+launch는 GNSS 노드를 시작하지 않으며 rosbag에는 ZED의 `/rgb` 하위 토픽만 기록한다.
 
 ```bash
 ros2 launch adom_bringup data_collection.launch.py
 ```
 
-X를 눌러 매뉴얼 모드로 전환하고 스틱을 중앙에 놓은 뒤 주행한다. Y는 데이터
-수집 시작/중지 토글이다. 기본 저장 위치는 `~/ADOM/data/captures`이다.
+저장소 루트에서 실행한다. X를 눌러 매뉴얼 모드로 전환하고 스틱을 중앙에 놓은 뒤
+주행한다. Y는 데이터 수집 시작/중지 토글이다. 기본 저장 위치는 저장소 기준
+`data/captures`이다.

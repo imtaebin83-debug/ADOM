@@ -30,6 +30,12 @@
 이 파일과 decision record를 함께 갱신한다. 추측값은 `제안/미검증`으로 표시하고
 담당자가 실측한 뒤에만 `검증됨`으로 바꾼다.
 
+GitHub 작업은 요청된 변경을 commit·push하면 사용자가 명시적으로 PR 생성을 금지하지
+않는 한 별도 요청을 기다리지 않고 PR을 연다. PR은 기본적으로 Ready for review로
+공개한다. RunPod·Jetson·장시간 검증 등 아직 수행하지 못한 항목은 PR 본문의 명시적
+merge blocker로 관리하며, 그 사실만으로 Draft로 두지는 않는다. Draft는 사용자가
+요청했거나 변경 자체가 아직 review 가능한 단위가 아닐 때만 사용한다.
+
 ## 1. 프로젝트 개요
 
 ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semantic perception이
@@ -553,6 +559,10 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: log를 포함한 후보를 문서 지표만으로 먼저 고정하지 않고, E0 B0의 Semantic20
   전체 출력을 실제 후보 장면에서 비교해 실패도·군사 시나리오 적합성·재현성에 근거해
   선택해야 한다. 2026-08-06 log 기본 target 결정은 decision record 0008로 대체한다.
+- **[2026-08-07] commit·push된 작업의 PR을 별도 요청 없이 Ready로 공개**
+  이유: review 시작을 별도 PR 요청이나 외부 장비 검증 완료에 종속시키지 않는다.
+  미완료 검증은 PR 본문에 merge blocker로 명시하고, Draft는 명시 요청 또는 변경이
+  아직 review 가능한 단위가 아닐 때만 사용한다.
 
 ## 17. Primary References
 

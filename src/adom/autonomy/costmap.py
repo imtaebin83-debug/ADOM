@@ -15,7 +15,7 @@ class CostmapConfig:
     sample_stride: int = 4
     min_height_m: float = -0.50
     max_height_m: float = 1.50
-    class_costs: tuple[int, int, int, int] = (0, 15, 60, 100)
+    class_costs: tuple[int, ...] = (0, 15, 60, 100)
     geometric_obstacle_min_height_m: float = 0.10
     inflation_radius_m: float = 0.25
     inflation_min_cost: int = 60
@@ -64,7 +64,7 @@ def project_mask_depth(
     translation: np.ndarray,
     config: CostmapConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return base-frame XYZ points and Cost4 IDs sampled from aligned images."""
+    """Return base-frame XYZ points and configured semantic IDs."""
     if mask.ndim != 2 or depth_m.ndim != 2:
         raise ValueError("mask and depth must both be HxW")
     if mask.shape != depth_m.shape:
@@ -81,7 +81,7 @@ def project_mask_depth(
         np.isfinite(z)
         & (z >= config.min_range_m)
         & (z <= config.max_range_m)
-        & (labels < 4)
+        & (labels < len(config.class_costs))
     )
     if not np.any(valid):
         return np.empty((0, 3), dtype=np.float64), np.empty(0, dtype=np.uint8)
@@ -146,7 +146,7 @@ def build_costmap(
         & (lateral >= 0)
         & (lateral < config.columns)
         & (labels >= 0)
-        & (labels < 4)
+        & (labels < len(config.class_costs))
     )
     costs = np.asarray(config.class_costs, dtype=np.int16)[labels[valid]]
     costs = np.where(

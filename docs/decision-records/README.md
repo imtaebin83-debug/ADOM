@@ -32,6 +32,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0006](0006-d5-poc-pivot.md) | D-5 live stop PoC pivot | Accepted | 현재 발표 범위 |
 | [0007](0007-camera-only-data-collection.md) | Camera-only data collection | Accepted | rosbag은 ZED RGB 토픽만 기록 |
 | [0008](0008-semantic20-perception-foundation.md) | Semantic20 autonomous perception foundation | Accepted | 현재 개발 범위; D-5 범위를 대체 |
+| [0009](0009-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Accepted | GPS는 global, costmap은 local 회피 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

@@ -23,6 +23,7 @@ from adom.autonomy.costmap import (
     project_mask_depth,
     quaternion_matrix,
 )
+from adom.perception import load_semantic20_ontology
 
 
 def stamp_ns(message) -> int:
@@ -36,6 +37,8 @@ class SemanticCostmapNode(Node):
         super().__init__("semantic_costmap")
         defaults = {
             "mask_topic": "/adom/perception/semantic_mask",
+            "ontology": "cost4",
+            "bridge_mapping_path": "",
             "depth_topic": "/zed/zed_node/depth/depth_registered",
             "camera_info_topic": "/zed/zed_node/rgb/color/rect/camera_info",
             "costmap_topic": "/adom/navigation/semantic_costmap",
@@ -61,10 +64,21 @@ class SemanticCostmapNode(Node):
             self.declare_parameter(name, value)
         self.p = {name: self.get_parameter(name).value for name in defaults}
         costs = tuple(int(value) for value in self.p["class_costs"])
-        if len(costs) != 4 or any(value < 0 or value > 100 for value in costs):
+        ontology = str(self.p["ontology"]).strip().lower()
+        if ontology == "semantic20":
+            mapping_path = str(self.p["bridge_mapping_path"]).strip() or None
+            expected_classes = load_semantic20_ontology(mapping_path).num_classes
+        elif ontology == "cost4":
+            expected_classes = 4
+        else:
+            raise ValueError("ontology must be 'semantic20' or 'cost4'")
+        if len(costs) != expected_classes or any(
+            value < 0 or value > 100 for value in costs
+        ):
             raise ValueError(
-                "class_costs must contain four OccupancyGrid costs in [0,100]"
+                f"class_costs must contain {expected_classes} values in [0,100]"
             )
+        self._ontology = ontology
         self._config = CostmapConfig(
             resolution_m=float(self.p["resolution_m"]),
             length_m=float(self.p["length_m"]),
@@ -198,6 +212,7 @@ class SemanticCostmapNode(Node):
             self._costmap_pub.publish(output)
             self._publish_status(
                 "ok",
+                ontology=self._ontology,
                 projected_points=int(len(points)),
                 observed_cells=int(np.count_nonzero(grid >= 0)),
                 sync_error_sec=round(sync_error, 3),

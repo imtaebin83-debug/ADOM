@@ -32,11 +32,10 @@ mailbox의 pending frame을 교체한다. 별도 worker가 현재 추론을 마�
 - `overwritten_frames`: 추론하지 않고 더 최신 frame으로 교체된 누적 frame 수
 
 카메라 clock과 ROS clock이 같은 time domain이고 header stamp가 0이 아닐 때만
-`capture_to_*` 값이 유효하다. downstream은 mask header를 그대로 보존한다. rule
-planner는 각 costmap에서 처음 만들어진 `/cmd_vel`에 대해
-`/adom/navigation/action_latency`로 camera→software action의 현재값과 rolling
-p50/p95를 발행한다. 이 값은 호환되는 costmap을 명시적으로 연결한 뒤에 유효하며
-ESC/PCA9685의 물리 응답시간을 포함하지 않는다.
+`capture_to_*` 값이 유효하다. downstream은 mask header를 path까지 그대로 보존한다.
+path controller는 `/adom/control/local_path_status`의 `source_to_command_ms`로
+camera→software command 시간을 발행한다. 이 값은 호환되는 costmap과 controller를
+연결한 뒤에 유효하며 ESC/PCA9685의 물리 응답시간을 포함하지 않는다.
 
 ## 실행
 

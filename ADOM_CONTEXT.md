@@ -51,15 +51,35 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 Semantic20 perception�
 - Input QoS: Best Effort, Keep Last 1; callback은 one-slot mailbox의 최신 frame만 보존
 - Scheduling: 현재 추론 완료 후 그 시점의 최신 frame을 선택; 시작률 상한 30 FPS
 - Latency: capture→receive, queue, inference, capture→perception output을 status로 발행
-- Software action latency: 호환되는 costmap 연결 후 camera stamp→각 costmap의 첫
-  `/cmd_vel` publish 및 rolling p50/p95를 `/adom/navigation/action_latency`로 발행
+- Software action latency: camera stamp→path controller의 `/cmd_vel` publish 시간을
+  `/adom/control/local_path_status`의 `source_to_command_ms`로 발행
 - Physical action latency: PCA9685/ESC/servo 응답은 software metric에 포함되지 않으며
   target hardware에서 외부 계측 필요
-- Semantic20→주행 비용 mapping: **미결정**; 기존 Cost4 costmap에 자동 연결 금지
+- Semantic20→주행 비용 mapping: `semantic20_costs.yaml`에 **초기 제안/미검증**으로
+  분리하며 기존 Cost4 costmap 설정에 자동 대체하지 않는다.
 
 30 FPS는 설정된 추론 시작률 상한이며 Jetson 실측 처리량이 아니다. camera timestamp와
 ROS clock이 같은 time domain인지 target 장치에서 확인하기 전 end-to-end latency 값은
 검증됨으로 간주하지 않는다.
+
+### 현재 Semantic20 local planning 계약
+
+- `semantic20.py`는 ontology 계약이며 3D geometry 자체를 만들지 않는다.
+- 3D 관측은 Semantic20 mask + registered depth + camera info + TF로 생성한다.
+- local planner 입력은 로봇 기준 `/adom/navigation/semantic_costmap`이다.
+- planner 출력은 `/adom/navigation/local_path` (`nav_msgs/Path`)이며
+  `local_path_control`이 IMU/GPS feedback으로 `/cmd_vel`을 생성한다.
+- planner는 Ackermann-feasible corridor를 비교해 low-cost gap을 선택하고 stale/empty
+  costmap에서는 empty path를 발행한다. controller는 이를 받아 zero command를 발행한다.
+- depth-projected 첫 lethal obstacle 거리와 근거리 가중치를 path score와 속도에
+  반영한다. 가까운 장애물일수록 더 강한 회피·감속을 적용한다.
+- controller는 `/zed/zed_node/imu/data`와 `/fix`를 제안 기본 topic으로 사용한다.
+  GPS 연속 fix로 지상속도를 계산하고 IMU 종방향 가속도 적분을 GPS로 보정한다.
+  path/IMU/GPS timeout 시 `/cmd_vel` zero를 발행한다.
+- GPS/RTK는 후속 global layer에서 목적지와 선호 진행방향을 제공한다. 매 perception
+  frame의 local obstacle avoidance를 GPS path 생성에 의존시키지 않는다.
+- `semantic20_costs.yaml`의 19-class 비용은 **초기 제안/미검증**이다. recorded scene,
+  wheels-off, 저속 시험을 거쳐 동결하기 전 자율 GO에 사용하지 않는다.
 
 ### 현재 확보 자산
 
@@ -534,6 +554,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
 - ONNX/TensorRT regression과 target hardware benchmark 자동화
 
 ## 16. Decision Log
+
+- **[2026-08-07] GPS와 Semantic20 local gap planning의 계층 분리**
+  이유: GPS는 전역 목적 진행방향에 적합하지만 즉시 장애물 회피 해상도와 latency가
+  부족하다. Semantic20+depth costmap에서 local path와 command를 만들고 GPS는 상위
+  goal bias로 결합한다. 상세 계약은 decision record 0009를 따른다.
 
 - **[2026-08-07] D-5 PoC에서 Semantic20 자율주행 기반 구축으로 전환**
   이유: 실제 자율주행 개발의 첫 단계로 canonical Semantic20 perception, 최신 frame

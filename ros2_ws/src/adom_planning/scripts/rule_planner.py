@@ -5,8 +5,8 @@ from collections import deque
 import json
 import math
 
-from geometry_msgs.msg import Point, Twist
-from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import Point, PoseStamped, Twist
+from nav_msgs.msg import OccupancyGrid, Path
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -22,6 +22,8 @@ class RulePlannerNode(Node):
         defaults = {
             "costmap_topic": "/adom/navigation/semantic_costmap",
             "cmd_vel_topic": "/cmd_vel",
+            "publish_cmd_vel": False,
+            "local_path_topic": "/adom/navigation/local_path",
             "path_marker_topic": "/adom/navigation/rule_path",
             "status_topic": "/adom/navigation/rule_status",
             "action_latency_topic": "/adom/navigation/action_latency",
@@ -41,6 +43,9 @@ class RulePlannerNode(Node):
             "max_speed_mps": 0.25,
             "min_speed_mps": 0.08,
             "steering_penalty": 8.0,
+            "distance_decay_m": 1.25,
+            "clearance_penalty": 35.0,
+            "slow_distance_m": 2.0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -62,17 +67,24 @@ class RulePlannerNode(Node):
             max_speed_mps=float(self.p["max_speed_mps"]),
             min_speed_mps=float(self.p["min_speed_mps"]),
             steering_penalty=float(self.p["steering_penalty"]),
+            distance_decay_m=float(self.p["distance_decay_m"]),
+            clearance_penalty=float(self.p["clearance_penalty"]),
+            slow_distance_m=float(self.p["slow_distance_m"]),
         )
         self._grid: np.ndarray | None = None
         self._costmap_config: CostmapConfig | None = None
         self._frame_id = "base_link"
         self._last_grid_ns: int | None = None
         self._source_stamp_ns: int | None = None
+        self._source_stamp = None
         self._source_action_reported = False
         self._action_latencies_ms: deque[float] = deque(
             maxlen=max(1, int(self.p["action_latency_window"]))
         )
         self._cmd_pub = self.create_publisher(Twist, str(self.p["cmd_vel_topic"]), 10)
+        self._path_pub = self.create_publisher(
+            Path, str(self.p["local_path_topic"]), 1
+        )
         self._marker_pub = self.create_publisher(
             Marker, str(self.p["path_marker_topic"]), 10
         )
@@ -119,6 +131,7 @@ class RulePlannerNode(Node):
         self._frame_id = message.header.frame_id or "base_link"
         self._last_grid_ns = now_ns
         self._source_stamp_ns = source_ns if source_ns > 0 else None
+        self._source_stamp = message.header.stamp
         self._source_action_reported = False
 
     def _publish_action_latency(self, state: str) -> None:
@@ -148,10 +161,38 @@ class RulePlannerNode(Node):
         self._latency_pub.publish(message)
 
     def _publish_stop(self, reason: str) -> None:
-        self._cmd_pub.publish(Twist())
+        if bool(self.p["publish_cmd_vel"]):
+            self._cmd_pub.publish(Twist())
+        self._publish_path(np.empty((0, 2), dtype=np.float64))
         status = String()
         status.data = json.dumps({"state": "stopped", "reason": reason}, sort_keys=True)
         self._status_pub.publish(status)
+
+    def _publish_path(self, path_xy: np.ndarray) -> None:
+        message = Path()
+        message.header.frame_id = self._frame_id
+        message.header.stamp = (
+            self._source_stamp
+            if self._source_stamp is not None
+            else self.get_clock().now().to_msg()
+        )
+        if len(path_xy):
+            headings = (
+                np.zeros(1, dtype=np.float64)
+                if len(path_xy) == 1
+                else np.arctan2(
+                    np.gradient(path_xy[:, 1]), np.gradient(path_xy[:, 0])
+                )
+            )
+            for (x, y), heading in zip(path_xy, headings):
+                pose = PoseStamped()
+                pose.header = message.header
+                pose.pose.position.x = float(x)
+                pose.pose.position.y = float(y)
+                pose.pose.orientation.z = math.sin(float(heading) / 2.0)
+                pose.pose.orientation.w = math.cos(float(heading) / 2.0)
+                message.poses.append(pose)
+        self._path_pub.publish(message)
 
     def _publish_marker(self, path: np.ndarray, blocked: bool) -> None:
         marker = Marker()
@@ -203,8 +244,11 @@ class RulePlannerNode(Node):
             * math.tan(plan.steering_rad)
             / float(self.p["wheelbase_m"])
         )
-        self._cmd_pub.publish(command)
-        self._publish_action_latency("blocked" if plan.blocked else "driving")
+        if bool(self.p["publish_cmd_vel"]):
+            self._cmd_pub.publish(command)
+        self._publish_path(plan.path_xy)
+        if bool(self.p["publish_cmd_vel"]):
+            self._publish_action_latency("blocked" if plan.blocked else "driving")
         self._publish_marker(plan.path_xy, plan.blocked)
         status = String()
         status.data = json.dumps(
@@ -214,13 +258,20 @@ class RulePlannerNode(Node):
                 "steering_deg": round(math.degrees(plan.steering_rad), 2),
                 "score": round(plan.score, 2),
                 "costmap_age_sec": round(age, 3),
+                "local_path_points": int(len(plan.path_xy)),
+                "lookahead_lateral_offset_m": (
+                    None
+                    if len(plan.path_xy) == 0
+                    else round(float(plan.path_xy[-1, 1]), 3)
+                ),
+                "obstacle_clearance_m": round(plan.clearance_m, 3),
             },
             sort_keys=True,
         )
         self._status_pub.publish(status)
 
     def destroy_node(self):
-        if rclpy.ok(context=self.context):
+        if rclpy.ok(context=self.context) and bool(self.p["publish_cmd_vel"]):
             self._cmd_pub.publish(Twist())
         return super().destroy_node()
 

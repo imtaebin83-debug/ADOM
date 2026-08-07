@@ -45,20 +45,29 @@ ros2 launch adom_planning sequential_gps.launch.py \
 
 차량 실측 후 `minimum_turning_radius`, footprint, 속도/가속도 제한을 수정한다.
 
-## Cost4 rule planning
+## Semantic20 local corridor planning
 
-각 camera-stamped costmap으로 처음 발행한 `/cmd_vel`의 software action latency는
-`/adom/navigation/action_latency` (`std_msgs/String`, JSON)로 발행한다. 현재값과
-rolling p50/p95를 포함하며 actuator/PWM의 물리 응답시간은 포함하지 않는다.
+이 로컬 플래너는 GPS 경로를 직접 만들지 않는다. 로봇 기준 semantic costmap 위에
+Ackermann 조향각별 corridor를 생성하고, 충돌 비용과 평균 비용이 낮은 gap을 선택해
+`/adom/navigation/local_path` (`nav_msgs/Path`)를 발행한다. `local_path_control`이 이
+경로와 IMU/GPS feedback으로 `/cmd_vel`을 만든다. GPS는 후속 전역 계획 계층에서 목표
+진행방향을 제공하고 로컬 플래너는 장애물 회피를 담당한다.
+
+Semantic20 costmap과 로컬 플래너는 다음 명령으로 함께 실행한다.
+
+```bash
+ros2 launch adom_planning semantic20_local_planning.launch.py
+```
 
 `rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는 여러
-Ackermann corridor를 평가한다. 가장 낮은 비용의 corridor를 `/cmd_vel`로 발행하며,
+Ackermann corridor를 평가한다. 가장 낮은 비용의 corridor를 local path로 발행하며,
 가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.40초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
-기본 최대 속도 0.25 m/s는 `adom_control`의 0.30 m/s 하드웨어 제한보다 낮다. `/cmd_vel`은
-gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로 전달되며 PCA9685에 직접
-연결하지 않는다.
+기본 최대 속도 0.25 m/s는 `adom_control`의 0.30 m/s 안전 제한보다 낮다. controller의
+`/cmd_vel`은 gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로 전달되며
+PCA9685에 직접 연결하지 않는다. camera source stamp부터 controller command까지의
+지연은 `/adom/control/local_path_status`의 `source_to_command_ms`로 확인한다.
 
 ```bash
 ros2 launch adom_planning rule_planning.launch.py

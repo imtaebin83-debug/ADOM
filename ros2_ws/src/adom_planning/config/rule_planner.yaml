@@ -2,6 +2,9 @@ rule_planner:
   ros__parameters:
     costmap_topic: /adom/navigation/semantic_costmap
     cmd_vel_topic: /cmd_vel
+    # The local path controller owns /cmd_vel. Enable only for planner-only tests.
+    publish_cmd_vel: false
+    local_path_topic: /adom/navigation/local_path
     path_marker_topic: /adom/navigation/rule_path
     status_topic: /adom/navigation/rule_status
     # First /cmd_vel causally produced from each camera-stamped costmap.
@@ -26,3 +29,7 @@ rule_planner:
     max_speed_mps: 0.25
     min_speed_mps: 0.08
     steering_penalty: 8.0
+    # Depth-projected obstacle distance weighting.
+    distance_decay_m: 1.25
+    clearance_penalty: 35.0
+    slow_distance_m: 2.0

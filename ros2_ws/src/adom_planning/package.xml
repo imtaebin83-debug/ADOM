@@ -7,6 +7,8 @@
   <license>MIT</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <exec_depend>action_msgs</exec_depend>
+  <exec_depend>adom_costmap_ros</exec_depend>
+  <exec_depend>adom_control</exec_depend>
   <exec_depend>geographic_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>

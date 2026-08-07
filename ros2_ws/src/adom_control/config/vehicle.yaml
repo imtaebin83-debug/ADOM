@@ -25,9 +25,9 @@ pca9685_control:
     steering_channel: 1
 
     # Placeholder calibration values: measure with the vehicle lifted.
-    esc_neutral_us: 1500.0
-    esc_forward_max_us: 2000.0
-    esc_reverse_max_us: 1000.0
+    esc_neutral_us: 1530.0
+    esc_forward_max_us: 17000.0
+    esc_reverse_max_us: 1300.0
     steering_center_us: 1500.0
     steering_left_us: 1000.0
     steering_right_us: 2000.0

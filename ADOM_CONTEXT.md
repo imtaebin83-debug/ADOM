@@ -1,7 +1,7 @@
-# ADOM Project Context — D-5 PoC Single Source of Truth
+# ADOM Project Context — Autonomous Driving Foundation Single Source of Truth
 
-> 상태: **ACTIVE / 발표 시연 우선**
-> 기준일: **2026-08-06**
+> 상태: **ACTIVE / Semantic20 자율주행 기반 구축**
+> 기준일: **2026-08-07**
 > 권위: 이 파일이 ADOM의 유일한 프로젝트 Source of Truth다. 기존 설계 문서나
 > 회의 기록과 충돌하면 이 문서를 우선한다.
 > 변경 규칙: 범위, 인터페이스, 담당자, 성공 기준을 변경할 때는 이 파일의
@@ -32,12 +32,34 @@
 
 ## 1. 프로젝트 개요
 
-ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semantic perception이
-차량의 안전 정지로 이어지는 end-to-end 온보드 파이프라인을 시연한다.
+ADOM은 산악·오프로드 환경의 1/10 RC Car에서 Semantic20 perception을 기반으로
+실제 자율주행 stack을 단계적으로 구축한다. 현재 increment는 최신 카메라 frame을
+우선하는 Semantic20 perception과 camera→software-action latency 계측이다. 클래스별
+주행 비용, depth 결합, localization/Nav2 및 closed-loop 주행 계약은 검증·결정 기록을
+거쳐 후속 increment에서 연결한다.
 
-현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
-아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
-웹 기반 MLOps 자동화, depth 기반 costmap과 Nav2 통합은 발표 시연 이후로 연기한다.
+2026-08-06의 D-5 Go/Stop PoC 범위와 결과는 안전 baseline 및 historical milestone로
+보존한다. 이 문서의 D-5 상세 절은 당시 계약을 설명하며, 현재 범위와 충돌할 때는
+이 절과 decision record 0008을 우선한다. watchdog, command timeout neutral, STOP 후
+수동 reset, wheels-off→저속 순서의 안전 정책은 계속 유효하다.
+
+### 현재 Semantic20 perception 계약
+
+- Canonical ontology: `src/data/semantic_20/config/bridge_mapping.yaml`
+- Train IDs: `0..18`; ignore: `255`; Cost4/Cost5와 topic·config·artifact 분리
+- Output: `/adom/perception/semantic20_mask` (`sensor_msgs/Image`, `mono8`)
+- Input QoS: Best Effort, Keep Last 1; callback은 one-slot mailbox의 최신 frame만 보존
+- Scheduling: 현재 추론 완료 후 그 시점의 최신 frame을 선택; 시작률 상한 30 FPS
+- Latency: capture→receive, queue, inference, capture→perception output을 status로 발행
+- Software action latency: 호환되는 costmap 연결 후 camera stamp→각 costmap의 첫
+  `/cmd_vel` publish 및 rolling p50/p95를 `/adom/navigation/action_latency`로 발행
+- Physical action latency: PCA9685/ESC/servo 응답은 software metric에 포함되지 않으며
+  target hardware에서 외부 계측 필요
+- Semantic20→주행 비용 mapping: **미결정**; 기존 Cost4 costmap에 자동 연결 금지
+
+30 FPS는 설정된 추론 시작률 상한이며 Jetson 실측 처리량이 아니다. camera timestamp와
+ROS clock이 같은 time domain인지 target 장치에서 확인하기 전 end-to-end latency 값은
+검증됨으로 간주하지 않는다.
 
 ### 현재 확보 자산
 
@@ -48,15 +70,15 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semant
 - ROS 2 control node, gamepad manual/autonomous/stop mode, command watchdog
 - 640x384 ONNX export 설정과 PyTorch↔ONNX logits parity 검사
 
-### 아직 구현되지 않은 핵심 구간
+### 아직 구현되지 않았거나 target hardware에서 검증되지 않은 핵심 구간
 
 - TensorRT engine 및 Jetson standalone inference
-- `adom_perception_ros` 실제 inference node
+- `adom_perception_ros` Semantic20 inference 코드는 구현됨; Jetson/ZED 실측 미검증
 - target mask에서 Go/Stop을 결정하는 safety-reflex node
 - perception→`/drive/autonomous`→PCA9685 end-to-end 검증
 - 신규 target-class 촬영·CVAT 라벨·short fine-tuning
 
-## 2. D-5 Definition of Done
+## 2. Historical D-5 Definition of Done
 
 ### 필수 성공 조건
 
@@ -512,6 +534,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
 - ONNX/TensorRT regression과 target hardware benchmark 자동화
 
 ## 16. Decision Log
+
+- **[2026-08-07] D-5 PoC에서 Semantic20 자율주행 기반 구축으로 전환**
+  이유: 실제 자율주행 개발의 첫 단계로 canonical Semantic20 perception, 최신 frame
+  scheduling 및 camera→action 지연 계측을 확립해야 한다. Cost4 주행 비용과는 명시적으로
+  분리하며 세부 계약은 decision record 0008을 따른다.
 
 - **[2026-08-06] 연구 중심에서 D-5 라이브 PoC 중심으로 전환**
   이유: 제한된 기간에 모델 novelty보다 RGB→인지→정지 end-to-end 신뢰성을 먼저

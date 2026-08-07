@@ -1,7 +1,7 @@
 # ADOM Project Context — D-5 PoC Single Source of Truth
 
 > 상태: **ACTIVE / 발표 시연 우선**
-> 기준일: **2026-08-06**
+> 기준일: **2026-08-07**
 > 권위: 이 파일이 ADOM의 유일한 프로젝트 Source of Truth다. 기존 설계 문서나
 > 회의 기록과 충돌하면 이 문서를 우선한다.
 > 변경 규칙: 범위, 인터페이스, 담당자, 성공 기준을 변경할 때는 이 파일의
@@ -80,35 +80,33 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semant
 
 ## 3. D-5 시연 시나리오와 타겟 클래스
 
-### 3.1 기본 타겟: `log`
+### 3.1 현재 상태: target 미동결
 
-`log`를 발표 PoC의 기본 target class로 사용한다.
+E0 B0의 19-class Semantic20 출력을 실제 ZED/현장 후보 장면에서 먼저 시각화한 뒤
+fine-tuning 및 Go/Stop target을 선택한다. Baseline ONNX/TensorRT는 특정 class만
+추론하거나 제거하지 않고 ID `0..18` 전체 logits와 argmax mask를 보존한다.
 
-- B0 IoU 40.33, B2 IoU 40.17로 backbone 용량 증가가 문제를 해결하지 못했다.
-- RELLIS E0 train 노출은 94 images로 매우 희소하다.
-- 산과 도시에서 통나무·굵은 나뭇가지를 안전하게 배치해 반복 촬영할 수 있다.
-- pole보다 영상에서 차지하는 면적이 넓어 resize 후에도 label이 보존된다.
-- 차량 진행 경로를 가로지르는 collision hazard라는 시연 서사가 명확하다.
+target 선택 전에는 자동 STOP 판정을 활성화하지 않는다. 다음 evidence를 함께 보고
+한 class를 동결한다.
 
-### 3.2 Stretch: `pole`
+- 현장 영상에서 일관되게 실패하거나 recall이 낮은가
+- 군사·오프로드 안전 시나리오와 설명 가능한가
+- 안전하게 반복 배치·촬영·라벨링할 수 있는가
+- resize/padding 뒤에도 충분한 pixel area가 남는가
+- negative scene에서 false stop을 통제할 수 있는가
 
-pole은 B0/B2 모두 IoU·Recall 0으로 연구적 실패 사례는 가장 강하다. 그러나 얇은
-구조가 resize/crop에서 소실되고 전체 화면 면적 기준과 맞지 않아 D-5 기본 타겟으로는
-위험하다. log pipeline이 Day 2 안에 통과한 경우에만 추가 수집·정성 시연한다.
+### 3.2 탐색 후보
 
-### 3.3 Hard fallback: `rubble`
+`log`, `pole`, `rubble`, `barrier`, `mud` 등은 과거 정량 결과를 이용한 탐색 후보이며
+현재 기본 target이 아니다. E0 baseline의 1–3개 sample overlay와 per-class ROI 면적,
+현장 실패 장면을 확인한 뒤 선택한다. canonical split에 GT가 없는 class는 해당 split
+IoU만으로 배제하거나 채택하지 않는다.
 
-신규 fine-tuning이 개선되지 않으면 기존 B0→B2의 rubble IoU 개선
-`53.34 → 66.87 (+13.53%p)`을 사용한다. 동일 TensorRT/ROS pipeline에서 B0와 B2
-engine만 교체해 recorded/live 비교를 시도한다. B2 latency가 라이브 요구를 충족하지
-못하면 recorded ZED input에서 결과를 비교하고, 라이브 정지는 B0 pipeline으로 보인다.
+### 3.3 선택 후 계약
 
-### 3.4 제외 클래스
-
-- water: canonical test GT가 없고 RGB만으로 깊이·견인 위험을 알 수 없다.
-- puddle: B0 IoU가 이미 70.93이며 개선 서사가 약하다.
-- mud: 환경 재현성이 낮고 정지 장애물보다 주행 비용 문제에 가깝다.
-- barrier: B0는 56.68이나 B2는 39.27로 악화되어 post-model 성공 보장이 없다.
+target을 동결하면 class ID, 시나리오, 선택 evidence, ROI, threshold, annotation 범위,
+held-out test를 이 문서와 새 decision record에 함께 기록한다. 그 전까지 target별
+수치와 topic은 제안으로만 취급한다.
 
 ## 4. 정지 판정 계약
 
@@ -120,15 +118,15 @@ engine만 교체해 recorded/live 비교를 시도한다. B2 latency가 라이�
 | 항목 | 초기값 | 규칙 |
 | --- | ---: | --- |
 | 최대 자율 속도 | 0.30 m/s | 실제 속도는 open-loop이므로 저속 실측 필요 |
-| target | log, class ID 10 | Semantic20 ID 고정 |
-| ROI | 하단 중앙 trapezoid | 카메라 장착 후 고정 |
-| target area ratio | ROI의 1.0% | log validation에서 0.5–3% 사이 조정 |
+| target | 미동결 | Semantic20 IDs 0..18 전체를 먼저 검토 |
+| ROI | 하단 중앙 trapezoid 후보 | padding 제외 source-image 좌표로 카메라 장착 후 고정 |
+| target area ratio | 미동결 | 선택 class validation에서 조정 |
 | stop debounce | 3 frames | 연속 충족 시 STOP |
 | release debounce | 5 frames | 발표 시 자동 release 대신 수동 reset 권장 |
 | command timeout | 0.25 s | timeout 시 neutral |
 
-STOP 이후 자동 재출발은 기본적으로 금지한다. 운영자가 게임패드로 scene을 확인하고
-manual 또는 autonomous mode를 다시 선택해야 한다.
+target·ROI·threshold 동결 전에는 inference/ROI를 관찰 모드로만 실행한다. 동결 뒤에도
+STOP 이후 자동 재출발은 금지하고 운영자가 scene을 확인해 mode를 다시 선택한다.
 
 ## 5. D-5 파이프라인 아키텍처
 
@@ -137,7 +135,7 @@ flowchart LR
     A["ZED 2i RGB"] --> B["Verified Preprocess / Candidate 640x384"]
     B --> C["SegFormer-B0 TensorRT FP16"]
     C --> D["Semantic20 Argmax Mask"]
-    D --> E["Log ROI / Temporal Debounce"]
+    D --> E["Selected-class ROI / Temporal Debounce"]
     E --> F["Go/Stop Safety Reflex"]
     F --> G["/drive/autonomous"]
     G --> H["Existing Gamepad Mode Mux"]
@@ -258,6 +256,7 @@ frame은 쌓지 않는 구성을 우선 검토한다. 실제 ZED publisher QoS�
 - Architecture: SegFormer-B0
 - Baseline: E0 RELLIS checkpoint
 - Ontology: Semantic20, 19 trainable classes, void/unknown 255
+- ONNX contract: FP32 raw logits, NCHW output `1x19x384x640`, no embedded argmax
 - Demo precision: TensorRT FP16
 - Shape candidate: static batch 1, `1x3x384x640`; Day 1 parity·latency 후 동결
 - INT8, dynamic shape, batch inference: 금지
@@ -287,13 +286,13 @@ dump하고 Jetson preprocessing을 동일하게 맞춘다. 후보는 다음 세 
 2. 640x384 direct resize
 3. 기존 학습 계약과 가까운 512x512
 
-Day 1에 PyTorch/ONNX parity, target mask 보존, Jetson latency를 확인해 하나를 동결하고
+Day 1에 PyTorch/ONNX parity, 19-class mask 보존, Jetson latency를 확인해 하나를 동결하고
 `preprocess.json`에 resize, interpolation, padding 방향·값, RGB/BGR, mean/std를 기록한다.
 
 ### 태빈→가형 hand-off package
 
 ```text
-adom-b0-<target>-<version>/
+adom-b0-e0-semantic20-<version>/
 ├── model_static_1x3x384x640.onnx
 ├── checkpoint.pth
 ├── resolved_mmseg_config.py
@@ -316,12 +315,15 @@ Jetson의 실제 TensorRT 버전과 GPU에서 가형이 생성한다. 태빈이 
 
 - PyTorch↔ONNX pixel argmax agreement ≥ 99.9%
 - ONNX↔TensorRT pixel argmax agreement ≥ 99.0%
-- target ROI area ratio 차이 ≤ 0.2%p
+- padding 제외 valid image와 요청된 모든 class의 ROI area ratio 차이 ≤ 0.2%p
 - reference image 10장 이상 parity 통과
+- reference image 중 1–3장의 Semantic20 color mask와 overlay 보존
 - camera→command p95 latency 기록
 - 10 Hz control update 목표; 최소 5 Hz 미만이면 live GO 금지
 - 0.25초 command loss 시 neutral
 
+첫 parity는 FP32 PyTorch↔FP32 ONNX Runtime으로 graph 정확성을 분리 검증한다. 그 뒤
+target Jetson에서 같은 ONNX로 FP16 TensorRT engine을 만들고 별도 parity를 수행한다.
 MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 training Docker나
 전체 MMSeg stack을 설치하지 않고 native TensorRT runtime과 최소 ROS node를 우선한다.
 
@@ -330,8 +332,10 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 ### CVAT와 라벨
 
 - CVAT Docker 설치·project 생성: 태빈
-- Annotation: Semantic20 `log` ID 10만 라벨
-- 나머지 픽셀: `255 ignore`; 임의 background class를 만들지 않는다.
+- baseline visualization과 현장 실패 evidence로 target을 먼저 동결한다.
+- 선택 전에는 특정 class용 production annotation을 시작하지 않는다.
+- 선택 후에는 해당 Semantic20 ID만 라벨하고 나머지 픽셀은 `255 ignore`로 둔다.
+- 임의 background class를 만들지 않는다.
 - 원본 영상과 annotation export를 모두 versioned archive로 보관한다.
 - target-only partial label은 RELLIS full-label anchor data와 섞어서만 학습한다.
 
@@ -346,16 +350,16 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 
 ### 라벨 QC
 
-- log 경계가 실제 물체를 포함하는지 overlay 확인
-- class ID 10과 ignore 255 외 값이 없는지 자동 검사
+- 선택 target 경계가 실제 물체를 포함하는지 overlay 확인
+- 선택 class ID와 ignore 255 외 값이 없는지 자동 검사
 - mask/image 크기와 pair 검증
 - train/val/test source sequence 중복 검사
-- resize 후 log pixel이 소실되지 않는지 640x384 preview 확인
+- resize 후 target pixel이 소실되지 않는지 640x384 preview 확인
 
 ## 10. Short fine-tuning recipe
 
 1. B0-E0 selected checkpoint에서 시작한다.
-2. RELLIS anchor와 custom-log partial data를 초기 1:1 exposure로 구성한다.
+2. RELLIS anchor와 selected-target partial data를 초기 1:1 exposure로 구성한다.
 3. Head 중심 500–1,000 optimizer updates를 실행한다.
 4. Backbone LR을 head의 0.1배로 두고 full model을 2,000–5,000 updates fine-tune한다.
 5. 500 updates마다 custom validation target IoU/Recall과 RELLIS validation을 평가한다.
@@ -364,8 +368,8 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 
 ### 선택 기준
 
-- Primary: custom validation `log Recall`
-- Secondary: custom validation `log IoU/Precision`
+- Primary: custom validation selected-target Recall
+- Secondary: custom validation selected-target IoU/Precision
 - Safety: negative clips의 false-stop rate
 - Non-degradation: RELLIS supported mIoU와 주요 클래스가 크게 붕괴하지 않음
 
@@ -424,8 +428,8 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 - PWM neutral/steering/gamepad/watchdog wheels-off 검증
 - B0-E0 ONNX export와 target Jetson FP16 engine
 - file inference 성공
-- log/pole 후보 각 20개 frame의 E0 miss pattern 확인
-- 기본 target은 log; log 촬영이 불가능할 때만 pole로 전환
+- Semantic20 전체 overlay와 per-class area를 실제 후보 frame에서 확인
+- 실패도·시나리오 적합성·재현성 evidence가 모이기 전 target을 동결하지 않음
 
 **Gate 1:** file→TensorRT mask와 control hardware가 각각 독립 통과하지 않으면
 데이터 수집 외 신규 기능 개발을 중단하고 해당 blocker를 먼저 해결한다.
@@ -434,8 +438,8 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 
 - ZED RGB→TensorRT→mask live
 - mask→Go/Stop→`/drive/autonomous` shadow mode
-- E0 failure scene 촬영
-- 산/도시 target video 수집, CVAT annotation 시작
+- E0 failure scene 촬영과 target 선택
+- target 동결 뒤 산/도시 video 수집, CVAT annotation 시작
 
 **Gate 2:** Day 2 종료까지 live E0 mask가 없으면 최종 시연은 recorded input으로
 전환하고, 모델 fine-tuning과 ROS integration을 병렬 유지한다.
@@ -465,10 +469,11 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 
 ## 13. Fallback Ladder
 
-1. **Primary:** B0-E0 log 실패 → custom-log B0 성공, live RC stop
-2. **Fallback A:** log improvement가 약하면 pole로 늦게 갈아타지 않는다. 가장 좋은
-   custom checkpoint와 E0의 정량/정성 차이를 recorded input에서 보이고, live에서는
-   안전한 고정 target으로 pipeline만 증명한다.
+1. **Primary:** 현장 evidence로 선택한 target의 B0-E0 실패 → fine-tuned B0 성공,
+   live RC stop
+2. **Fallback A:** target improvement가 약하면 시연 직전에 다른 class로 갈아타지
+   않는다. 가장 좋은 custom checkpoint와 E0의 차이를 recorded input에서 보이고,
+   live에서는 안전한 고정 target으로 pipeline만 증명한다.
 3. **Fallback B:** 신규 학습이 붕괴하면 기존 B0/B2 rubble 차이를 사용한다.
 4. **Fallback C:** live camera가 불안정하면 고정 ZED SVO/rosbag replay로
    perception→control topic을 재현하고 RC는 wheels-off로 검증한다.
@@ -544,6 +549,10 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   동기 수집하는 범위는 현재 PoC에 과하다. `data_collection.launch.py`는 GNSS를
   시작하지 않고 recorder는 ZED의 `/rgb` 하위 토픽만 기록한다. capture 경로는
   저장소 기준 상대경로를 기본으로 한다. 상세 근거는 decision record 0007을 따른다.
+- **[2026-08-07] 기본 target 동결을 baseline 현장 시각화 이후로 연기**
+  이유: log를 포함한 후보를 문서 지표만으로 먼저 고정하지 않고, E0 B0의 Semantic20
+  전체 출력을 실제 후보 장면에서 비교해 실패도·군사 시나리오 적합성·재현성에 근거해
+  선택해야 한다. 2026-08-06 log 기본 target 결정은 decision record 0008로 대체한다.
 
 ## 17. Primary References
 

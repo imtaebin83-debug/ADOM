@@ -18,6 +18,14 @@ from adom.runtime.cycle import (
     _tracking_env,
 )
 from adom.runtime.doctor import EXPECTED_VERSIONS
+from adom.runtime.onnx_parity import (
+    DEFAULT_EXPECTED_NUM_CLASSES,
+    DEFAULT_MINIMUM_IMAGES,
+    DEFAULT_VISUALIZATION_COUNT,
+    keep_ratio_valid_region,
+    normalized_polygon_mask,
+    parse_normalized_polygon,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -75,6 +83,48 @@ class RuntimeContractTests(unittest.TestCase):
             / "rellis3d_cost4.py"
         ).read_text(encoding="utf-8")
         self.assertIn('reduce_zero_label=False', dataset)
+
+    def test_export_configs_are_semantic20_only(self) -> None:
+        export_root = REPO_ROOT / "configs" / "adom" / "export"
+        for model in ("b0", "b2"):
+            for profile in ("384x384", "640x384"):
+                text = (
+                    export_root / f"segformer_{model}_{profile}_rellis3d.py"
+                ).read_text(encoding="utf-8")
+                self.assertIn(
+                    f"segformer_{model}_stage2_e0_rellis.py",
+                    text,
+                )
+                self.assertNotIn(
+                    f'"../segformer_{model}_stage2_rellis3d.py"',
+                    text,
+                )
+                self.assertIn('dict(type="Resize"', text)
+                self.assertIn("keep_ratio=True", text)
+                self.assertIn('dict(type="Pad"', text)
+        cycle_text = (REPO_ROOT / "src" / "adom" / "runtime" / "cycle.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('/ "cost4"', cycle_text)
+
+    def test_parity_defaults_and_roi_polygon_contract(self) -> None:
+        self.assertEqual(DEFAULT_MINIMUM_IMAGES, 10)
+        self.assertEqual(DEFAULT_EXPECTED_NUM_CLASSES, 19)
+        self.assertEqual(DEFAULT_VISUALIZATION_COUNT, 3)
+        valid_region = keep_ratio_valid_region((720, 1280), (384, 640))
+        self.assertEqual(valid_region, (0, 0, 360, 640))
+        polygon = parse_normalized_polygon("0,0;1,0;1,1;0,1")
+        self.assertIsNotNone(polygon)
+        mask = normalized_polygon_mask(
+            (384, 640), polygon or [], valid_region=valid_region
+        )
+        self.assertEqual(mask.shape, (384, 640))
+        self.assertGreater(int(mask.sum()), 0)
+        self.assertFalse(mask[383].any())
+        with self.assertRaises(ValueError):
+            parse_normalized_polygon("0,0;1,0")
+        with self.assertRaises(ValueError):
+            parse_normalized_polygon("0,0;1.1,0;1,1")
 
     def test_checkpoint_resolution_rejects_ambiguity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -192,6 +242,7 @@ class RuntimeContractTests(unittest.TestCase):
                     / "configs"
                     / "adom"
                     / "export"
+                    / "cost4"
                     / "segformer_b0_384x384_rellis3d.py"
                 ),
                 checkpoint=files["best.pth"],

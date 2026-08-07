@@ -33,6 +33,21 @@
 원본 `summary.json`, `test_metrics.json`, `confusion_matrix.json`은 repository에
 추적되지 않는다. W&B/local output artifact의 영구 보관 상태를 별도로 보완해야 한다.
 
+### Deployment checkpoint provenance
+
+- Selected checkpoint: Stage 2 `best_mIoU_iter_6000.pth`
+- Network Volume path reported on 2026-08-07:
+  `/workspace/adom/runs/semantic20/e0/20260805T122006Z-5c50bfdf2900-b0-full/b0/stage2/best_mIoU_iter_6000.pth`
+- Selection rule used by this legacy run: maximum raw validation MMSeg mIoU
+- Selection evidence: validation mIoU `51.07` at iter 6,000; canonical test was
+  executed with the same checkpoint
+- `checkpoint_selection.json`: not produced by this pre-Clean-v1 legacy run
+- Checkpoint SHA256: pending direct calculation on the Network Volume
+
+The immutable image revision, W&B run, exact checkpoint path, selection rule, and
+SHA256 must all be copied into the ONNX export report. The later Clean-v1
+`checkpoint_selection.json` contract must not be retroactively attributed to this run.
+
 ## Aggregate results
 
 단위는 percent이다. `Fixed mIoU`는 model prediction이 아니라 GT support로 고정한

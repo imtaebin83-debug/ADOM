@@ -25,11 +25,14 @@
 
 ## Pull requests
 
+- After committing and pushing requested changes, open a PR by default unless the
+  user explicitly asks not to open one. Do not wait for a separate PR request.
 - Write every PR body bilingually in Korean and English. For each major section,
   provide the Korean explanation first and the corresponding English explanation
   immediately after it; do not maintain two PRs or two conflicting descriptions.
-- When the requested work is complete and required checks pass, open or convert the
-  PR to Ready for review so it can be merged. Use Draft only when the user explicitly
-  requests it or when required work/checks remain incomplete, and state the reason.
+- Open PRs as Ready for review by default. Record incomplete external, hardware, or
+  long-running checks as explicit merge blockers in the PR body; those blockers do
+  not by themselves require Draft status. Use Draft only when the user explicitly
+  requests it or when the submitted changes are not yet coherent enough to review.
 - Keep the PR body current when follow-up commits change validation results, known
   limitations, or merge readiness.

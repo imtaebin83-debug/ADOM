@@ -526,6 +526,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 CONFIG_ROOT
                 / "adom"
                 / "export"
+                / "cost4"
                 / f"segformer_{model}_{profile}_rellis3d.py"
             )
             deploy_config = (
@@ -573,6 +574,12 @@ def run_cycle(args: argparse.Namespace) -> None:
                 str(onnx_path),
                 "--image",
                 str(image),
+                "--minimum-images",
+                "1",
+                "--target-class-id",
+                "3",
+                "--expected-num-classes",
+                "4",
                 "--device",
                 args.device,
                 "--output",

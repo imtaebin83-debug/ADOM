@@ -56,8 +56,8 @@ gamepad_control:
 
     max_forward_speed_mps: 6.0
     max_reverse_speed_mps: 3.0
-    max_steering_angle_deg: 24
-    wheelbase_m: 0.33s
+    max_steering_angle_deg: 24.0
+    wheelbase_m: 0.33
     joy_timeout_sec: 0.50
     autonomous_timeout_sec: 0.25
     publish_rate_hz: 50.0

@@ -1,33 +1,65 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
+import threading
 import time
 
 import cv2
 from cv_bridge import CvBridge
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
-from adom.perception import MmsegBackend, colorize_mask
+from adom.perception import (
+    LatestItemMailbox,
+    MmsegBackend,
+    colorize_semantic20_mask,
+    load_semantic20_ontology,
+)
+
+
+@dataclass(frozen=True)
+class ReceivedFrame:
+    message: Image
+    received_monotonic: float
+    received_ros_ns: int
+
+
+def stamp_ns(message: Image) -> int:
+    return int(message.header.stamp.sec) * 1_000_000_000 + int(
+        message.header.stamp.nanosec
+    )
+
+
+def elapsed_ms(later_ns: int, earlier_ns: int) -> float | None:
+    if earlier_ns <= 0:
+        return None
+    elapsed = (later_ns - earlier_ns) / 1e6
+    if elapsed < 0.0:
+        return None
+    return round(elapsed, 2)
 
 
 class AdomPerceptionNode(Node):
+    """Semantic20 inference with an explicit latest-frame-only worker."""
+
     def __init__(self) -> None:
         super().__init__("adom_perception")
         defaults = {
             "image_topic": "/zed/zed_node/rgb/color/rect/image",
-            "mask_topic": "/adom/perception/semantic_mask",
+            "mask_topic": "/adom/perception/semantic20_mask",
             "confidence_topic": "/adom/perception/confidence",
             "overlay_topic": "/adom/perception/overlay",
             "status_topic": "/adom/perception/status",
+            "bridge_mapping_path": "",
             "config_path": "",
             "checkpoint_path": "",
             "device": "cuda:0",
-            "target_fps": 15.0,
+            "target_fps": 30.0,
             "overlay_alpha": 0.45,
         }
         for name, value in defaults.items():
@@ -39,8 +71,9 @@ class AdomPerceptionNode(Node):
         if target_fps <= 0.0:
             raise ValueError("target_fps must be positive")
 
+        mapping_path = str(self.p["bridge_mapping_path"]).strip() or None
+        self._ontology = load_semantic20_ontology(mapping_path)
         self._minimum_period = 1.0 / target_fps
-        self._last_started = -float("inf")
         self._frames = 0
         self._started_at = time.monotonic()
         self._bridge = CvBridge()
@@ -49,6 +82,9 @@ class AdomPerceptionNode(Node):
             str(self.p["checkpoint_path"]),
             str(self.p["device"]),
         )
+        self._mailbox: LatestItemMailbox[ReceivedFrame] = LatestItemMailbox()
+        self._shutdown = threading.Event()
+
         self._mask_pub = self.create_publisher(Image, str(self.p["mask_topic"]), 1)
         self._confidence_pub = self.create_publisher(
             Image, str(self.p["confidence_topic"]), 1
@@ -57,25 +93,72 @@ class AdomPerceptionNode(Node):
             Image, str(self.p["overlay_topic"]), 1
         )
         self._status_pub = self.create_publisher(String, str(self.p["status_topic"]), 10)
+        image_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+        )
         self.create_subscription(
             Image,
             str(self.p["image_topic"]),
             self._on_image,
-            qos_profile_sensor_data,
+            image_qos,
         )
+        self._worker = threading.Thread(
+            target=self._inference_loop,
+            name="adom-semantic20-inference",
+            daemon=True,
+        )
+        self._worker.start()
         self.get_logger().info(
-            f"ADOM MMSeg inference ready on {self.p['device']} at <= {target_fps:.1f} FPS"
+            "ADOM Semantic20 MMSeg inference ready on "
+            f"{self.p['device']} at <= {target_fps:.1f} FPS; "
+            f"mapping={self._ontology.dataset_name}:{self._ontology.mapping_version}"
         )
 
     def _on_image(self, message: Image) -> None:
-        started = time.monotonic()
-        if started - self._last_started < self._minimum_period:
-            return
-        self._last_started = started
+        frame = ReceivedFrame(
+            message=message,
+            received_monotonic=time.monotonic(),
+            received_ros_ns=self.get_clock().now().nanoseconds,
+        )
+        try:
+            self._mailbox.put(frame)
+        except RuntimeError:
+            pass
+
+    def _publish_status(self, **fields) -> None:
+        status = String()
+        status.data = json.dumps(fields, sort_keys=True)
+        self._status_pub.publish(status)
+
+    def _inference_loop(self) -> None:
+        next_allowed_start = 0.0
+        while not self._shutdown.is_set():
+            delay = next_allowed_start - time.monotonic()
+            if delay > 0.0 and self._shutdown.wait(delay):
+                return
+            item = self._mailbox.take()
+            if item is None or self._shutdown.is_set():
+                return
+            started = time.monotonic()
+            next_allowed_start = started + self._minimum_period
+            self._process_frame(item.sequence, item.value, started)
+
+    def _process_frame(
+        self, sequence: int, frame: ReceivedFrame, started: float
+    ) -> None:
+        message = frame.message
+        source_ns = stamp_ns(message)
+        inference_started_ros_ns = self.get_clock().now().nanoseconds
         try:
             image = self._bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
+            inference_started = time.monotonic()
             mask, confidence = self._backend.infer(image)
-            colors = colorize_mask(mask)
+            inference_finished = time.monotonic()
+            self._ontology.validate_mask(mask)
+            colors = colorize_semantic20_mask(mask, self._ontology)
             alpha = min(1.0, max(0.0, float(self.p["overlay_alpha"])))
             overlay = cv2.addWeighted(image, 1.0 - alpha, colors, alpha, 0.0)
 
@@ -90,24 +173,50 @@ class AdomPerceptionNode(Node):
             self._confidence_pub.publish(confidence_message)
             self._overlay_pub.publish(overlay_message)
 
+            output_ros_ns = self.get_clock().now().nanoseconds
+            finished = time.monotonic()
             self._frames += 1
-            elapsed = max(time.monotonic() - self._started_at, 1e-6)
-            status = String()
-            status.data = json.dumps(
-                {
-                    "state": "ok",
-                    "latency_ms": round((time.monotonic() - started) * 1000.0, 2),
-                    "average_fps": round(self._frames / elapsed, 2),
-                    "frame_id": message.header.frame_id,
-                },
-                sort_keys=True,
+            elapsed = max(finished - self._started_at, 1e-6)
+            self._publish_status(
+                state="ok",
+                ontology="Semantic20",
+                mapping_version=self._ontology.mapping_version,
+                source_sequence=sequence,
+                source_stamp_ns=source_ns,
+                frame_id=message.header.frame_id,
+                target_fps=float(self.p["target_fps"]),
+                average_fps=round(self._frames / elapsed, 2),
+                queue_wait_ms=round((started - frame.received_monotonic) * 1000.0, 2),
+                capture_to_receive_ms=elapsed_ms(frame.received_ros_ns, source_ns),
+                capture_to_inference_start_ms=elapsed_ms(
+                    inference_started_ros_ns, source_ns
+                ),
+                inference_ms=round(
+                    (inference_finished - inference_started) * 1000.0, 2
+                ),
+                processing_ms=round((finished - started) * 1000.0, 2),
+                capture_to_perception_output_ms=elapsed_ms(output_ros_ns, source_ns),
+                received_frames=self._mailbox.received,
+                overwritten_frames=self._mailbox.overwritten,
             )
-            self._status_pub.publish(status)
         except Exception as error:
             self.get_logger().error(f"Perception frame failed: {error}")
-            status = String()
-            status.data = json.dumps({"state": "error", "message": str(error)})
-            self._status_pub.publish(status)
+            self._publish_status(
+                state="error",
+                ontology="Semantic20",
+                source_sequence=sequence,
+                source_stamp_ns=source_ns,
+                message=str(error),
+            )
+
+    def destroy_node(self):
+        self._shutdown.set()
+        self._mailbox.close()
+        if self._worker.is_alive():
+            self._worker.join(timeout=10.0)
+        if self._worker.is_alive():
+            self.get_logger().warning("Inference worker did not stop within 10 seconds")
+        return super().destroy_node()
 
 
 def main(args=None) -> None:

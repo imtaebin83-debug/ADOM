@@ -6,4 +6,8 @@ install(PROGRAMS scripts/perception_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME adom_perception_node
 )
+install(PROGRAMS scripts/perception_cost4_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME adom_cost4_perception_node
+)
 ament_package()

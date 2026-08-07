@@ -47,6 +47,10 @@ ros2 launch adom_planning sequential_gps.launch.py \
 
 ## Cost4 rule planning
 
+각 camera-stamped costmap으로 처음 발행한 `/cmd_vel`의 software action latency는
+`/adom/navigation/action_latency` (`std_msgs/String`, JSON)로 발행한다. 현재값과
+rolling p50/p95를 포함하며 actuator/PWM의 물리 응답시간은 포함하지 않는다.
+
 `rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는 여러
 Ackermann corridor를 평가한다. 가장 낮은 비용의 corridor를 `/cmd_vel`로 발행하며,
 가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.40초 이상 오래된 센서

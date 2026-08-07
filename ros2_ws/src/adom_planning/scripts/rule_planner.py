@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collections import deque
 import json
 import math
 
@@ -23,6 +24,8 @@ class RulePlannerNode(Node):
             "cmd_vel_topic": "/cmd_vel",
             "path_marker_topic": "/adom/navigation/rule_path",
             "status_topic": "/adom/navigation/rule_status",
+            "action_latency_topic": "/adom/navigation/action_latency",
+            "action_latency_window": 300,
             "publish_rate_hz": 20.0,
             "costmap_timeout_sec": 0.20,
             "max_source_age_sec": 0.40,
@@ -64,11 +67,19 @@ class RulePlannerNode(Node):
         self._costmap_config: CostmapConfig | None = None
         self._frame_id = "base_link"
         self._last_grid_ns: int | None = None
+        self._source_stamp_ns: int | None = None
+        self._source_action_reported = False
+        self._action_latencies_ms: deque[float] = deque(
+            maxlen=max(1, int(self.p["action_latency_window"]))
+        )
         self._cmd_pub = self.create_publisher(Twist, str(self.p["cmd_vel_topic"]), 10)
         self._marker_pub = self.create_publisher(
             Marker, str(self.p["path_marker_topic"]), 10
         )
         self._status_pub = self.create_publisher(String, str(self.p["status_topic"]), 10)
+        self._latency_pub = self.create_publisher(
+            String, str(self.p["action_latency_topic"]), 10
+        )
         self.create_subscription(
             OccupancyGrid, str(self.p["costmap_topic"]), self._on_costmap, 1
         )
@@ -107,6 +118,34 @@ class RulePlannerNode(Node):
         )
         self._frame_id = message.header.frame_id or "base_link"
         self._last_grid_ns = now_ns
+        self._source_stamp_ns = source_ns if source_ns > 0 else None
+        self._source_action_reported = False
+
+    def _publish_action_latency(self, state: str) -> None:
+        if self._source_action_reported or self._source_stamp_ns is None:
+            return
+        action_ns = self.get_clock().now().nanoseconds
+        latency_ms = (action_ns - self._source_stamp_ns) / 1e6
+        if latency_ms < 0.0:
+            return
+        self._source_action_reported = True
+        self._action_latencies_ms.append(latency_ms)
+        values = np.asarray(self._action_latencies_ms, dtype=np.float64)
+        message = String()
+        message.data = json.dumps(
+            {
+                "state": state,
+                "action_topic": str(self.p["cmd_vel_topic"]),
+                "source_stamp_ns": self._source_stamp_ns,
+                "action_stamp_ns": action_ns,
+                "camera_to_action_ms": round(latency_ms, 2),
+                "window_samples": len(values),
+                "camera_to_action_p50_ms": round(float(np.percentile(values, 50)), 2),
+                "camera_to_action_p95_ms": round(float(np.percentile(values, 95)), 2),
+            },
+            sort_keys=True,
+        )
+        self._latency_pub.publish(message)
 
     def _publish_stop(self, reason: str) -> None:
         self._cmd_pub.publish(Twist())
@@ -165,6 +204,7 @@ class RulePlannerNode(Node):
             / float(self.p["wheelbase_m"])
         )
         self._cmd_pub.publish(command)
+        self._publish_action_latency("blocked" if plan.blocked else "driving")
         self._publish_marker(plan.path_xy, plan.blocked)
         status = String()
         status.data = json.dumps(

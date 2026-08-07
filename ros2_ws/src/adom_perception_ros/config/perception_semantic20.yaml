@@ -1,0 +1,15 @@
+adom_perception:
+  ros__parameters:
+    image_topic: /zed/zed_node/rgb/color/rect/image
+    mask_topic: /adom/perception/semantic20_mask
+    confidence_topic: /adom/perception/confidence
+    overlay_topic: /adom/perception/overlay
+    status_topic: /adom/perception/status
+    # Empty resolves to the installed canonical
+    # data/semantic_20/config/bridge_mapping.yaml resource.
+    bridge_mapping_path: ""
+    config_path: ""
+    checkpoint_path: ""
+    device: cuda:0
+    target_fps: 30.0
+    overlay_alpha: 0.45

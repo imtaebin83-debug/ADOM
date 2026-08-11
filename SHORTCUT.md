@@ -69,6 +69,23 @@ ros2 launch adom_bringup data_collection.launch.py
 현재 함수는 `~/ADOM/ros2_ws`에서 launch를 실행한다. 상대 경로로 지정된 결과물은 이
 작업 디렉터리를 기준으로 생성될 수 있다.
 
+게임패드의 Y 버튼으로 녹화를 시작하거나 중지한다. rosbag에는 ZED의 `/rgb` 하위
+토픽만 기록하며 GPS, depth, point cloud, IMU, `/joy`, `/drive`는 기록하지 않는다.
+
+`ADOM_REPO_ROOT`를 별도로 설정하지 않았다면 상대 저장 경로 `data/captures`는 다음
+위치로 해석된다.
+
+```text
+~/ADOM/ros2_ws/data/captures
+```
+
+저장소 루트의 `~/ADOM/data/captures`를 사용하려면 `~/.bashrc`의 ADOM 환경 설정에
+다음을 추가한다.
+
+```bash
+export ADOM_REPO_ROOT="$HOME/ADOM"
+```
+
 ## `pwm` — PWM 출력 확인
 
 ```bash
@@ -99,6 +116,16 @@ ros2 topic echo /adom/recording/status
 
 `zed`라는 이름이지만 카메라 영상 토픽이 아니라 ADOM recorder의 상태 토픽을 확인하는
 함수다. 출력은 `Ctrl-C`로 종료한다.
+
+주요 JSON 필드는 다음과 같다.
+
+| 필드 | 의미 |
+| --- | --- |
+| `recording` | 현재 녹화 중인지 여부 |
+| `session` | 현재 session 디렉터리 |
+| `size_bytes` | 현재 저장 크기 |
+| `max_size_bytes` | session 최대 크기 |
+| `reason` | 녹화 상태 또는 종료 사유 |
 
 ## `zedgui` — ZED Explorer
 

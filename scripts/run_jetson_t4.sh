@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-set -u
+# ROS 2 setup files read optional AMENT variables that may be unset. Do not
+# enable nounset in this wrapper; required ADOM variables use guarded expansion.
 
 adom_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 adom_repo="${ADOM_REPO:-$(cd "$adom_script_dir/.." && pwd)}"
@@ -49,9 +50,7 @@ export ADOM_MODEL_CONFIG="$adom_model_config"
 export ADOM_CHECKPOINT="$adom_checkpoint"
 export PYTHONPATH="$adom_repo/src${PYTHONPATH:+:$PYTHONPATH}"
 
-set +u
 source /opt/ros/jazzy/setup.bash || exit 1
-set -u
 
 cd "$adom_repo/ros2_ws" || exit 1
 
@@ -60,9 +59,7 @@ colcon build \
     --packages-select adom_perception_ros \
     --allow-overriding adom_perception_ros || exit 1
 
-set +u
 source "$adom_repo/ros2_ws/install/setup.bash" || exit 1
-set -u
 
 cd "$adom_repo" || exit 1
 

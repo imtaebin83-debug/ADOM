@@ -49,7 +49,10 @@ export ADOM_MODEL_CONFIG="$adom_model_config"
 export ADOM_CHECKPOINT="$adom_checkpoint"
 export PYTHONPATH="$adom_repo/src${PYTHONPATH:+:$PYTHONPATH}"
 
+set +u
 source /opt/ros/jazzy/setup.bash || exit 1
+set -u
+
 cd "$adom_repo/ros2_ws" || exit 1
 
 colcon build \
@@ -57,7 +60,10 @@ colcon build \
     --packages-select adom_perception_ros \
     --allow-overriding adom_perception_ros || exit 1
 
+set +u
 source "$adom_repo/ros2_ws/install/setup.bash" || exit 1
+set -u
+
 cd "$adom_repo" || exit 1
 
 python3 -c 'import torch, mmcv, mmseg, adom; print("Perception imports: OK")' || exit 1

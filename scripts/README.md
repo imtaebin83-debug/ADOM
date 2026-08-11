@@ -7,6 +7,18 @@ root는 `--dataset` 또는 `ADOM_DATA_ROOT`로 전달하며 ONNX export는 학�
 반복 가능한 운영 진입점만 둔다. 데이터 로직은 `src/adom/data`, MMSeg 확장은
 `src/adom/mmseg`, 실행 상태 관리는 `src/adom/runtime`에 있다.
 
+## Jetson B0-E0 perception
+
+```bash
+scripts/run_jetson_t4.sh
+```
+
+`e49ad80`에서 기록한 Semantic20 SegFormer-B0 E0 export config와 Jetson에 전달된
+checkpoint를 검증한 뒤 `adom_perception_ros`를 빌드·실행한다. 기본 checkpoint 위치는
+`models/checkpoints/b0-e0/`이며 정확히 한 개의 `.pth`만 허용한다. 다른 위치를 사용할
+때는 `ADOM_CHECKPOINT`에 절대 경로를 지정한다. 자세한 설치와 `t4` wrapper는
+[`SHORTCUT.md`](../SHORTCUT.md)를 따른다.
+
 ## RunPod 학습 1-cycle
 
 ```bash

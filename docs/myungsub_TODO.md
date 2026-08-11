@@ -67,10 +67,10 @@
   SSH shell까지 logout됐다.
 - ROS graph에 `/adom_perception`, `/adom/perception/semantic20_mask`,
   `/adom/perception/status`가 없다.
-- 사용할 checkpoint는
-  `segformer_b0_stage2_e1_combined.py`와 대응하는 Semantic20 B0 Stage 2 E1
-  `.pth` 파일이어야 한다. Cost4/B2/다른 ontology checkpoint를 섞어 사용하지
-  않는다.
+- 사용할 checkpoint는 `e49ad80`에 기록된 Semantic20 B0 Stage 2 E0
+  `best_mIoU_iter_6000.pth`이며, config는
+  `configs/adom/export/segformer_b0_640x384_rellis3d.py`다.
+  Cost4/B2/E1/다른 ontology checkpoint를 섞어 사용하지 않는다.
 
 ### `t5` Semantic20 local planning blocker
 
@@ -87,14 +87,15 @@
 
 ### P0 — `t4` perception 복구
 
-- [ ] Jetson에서 Semantic20 B0 Stage 2 E1 checkpoint 위치를 확인한다.
+- [ ] Jetson에서 Semantic20 B0 Stage 2 E0 checkpoint 위치를 확인한다.
 - [ ] checkpoint가 없으면 RunPod/W&B artifact 또는 학습 담당자의 보관 파일을
   Jetson으로 전달한다.
-- [ ] `checkpoint_selection.json`의 `selected.checkpoint`가 가리키는
-  `best_clean_selection_iter_*.pth`를 선택한다.
-- [ ] Jetson `~/.bashrc`의 `ADOM_CHECKPOINT`를 실제 절대 경로로 바꾼다.
-- [ ] `t4` 함수의 실패 경로에서 `exit 1`을 `return 1`로 바꾸어 SSH shell
-  종료를 막는다.
+- [ ] legacy B0-E0 run의 `best_mIoU_iter_6000.pth`를 선택한다. 이 run에는 후대의
+  `checkpoint_selection.json`이 없으므로 해당 계약을 소급 적용하지 않는다.
+- [ ] checkpoint를 기본 경로 `~/ADOM/models/checkpoints/b0-e0/`에 복사하거나
+  `ADOM_CHECKPOINT`로 실제 절대 경로를 지정한다.
+- [ ] Jetson `~/.bashrc`의 기존 `t4` 함수를 `scripts/run_jetson_t4.sh` wrapper로
+  교체해 실패 시 SSH shell 종료를 막는다.
 - [ ] `test -r "$ADOM_CHECKPOINT"`로 파일을 검증한 뒤 `t4`를 다시 실행한다.
 - [ ] `/adom_perception`, `/adom/perception/semantic20_mask`,
   `/adom/perception/status`를 확인한다.

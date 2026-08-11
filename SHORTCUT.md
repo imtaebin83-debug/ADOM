@@ -265,32 +265,54 @@ ros2 launch adom_control gamepad_control.launch.py start_pca9685:=true
 t4
 ```
 
-다음 모델 설정을 사용하도록 정의되어 있다.
+`e49ad80`에서 perception 팀원이 기록한 Semantic20 SegFormer-B0 E0 모델 계약을
+사용한다. 여기서 checkpoint는 목적지나 주행 경로가 아니라 학습된 perception 신경망의
+가중치가 저장된 `.pth` 파일이다.
 
-```bash
-export ADOM_MODEL_CONFIG="$HOME/ADOM/configs/adom/phase1_semantic20/segformer_b0_stage2_e1_combined.py"
-export ADOM_CHECKPOINT="<CHECKPOINT_ABSOLUTE_PATH>"
-export PYTHONPATH="$HOME/ADOM/src${PYTHONPATH:+:$PYTHONPATH}"
+Git에는 checkpoint가 포함되지 않는다. perception 팀의 다음 파일을 Jetson으로 복사한다.
+
+```text
+best_mIoU_iter_6000.pth
 ```
 
-빌드와 실행 명령:
+권장 저장 위치는 다음과 같다. `models/checkpoints/`는 Git에서 제외된다.
 
 ```bash
-colcon build --symlink-install --packages-select adom_perception_ros
-python3 -c 'import torch, mmcv, mmseg, adom; print("Perception imports: OK")'
-ros2 launch adom_perception_ros perception.launch.py \
-  model_config:="$ADOM_MODEL_CONFIG" \
-  checkpoint:="$ADOM_CHECKPOINT" \
-  device:=cuda:0
+mkdir -p "$HOME/ADOM/models/checkpoints/b0-e0"
+# 전달받은 파일을 위 디렉터리에 복사한다.
 ```
 
-> **실행 전 필수:** `~/.bashrc`의 `<CHECKPOINT_ABSOLUTE_PATH>`를 Jetson에 실제로 존재하며
-> 위 Semantic20 config와 대응하는 checkpoint 절대 경로로 바꾼다.
+`~/.bashrc`의 기존 `t4` 함수 전체를 다음 wrapper로 교체하고 설정을 다시 읽는다.
 
-함수는 config와 checkpoint가 읽히는지 검사하고 PyTorch, MMCV, MMSegmentation, ADOM
-import를 검증한다. 현재 검사 실패 경로에 `exit 1`이 들어 있으므로 실패하면 `t4`만
-끝나는 것이 아니라 현재 SSH shell 자체가 종료된다. shell을 유지하려면 `exit 1`을
-`return 1`로 바꾸는 것이 안전하다.
+```bash
+t4() {
+    "$HOME/ADOM/scripts/run_jetson_t4.sh"
+}
+
+source ~/.bashrc
+```
+
+wrapper는 다음 B0-E0 config를 고정해 사용한다.
+
+```text
+configs/adom/export/segformer_b0_640x384_rellis3d.py
+```
+
+이 config는 `segformer_b0_stage2_e0_rellis.py`를 기반으로 하며 Semantic20 ID `0..18`,
+ignore `255`, 640x384 resize/padding 계약을 사용한다. E1, B2 또는 Cost4 checkpoint를
+같은 디렉터리에 넣지 않는다.
+
+기본 디렉터리 밖의 파일을 사용하려면 실행 전에 정확한 B0-E0 파일을 지정한다.
+
+```bash
+export ADOM_CHECKPOINT="/absolute/path/to/best_mIoU_iter_6000.pth"
+t4
+```
+
+script는 checkpoint가 없거나 여러 개면 launch를 시작하지 않고 원인을 출력한다.
+별도 프로세스로 실행되므로 실패해도 현재 SSH shell은 종료되지 않는다. 빌드할 때
+동일 workspace의 기존 install을 의도적으로 갱신하므로
+`--allow-overriding adom_perception_ros`를 사용한다.
 
 ## `t5` — Semantic20 local planning
 

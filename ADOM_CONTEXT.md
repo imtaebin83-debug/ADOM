@@ -44,9 +44,11 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semant
 ### 현재 post-D-5 개발 범위
 
 인지 모델이 동작하는 현재 increment는 복잡한 global navigation 대신 robot-frame
-Semantic20 costmap에서 실행되는 저수준 방향 tree planner를 사용한다. planner는
-Ackermann 가능한 좌/직진/우 방향을 다단계로 전개하고 매 cycle 첫 방향만 실행해
-직진과 근거리 장애물 회피를 수행한다. GPS는 localization, planning, control 입력으로
+Semantic20 costmap에서 실행되는 gap-guided 방향 tree planner를 사용한다. 중앙 장애물이
+없으면 Ackermann 가능한 좌/직진/우 3단계 tree를 평가한다. 중앙 장애물이 감지되면
+좌·우 free-space 폭과 깊이를 비교해 gap 방향과 첫 조향을 고정하고, 남은 2단계 25개
+tree에서 경로를 선택한다. 매 cycle 첫 방향만 실행하며 gap 방향은 작은 score 변화에
+뒤집히지 않도록 hysteresis를 적용한다. GPS는 localization, planning, control 입력으로
 사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
 
 자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
@@ -627,6 +629,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   지연 중앙값이 약 0.33초, 95 percentile이 약 0.43초였고 perception 출력은 약
   10.2 Hz였다. 현장 설정 1.0 m/s의 75%인 0.75 m/s를 planner와 local controller의
   hard ceiling으로 적용한다. 상세 근거는 decision record 0018을 따른다.
+- **[2026-08-12] 중앙 장애물 회피에 gap-guided 25-candidate tree를 채택**
+  이유: 전체 125개 tree의 순간 최저 비용만 선택하면 더 넓게 열린 반대편 대신 국소적으로
+  막힌 방향에 진입할 수 있다. 중앙 장애물 기준 좌·우 gap 폭·깊이를 먼저 비교하고
+  선택 gap 중심각으로 첫 조향을 고정한 뒤 남은 25개 tree를 평가한다. 재현 benchmark의
+  P95 추가 비용 최댓값은 0.515 ms로 50 ms 기각 기준 이내였다. 상세 근거는 decision
+  record 0019를 따른다.
 
 ## 17. Primary References
 

@@ -34,7 +34,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0008](0008-defer-target-selection.md) | Defer target selection to field visualization | Accepted | 0006의 log 기본 target 부분 대체 |
 | [0008b](0008-semantic20-perception-foundation.md) | Semantic20 autonomous perception foundation | Accepted | ontology별 runtime topic 분리 |
 | [0009](0009-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Superseded in part | 방향 선택/control은 0010 우선 |
-| [0010](0010-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Accepted | 현재 local planning/control/logging 계약 |
+| [0010](0010-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Superseded in part | tree 방향 선택은 0019 우선; logging 계약 유지 |
 | [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Superseded in part | 0016이 live bag topic 범위를 더 축소 |
 | [0012](0012-planner-source-age-tolerance.md) | Planner source-age tolerance | Accepted | camera source age 폐기 기준 0.80초 |
 | [0013](0013-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
@@ -43,6 +43,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0016](0016-lightweight-autonomy-evidence-bag.md) | Lightweight autonomy evidence bag | Accepted | t2는 수치·상태·raw GPS만 기록; rec는 RGB 전용 유지 |
 | [0017](0017-zed-depth-ground-filter.md) | ZED depth and ground-frame filtering | Accepted | NEURAL 0.30--8.0 m, verified 0.21 m mount height |
 | [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Accepted | planner/control hard ceiling 0.75 m/s |
+| [0019](0019-gap-guided-direction-tree.md) | Gap-guided direction tree | Accepted | 중앙 장애물에서 gap 첫 조향 + 25개 tree |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

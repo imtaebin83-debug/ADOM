@@ -12,7 +12,13 @@ from .path_control import (
     local_gps_xy_m,
     select_lookahead_point,
 )
-from .rule_planner import PlannerConfig, RulePlan, plan_corridor
+from .rule_planner import (
+    GapAnalysis,
+    PlannerConfig,
+    RulePlan,
+    analyze_directional_gaps,
+    plan_corridor,
+)
 from .stuck_recovery import (
     StuckRecoveryConfig,
     StuckRecoveryDecision,
@@ -21,6 +27,7 @@ from .stuck_recovery import (
 
 __all__ = [
     "CostmapConfig",
+    "GapAnalysis",
     "ImuSpeedEstimate",
     "ImuSpeedEstimator",
     "ImuSpeedEstimatorConfig",
@@ -32,6 +39,7 @@ __all__ = [
     "StuckRecoveryDecision",
     "StuckRecoveryGate",
     "build_costmap",
+    "analyze_directional_gaps",
     "control_local_path",
     "gps_speed_mps",
     "haversine_distance_m",

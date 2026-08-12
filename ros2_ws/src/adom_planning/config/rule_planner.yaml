@@ -40,3 +40,16 @@ rule_planner:
     distance_decay_m: 2.0
     clearance_penalty: 35.0
     slow_distance_m: 3.0
+
+    # A central obstacle triggers a lightweight 2D Follow-the-Gap pass. The
+    # wider feasible side and its goal angle fix the tree's first action, so
+    # only the remaining 5^2=25 Ackermann sequences are evaluated.
+    gap_enabled: true
+    gap_field_of_view_deg: 120.0
+    gap_ray_count: 41
+    gap_detection_half_angle_deg: 12.0
+    gap_trigger_distance_m: 3.5
+    gap_min_depth_m: 0.8
+    gap_min_width_m: 0.45
+    gap_switch_margin_m: 0.25
+    gap_unknown_penalty_m: 0.50

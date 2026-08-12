@@ -211,6 +211,7 @@ class RulePlannerTests(unittest.TestCase):
             max_steering_deg=1.0,
             tree_depth=1,
             tree_branch_steering_deg=1.0,
+            gap_enabled=False,
         )
         near = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         far = near.copy()
@@ -233,6 +234,63 @@ class RulePlannerTests(unittest.TestCase):
         )
         self.assertEqual(len(plan.steering_sequence_rad), 3)
         self.assertTrue(all(abs(value) < 1e-9 for value in plan.steering_sequence_rad))
+
+    def test_wider_left_gap_fixes_first_action_and_reduces_tree_to_25(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 3 : center + 4, 10:18] = 100
+        grid[: center - 5, 10:35] = 100
+        plan = plan_corridor(grid, self.costmap, self.planner)
+        self.assertTrue(plan.gap.obstacle_detected)
+        self.assertEqual(plan.gap.selected_side, 1)
+        self.assertGreater(plan.gap.left_width_m, plan.gap.right_width_m)
+        self.assertGreater(plan.steering_rad, 0.0)
+        self.assertEqual(plan.candidate_count, 25)
+
+    def test_wider_right_gap_fixes_first_action_and_reduces_tree_to_25(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 3 : center + 4, 10:18] = 100
+        grid[center + 5 :, 10:35] = 100
+        plan = plan_corridor(grid, self.costmap, self.planner)
+        self.assertTrue(plan.gap.obstacle_detected)
+        self.assertEqual(plan.gap.selected_side, -1)
+        self.assertGreater(plan.gap.right_width_m, plan.gap.left_width_m)
+        self.assertLess(plan.steering_rad, 0.0)
+        self.assertEqual(plan.candidate_count, 25)
+
+    def test_no_feasible_side_gap_stops(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 3 : center + 4, 10:18] = 100
+        grid[: center - 3, 8:40] = 100
+        grid[center + 4 :, 8:40] = 100
+        plan = plan_corridor(grid, self.costmap, self.planner)
+        self.assertTrue(plan.gap.obstacle_detected)
+        self.assertEqual(plan.gap.selected_side, 0)
+        self.assertTrue(plan.blocked)
+        self.assertEqual(plan.candidate_count, 0)
+
+    def test_gap_hysteresis_keeps_previous_feasible_side(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 3 : center + 4, 10:18] = 100
+        plan = plan_corridor(
+            grid,
+            self.costmap,
+            self.planner,
+            preferred_gap_side=1,
+        )
+        self.assertEqual(plan.gap.selected_side, 1)
+        self.assertGreater(plan.steering_rad, 0.0)
+        self.assertEqual(plan.candidate_count, 25)
+
+    def test_clear_scene_keeps_full_tree_and_straight_path(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        plan = plan_corridor(grid, self.costmap, self.planner)
+        self.assertFalse(plan.gap.obstacle_detected)
+        self.assertEqual(plan.candidate_count, 125)
+        self.assertAlmostEqual(plan.steering_rad, 0.0)
 
 
 class LocalPathControlTests(unittest.TestCase):
@@ -257,6 +315,9 @@ class LocalPathControlTests(unittest.TestCase):
         self.assertEqual(local["max_steering_deg"], planner["max_steering_deg"])
         self.assertEqual(planner["lookahead_m"], 4.0)
         self.assertEqual(planner["slow_distance_m"], 3.5)
+        self.assertTrue(planner["gap_enabled"])
+        self.assertEqual(planner["gap_ray_count"], 41)
+        self.assertEqual(planner["gap_min_width_m"], 0.45)
         self.assertEqual(
             planner["downstream_max_speed_mps"], gamepad["max_forward_speed_mps"]
         )

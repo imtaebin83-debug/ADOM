@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 import sys
@@ -30,6 +31,18 @@ class Sample:
     mask_path: Path
 
 
+@dataclass(frozen=True)
+class PreflightResult:
+    distribution: Counter[int]
+    distribution_by_split: dict[str, Counter[int]]
+    distribution_by_sequence: dict[str, Counter[int]]
+    image_presence_by_split: dict[str, Counter[int]]
+    image_presence_by_sequence: dict[str, Counter[int]]
+    non_ignore_pixels_by_split: Counter[str]
+    non_ignore_pixels_by_sequence: Counter[str]
+    all_ignore_by_split: dict[str, list[str]]
+
+
 def parse_args() -> argparse.Namespace:
     script_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(
@@ -49,6 +62,14 @@ def parse_args() -> argparse.Namespace:
         "--splits",
         type=Path,
         default=script_root / "config" / "split_sequences.json",
+    )
+    parser.add_argument(
+        "--skip-upload-manifest-check",
+        action="store_true",
+        help=(
+            "Allow conversion without verifying input-root/manifest.json. "
+            "Use only for legacy or locally reconstructed sources."
+        ),
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -138,6 +159,87 @@ def collect_pngs(root: Path) -> dict[Path, Path]:
             raise ValueError(f"Duplicate relative path: {relative_path.as_posix()}")
         output[relative_path] = path
     return output
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _portable_relative_path(value: object, context: str) -> Path:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"Missing relative path in upload manifest: {context}")
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"Non-portable upload manifest path: {value}")
+    return path
+
+
+def verify_upload_manifest(input_root: Path, samples: list[Sample]) -> str:
+    manifest_path = input_root / "manifest.json"
+    manifest = load_json(manifest_path)
+    if manifest.get("format_version") != 1:
+        raise ValueError("Upload manifest format_version must be 1")
+    dates = manifest.get("dates")
+    if not isinstance(dates, dict):
+        raise ValueError("Upload manifest dates must be an object")
+
+    expected: dict[str, dict[Path, Sample]] = {}
+    for sample in samples:
+        expected.setdefault(sample.source_date, {})[sample.relative_path] = sample
+    if set(dates) != set(expected):
+        raise ValueError(
+            "Upload manifest dates differ from discovered dates: "
+            f"manifest={sorted(dates)}, discovered={sorted(expected)}"
+        )
+
+    for date, date_samples in expected.items():
+        date_value = dates[date]
+        if not isinstance(date_value, dict):
+            raise ValueError(f"Upload manifest date entry must be an object: {date}")
+        files = date_value.get("files")
+        if not isinstance(files, list):
+            raise ValueError(f"Upload manifest files must be a list: {date}")
+        if date_value.get("pairs") != len(files):
+            raise ValueError(f"Upload manifest pair count mismatch: {date}")
+        records: dict[Path, dict[str, object]] = {}
+        for index, record in enumerate(files):
+            if not isinstance(record, dict):
+                raise ValueError(f"Upload manifest record must be an object: {date}/{index}")
+            relative_path = _portable_relative_path(
+                record.get("relative_path"), f"{date}/{index}"
+            )
+            if relative_path in records:
+                raise ValueError(
+                    f"Duplicate upload manifest path: {date}/{relative_path.as_posix()}"
+                )
+            records[relative_path] = record
+        if set(records) != set(date_samples):
+            raise ValueError(
+                f"Upload manifest files differ from discovered pairs: {date}"
+            )
+        for relative_path, sample in date_samples.items():
+            record = records[relative_path]
+            for field, path in (
+                ("raw_sha256", sample.image_path),
+                ("mask_sha256", sample.mask_path),
+            ):
+                expected_digest = record.get(field)
+                if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+                    raise ValueError(
+                        f"Invalid {field} in upload manifest: "
+                        f"{date}/{relative_path.as_posix()}"
+                    )
+                actual_digest = sha256(path)
+                if actual_digest != expected_digest.lower():
+                    raise ValueError(
+                        f"Upload manifest checksum mismatch for {field}: "
+                        f"{date}/{relative_path.as_posix()}"
+                    )
+    return sha256(manifest_path)
 
 
 def discover_samples(input_root: Path, assignments: dict[str, str]) -> list[Sample]:
@@ -253,9 +355,15 @@ def preflight(
     samples: list[Sample],
     mapping: dict[tuple[int, int, int], int],
     ignore_index: int,
-) -> tuple[Counter[int], int]:
+) -> PreflightResult:
     distribution: Counter[int] = Counter()
-    all_ignore_masks = 0
+    distribution_by_split = {split: Counter() for split in SPLITS}
+    distribution_by_sequence: dict[str, Counter[int]] = {}
+    image_presence_by_split = {split: Counter() for split in SPLITS}
+    image_presence_by_sequence: dict[str, Counter[int]] = {}
+    non_ignore_pixels_by_split: Counter[str] = Counter()
+    non_ignore_pixels_by_sequence: Counter[str] = Counter()
+    all_ignore_by_split = {split: [] for split in SPLITS}
     for sample in samples:
         try:
             with Image.open(sample.image_path) as image:
@@ -274,13 +382,49 @@ def preflight(
             source_mask, mapping, ignore_index, sample.mask_path
         )
         distribution.update(sample_distribution)
-        if sum(
+        distribution_by_split[sample.split].update(sample_distribution)
+        sequence_key = f"{sample.source_date}/{sample.source_sequence}"
+        distribution_by_sequence.setdefault(sequence_key, Counter()).update(
+            sample_distribution
+        )
+        non_ignore_pixels = sum(
             count
             for target_id, count in sample_distribution.items()
             if target_id != ignore_index
-        ) == 0:
-            all_ignore_masks += 1
-    return distribution, all_ignore_masks
+        )
+        non_ignore_pixels_by_split[sample.split] += non_ignore_pixels
+        non_ignore_pixels_by_sequence[sequence_key] += non_ignore_pixels
+        present_ids = {
+            target_id
+            for target_id, count in sample_distribution.items()
+            if target_id != ignore_index and count > 0
+        }
+        image_presence_by_split[sample.split].update(present_ids)
+        image_presence_by_sequence.setdefault(sequence_key, Counter()).update(
+            present_ids
+        )
+        if non_ignore_pixels == 0:
+            all_ignore_by_split[sample.split].append(sample.sample_key)
+    if all_ignore_by_split["train"]:
+        raise ValueError(
+            "Train contains all-ignore masks; move them to an explicit diagnostic "
+            "split or relabel them: "
+            f"{all_ignore_by_split['train'][:10]}"
+        )
+    return PreflightResult(
+        distribution=distribution,
+        distribution_by_split=distribution_by_split,
+        distribution_by_sequence=distribution_by_sequence,
+        image_presence_by_split=image_presence_by_split,
+        image_presence_by_sequence=image_presence_by_sequence,
+        non_ignore_pixels_by_split=non_ignore_pixels_by_split,
+        non_ignore_pixels_by_sequence=non_ignore_pixels_by_sequence,
+        all_ignore_by_split=all_ignore_by_split,
+    )
+
+
+def _counter_payload(value: Counter[int]) -> dict[str, int]:
+    return {str(target_id): value[target_id] for target_id in sorted(value)}
 
 
 def write_package(
@@ -290,8 +434,9 @@ def write_package(
     ignore_index: int,
     mapping_path: Path,
     splits_path: Path,
-    distribution: Counter[int],
-    all_ignore_masks: int,
+    preflight_result: PreflightResult,
+    upload_manifest_sha256: str | None,
+    upload_manifest_path: Path | None,
 ) -> None:
     manifest_rows: list[dict[str, str]] = []
     split_keys: dict[str, list[str]] = {split: [] for split in SPLITS}
@@ -353,6 +498,10 @@ def write_package(
     metadata_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(mapping_path, metadata_root / "label_mapping.json")
     shutil.copy2(splits_path, metadata_root / "split_sequences.json")
+    if upload_manifest_path is not None:
+        shutil.copy2(
+            upload_manifest_path, metadata_root / "source_upload_manifest.json"
+        )
     summary = {
         "format_version": 1,
         "dataset": "adom_data_semantic20_partial_v1",
@@ -361,11 +510,43 @@ def write_package(
         "reduce_zero_label": False,
         "samples": len(samples),
         "split_counts": split_counts,
-        "pixel_counts_by_target_id": {
-            str(target_id): distribution[target_id]
-            for target_id in sorted(distribution)
+        "pixel_counts_by_target_id": _counter_payload(
+            preflight_result.distribution
+        ),
+        "pixel_counts_by_split": {
+            split: _counter_payload(preflight_result.distribution_by_split[split])
+            for split in SPLITS
         },
-        "all_ignore_masks": all_ignore_masks,
+        "pixel_counts_by_sequence": {
+            sequence: _counter_payload(distribution)
+            for sequence, distribution in sorted(
+                preflight_result.distribution_by_sequence.items()
+            )
+        },
+        "image_presence_by_split": {
+            split: _counter_payload(preflight_result.image_presence_by_split[split])
+            for split in SPLITS
+        },
+        "image_presence_by_sequence": {
+            sequence: _counter_payload(presence)
+            for sequence, presence in sorted(
+                preflight_result.image_presence_by_sequence.items()
+            )
+        },
+        "non_ignore_pixels_by_split": {
+            split: preflight_result.non_ignore_pixels_by_split[split]
+            for split in SPLITS
+        },
+        "non_ignore_pixels_by_sequence": dict(
+            sorted(preflight_result.non_ignore_pixels_by_sequence.items())
+        ),
+        "all_ignore_masks": sum(
+            len(values) for values in preflight_result.all_ignore_by_split.values()
+        ),
+        "all_ignore_by_split": {
+            split: preflight_result.all_ignore_by_split[split] for split in SPLITS
+        },
+        "upload_manifest_sha256": upload_manifest_sha256,
         "path_policy": "All manifest paths are relative to the package root.",
     }
     (metadata_root / "conversion_summary.json").write_text(
@@ -389,13 +570,20 @@ def main() -> int:
         mapping, ignore_index = load_mapping(mapping_path)
         assignments = load_split_assignments(splits_path)
         samples = discover_samples(input_root, assignments)
-        distribution, all_ignore_masks = preflight(samples, mapping, ignore_index)
+        upload_manifest_sha256 = None
+        if not args.skip_upload_manifest_check:
+            upload_manifest_sha256 = verify_upload_manifest(input_root, samples)
+            print(f"Upload manifest SHA-256: {upload_manifest_sha256}")
+        preflight_result = preflight(samples, mapping, ignore_index)
         split_counts = Counter(sample.split for sample in samples)
         print(f"Samples: {len(samples)}")
         for split in SPLITS:
             print(f"{split}: {split_counts[split]}")
-        print(f"Observed target IDs: {sorted(distribution)}")
-        print(f"All-ignore masks: {all_ignore_masks}")
+        print(f"Observed target IDs: {sorted(preflight_result.distribution)}")
+        print(
+            "All-ignore masks: "
+            f"{sum(len(values) for values in preflight_result.all_ignore_by_split.values())}"
+        )
         if args.dry_run:
             print("DRY RUN: no files were created or modified")
             return 0
@@ -406,8 +594,9 @@ def main() -> int:
             ignore_index,
             mapping_path,
             splits_path,
-            distribution,
-            all_ignore_masks,
+            preflight_result,
+            upload_manifest_sha256,
+            input_root / "manifest.json" if upload_manifest_sha256 else None,
         )
         print(f"Output: {output_root}")
         print("✅ ADOM SEMANTIC20 PACKAGE CREATED")

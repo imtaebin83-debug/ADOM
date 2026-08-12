@@ -27,7 +27,7 @@ rule_planner:
     corridor_half_width_m: 0.18
     unknown_cost: 70.0
     lethal_cost: 90
-    stop_distance_m: 0.30
+    stop_distance_m: 0.60
 
     # Below the hardware control ceiling of 0.30 m/s.
     max_speed_mps: 0.25

@@ -18,6 +18,7 @@ class CostmapConfig:
     class_costs: tuple[int, ...] = (0, 15, 60, 100)
     geometric_obstacle_min_height_m: float = 0.10
     inflation_radius_m: float = 0.25
+    inflation_seed_cost: int = 90
     inflation_min_cost: int = 60
 
     @property
@@ -102,7 +103,10 @@ def _inflate(grid: np.ndarray, config: CostmapConfig) -> np.ndarray:
     radius = int(np.ceil(config.inflation_radius_m / config.resolution_m))
     if radius <= 0:
         return grid
-    danger = grid >= config.inflation_min_cost
+    # Only cells that are already lethal seed inflation.  Lower semantic costs
+    # remain useful for scoring and slowing without being promoted to a hard
+    # stop merely because inflation is enabled.
+    danger = grid >= config.inflation_seed_cost
     if not np.any(danger):
         return grid
     inflated = grid.copy()

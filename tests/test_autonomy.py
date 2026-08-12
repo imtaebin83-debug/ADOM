@@ -69,6 +69,21 @@ class SemanticCostmapTests(unittest.TestCase):
         self.assertEqual(int(grid[row, column]), 100)
         self.assertGreaterEqual(int(grid[row + 1, column]), 60)
 
+    def test_inflation_does_not_promote_nonlethal_semantic_cost(self):
+        config = CostmapConfig(
+            class_costs=(0, 85, 100),
+            inflation_radius_m=0.20,
+            resolution_m=0.10,
+            inflation_seed_cost=90,
+        )
+        grid = build_costmap(
+            np.asarray([[1.0, 0.0, 0.0]]), np.asarray([1], dtype=np.uint8), config
+        )
+        row = int(config.width_m / 2.0 / config.resolution_m)
+        column = int(1.0 / config.resolution_m)
+        self.assertEqual(int(grid[row, column]), 85)
+        self.assertEqual(int(grid[row + 1, column]), -1)
+
     def test_vertical_geometry_is_lethal_even_if_semantically_traversable(self):
         config = CostmapConfig(inflation_radius_m=0.0)
         grid = build_costmap(

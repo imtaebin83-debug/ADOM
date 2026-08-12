@@ -56,6 +56,7 @@ class SemanticCostmapNode(Node):
             "class_costs": [0, 15, 60, 100],
             "geometric_obstacle_min_height_m": 0.10,
             "inflation_radius_m": 0.25,
+            "inflation_seed_cost": 90,
             "inflation_min_cost": 60,
             "depth_queue_size": 15,
             "max_sync_error_sec": 0.35,
@@ -79,6 +80,13 @@ class SemanticCostmapNode(Node):
             raise ValueError(
                 f"class_costs must contain {expected_classes} values in [0,100]"
             )
+        inflation_seed_cost = int(self.p["inflation_seed_cost"])
+        inflation_min_cost = int(self.p["inflation_min_cost"])
+        if not 0 <= inflation_min_cost <= inflation_seed_cost <= 100:
+            raise ValueError(
+                "inflation costs must satisfy "
+                "0 <= inflation_min_cost <= inflation_seed_cost <= 100"
+            )
         self._ontology = ontology
         self._config = CostmapConfig(
             resolution_m=float(self.p["resolution_m"]),
@@ -94,7 +102,8 @@ class SemanticCostmapNode(Node):
                 self.p["geometric_obstacle_min_height_m"]
             ),
             inflation_radius_m=float(self.p["inflation_radius_m"]),
-            inflation_min_cost=int(self.p["inflation_min_cost"]),
+            inflation_seed_cost=inflation_seed_cost,
+            inflation_min_cost=inflation_min_cost,
         )
         self._bridge = CvBridge()
         self._camera_info: CameraInfo | None = None

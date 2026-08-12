@@ -4,6 +4,10 @@ Segmentation mask, registered depth, camera intrinsics와 TF를 결합해 로봇
 `OccupancyGrid`를 발행한다. Cost4의 위험도가 높은 관측이 같은 cell에서 항상 우선하며,
 차량 폭을 위한 inflation을 적용한다.
 
+`inflation_seed_cost` 이상인 이미 lethal한 cell만 inflation을 시작한다. 주변 ring은
+`inflation_min_cost` 이상의 감속 비용으로 유지하므로, 그 사이의 semantic cost가
+inflation 활성화만으로 hard-stop cost 100으로 승격되지는 않는다.
+
 ```text
 /adom/navigation/semantic_costmap  nav_msgs/OccupancyGrid
 /adom/navigation/costmap_status    std_msgs/String (JSON)

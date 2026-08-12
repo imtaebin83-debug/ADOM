@@ -25,6 +25,9 @@ semantic_costmap:
     class_costs: [20, 30, 100, 100, 100, 100, 100, 100, 0, 100, 100, 100, 100, 75, 10, 100, 75, 85, 95]
     geometric_obstacle_min_height_m: 0.10
     inflation_radius_m: 0.25
+    # Only already-lethal cells seed inflation. Costs 60..89 remain slowdown
+    # evidence instead of being promoted to a hard stop.
+    inflation_seed_cost: 90
     inflation_min_cost: 60
     depth_queue_size: 15
     max_sync_error_sec: 0.10

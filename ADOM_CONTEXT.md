@@ -590,6 +590,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: 정상 처리 지연은 대체로 기준 이내였지만 Jetson에서 간헐적인 0.4초 초과
   costmap이 관측돼 현장 진단을 위해 허용 범위를 늘린다. 수신 갱신 watchdog과
   actuator command timeout은 유지하며, 실차 검증 후 더 짧은 값으로 되돌릴 수 있다.
+- **[2026-08-12] semantic costmap inflation seed를 lethal cost 90 이상으로 분리**
+  이유: 감속용 cost 60~89가 inflation 활성화만으로 cost 100 hard stop으로 승격되는
+  동작을 제거한다. 원래 lethal cell과 geometric obstacle은 계속 정지 seed이며,
+  주변 inflation ring은 감속·회피 비용으로 유지한다. 상세 근거는 decision record
+  0013을 따른다.
 
 ## 17. Primary References
 

@@ -22,6 +22,7 @@ semantic_costmap:
     # Preserve geometric collision safety even when a vertical object is misclassified.
     geometric_obstacle_min_height_m: 0.10
     inflation_radius_m: 0.25
+    inflation_seed_cost: 90
     inflation_min_cost: 60
     depth_queue_size: 15
     max_sync_error_sec: 0.35

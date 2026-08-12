@@ -82,6 +82,7 @@ class RulePlannerNode(Node):
         self._source_stamp_ns: int | None = None
         self._source_stamp = None
         self._source_action_reported = False
+        self._last_logged_state: tuple[str, str | None] | None = None
         self._action_latencies_ms: deque[float] = deque(
             maxlen=max(1, int(self.p["action_latency_window"]))
         )
@@ -165,12 +166,42 @@ class RulePlannerNode(Node):
         self._latency_pub.publish(message)
 
     def _publish_stop(self, reason: str) -> None:
+        self._log_state_transition("stopped", reason=reason)
         if bool(self.p["publish_cmd_vel"]):
             self._cmd_pub.publish(Twist())
         self._publish_path(np.empty((0, 2), dtype=np.float64))
         status = String()
         status.data = json.dumps({"state": "stopped", "reason": reason}, sort_keys=True)
         self._status_pub.publish(status)
+
+    def _log_state_transition(
+        self,
+        state: str,
+        *,
+        reason: str | None = None,
+        clearance_m: float | None = None,
+        path_points: int | None = None,
+        speed_mps: float | None = None,
+    ) -> None:
+        key = (state, reason)
+        if key == self._last_logged_state:
+            return
+        self._last_logged_state = key
+        details = []
+        if reason is not None:
+            details.append(f"reason={reason}")
+        if clearance_m is not None:
+            details.append(f"clearance={clearance_m:.3f}m")
+        if path_points is not None:
+            details.append(f"path_points={path_points}")
+        if speed_mps is not None:
+            details.append(f"speed={speed_mps:.3f}m/s")
+        suffix = f" ({', '.join(details)})" if details else ""
+        message = f"Planner state: {state.upper()}{suffix}"
+        if state in ("stopped", "blocked"):
+            self.get_logger().warning(message)
+        else:
+            self.get_logger().info(message)
 
     def _publish_path(self, path_xy: np.ndarray) -> None:
         message = Path()
@@ -254,10 +285,17 @@ class RulePlannerNode(Node):
         if bool(self.p["publish_cmd_vel"]):
             self._publish_action_latency("blocked" if plan.blocked else "driving")
         self._publish_marker(plan.path_xy, plan.blocked)
+        state = "blocked" if plan.blocked else "driving"
+        self._log_state_transition(
+            state,
+            clearance_m=plan.clearance_m,
+            path_points=len(plan.path_xy),
+            speed_mps=plan.speed_mps,
+        )
         status = String()
         status.data = json.dumps(
             {
-                "state": "blocked" if plan.blocked else "driving",
+                "state": state,
                 "speed_mps": round(plan.speed_mps, 3),
                 "steering_deg": round(math.degrees(plan.steering_rad), 2),
                 "steering_sequence_deg": [

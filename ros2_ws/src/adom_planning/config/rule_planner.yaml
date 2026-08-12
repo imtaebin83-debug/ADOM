@@ -5,6 +5,7 @@ rule_planner:
     # The local path controller owns /cmd_vel. Enable only for planner-only tests.
     publish_cmd_vel: false
     local_path_topic: /adom/navigation/local_path
+    planned_speed_topic: /adom/navigation/planned_speed
     path_marker_topic: /adom/navigation/rule_path
     status_topic: /adom/navigation/rule_status
     # First /cmd_vel causally produced from each camera-stamped costmap.
@@ -29,9 +30,11 @@ rule_planner:
     lethal_cost: 90
     stop_distance_m: 0.30
 
-    # Below the hardware control ceiling of 0.30 m/s.
+    # Current planner command profile; downstream control maps 2000 us to 12.0 m/s.
     max_speed_mps: 3.0
     min_speed_mps: 0.25
+    # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
+    downstream_max_speed_mps: 12.0
     steering_penalty: 8.0
     # Depth-projected obstacle distance weighting.
     distance_decay_m: 1.25

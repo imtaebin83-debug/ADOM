@@ -1,6 +1,8 @@
 """Deterministic traversability costmap and rule-planning logic."""
 
+from .actuation import speed_to_pwm_us
 from .costmap import CostmapConfig, build_costmap
+from .imu_speed import ImuSpeedEstimate, ImuSpeedEstimator, ImuSpeedEstimatorConfig
 from .path_control import (
     PathControlCommand,
     PathControlConfig,
@@ -14,6 +16,9 @@ from .rule_planner import PlannerConfig, RulePlan, plan_corridor
 
 __all__ = [
     "CostmapConfig",
+    "ImuSpeedEstimate",
+    "ImuSpeedEstimator",
+    "ImuSpeedEstimatorConfig",
     "PlannerConfig",
     "PathControlCommand",
     "PathControlConfig",
@@ -25,4 +30,5 @@ __all__ = [
     "local_gps_xy_m",
     "plan_corridor",
     "select_lookahead_point",
+    "speed_to_pwm_us",
 ]

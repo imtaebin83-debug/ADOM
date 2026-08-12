@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 import numpy as np
@@ -74,7 +75,7 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         self.assertNotIn("bridge_mapping_path", cost4_params)
         self.assertEqual(semantic20_params["target_fps"], 30.0)
 
-    def test_live_autonomy_bag_keeps_mask_but_drops_diagnostic_images(self):
+    def test_live_autonomy_bag_is_numeric_status_only(self):
         config = yaml.safe_load(
             (
                 ROOT
@@ -88,7 +89,32 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         topic_regex = config["autonomy_data_recorder"]["ros__parameters"][
             "topic_regex"
         ]
-        self.assertIn("semantic20_mask", topic_regex)
+        matcher = re.compile(topic_regex)
+        for required_topic in (
+            "/adom/perception/status",
+            "/adom/navigation/rule_status",
+            "/adom/navigation/planned_speed",
+            "/adom/control/local_path_status",
+            "/adom/control/mode",
+            "/adom/control/pwm_us",
+            "/cmd_vel",
+            "/drive/autonomous",
+            "/drive",
+            "/emergency_stop",
+            "/fix",
+        ):
+            self.assertIsNotNone(matcher.fullmatch(required_topic))
+        for high_load_topic in (
+            "/adom/perception/semantic20_mask",
+            "/adom/navigation/semantic_costmap",
+            "/adom/navigation/local_path",
+            "/adom/navigation/rule_path",
+            "/adom/logging/gps_path",
+            "/zed/zed_node/imu/data",
+            "/tf",
+            "/tf_static",
+        ):
+            self.assertIsNone(matcher.fullmatch(high_load_topic))
         self.assertNotIn("confidence", topic_regex)
         self.assertNotIn("overlay", topic_regex)
 

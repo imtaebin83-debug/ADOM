@@ -35,9 +35,12 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0008b](0008-semantic20-perception-foundation.md) | Semantic20 autonomous perception foundation | Accepted | ontology별 runtime topic 분리 |
 | [0009](0009-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Superseded in part | 방향 선택/control은 0010 우선 |
 | [0010](0010-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Accepted | 현재 local planning/control/logging 계약 |
-| [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Accepted | confidence/overlay 제외, mask 판단 근거 유지 |
+| [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Superseded in part | 0016이 live bag topic 범위를 더 축소 |
 | [0012](0012-planner-source-age-tolerance.md) | Planner source-age tolerance | Accepted | camera source age 폐기 기준 0.80초 |
 | [0013](0013-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
+| [0014](0014-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; 6 m/s mapping은 0015가 대체 |
+| [0015](0015-imu-aided-12mps-pwm-calibration.md) | IMU-aided nominal 12 m/s PWM calibration | Accepted | 1500..2000 us = 0..12 m/s, IMU bias/ZUPT/P-feedback |
+| [0016](0016-lightweight-autonomy-evidence-bag.md) | Lightweight autonomy evidence bag | Accepted | t2는 수치·상태·raw GPS만 기록; rec는 RGB 전용 유지 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

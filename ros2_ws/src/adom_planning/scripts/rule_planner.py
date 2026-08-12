@@ -10,7 +10,7 @@ from nav_msgs.msg import OccupancyGrid, Path
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import Float32, String
 from visualization_msgs.msg import Marker
 
 from adom.autonomy import CostmapConfig, PlannerConfig, plan_corridor
@@ -24,6 +24,7 @@ class RulePlannerNode(Node):
             "cmd_vel_topic": "/cmd_vel",
             "publish_cmd_vel": False,
             "local_path_topic": "/adom/navigation/local_path",
+            "planned_speed_topic": "/adom/navigation/planned_speed",
             "path_marker_topic": "/adom/navigation/rule_path",
             "status_topic": "/adom/navigation/rule_status",
             "action_latency_topic": "/adom/navigation/action_latency",
@@ -42,8 +43,9 @@ class RulePlannerNode(Node):
             "unknown_cost": 70.0,
             "lethal_cost": 90,
             "stop_distance_m": 0.75,
-            "max_speed_mps": 0.25,
-            "min_speed_mps": 0.08,
+            "max_speed_mps": 3.0,
+            "min_speed_mps": 0.25,
+            "downstream_max_speed_mps": 12.0,
             "steering_penalty": 8.0,
             "distance_decay_m": 1.25,
             "clearance_penalty": 35.0,
@@ -52,9 +54,15 @@ class RulePlannerNode(Node):
         for name, value in defaults.items():
             self.declare_parameter(name, value)
         self.p = {name: self.get_parameter(name).value for name in defaults}
-        if float(self.p["max_speed_mps"]) > 0.30:
+        if float(self.p["max_speed_mps"]) <= 0.0:
+            raise ValueError("rule planner max_speed_mps must be positive")
+        if float(self.p["min_speed_mps"]) > float(self.p["max_speed_mps"]):
+            raise ValueError("rule planner min_speed_mps must not exceed max_speed_mps")
+        if float(self.p["max_speed_mps"]) > float(
+            self.p["downstream_max_speed_mps"]
+        ):
             raise ValueError(
-                "rule planner max_speed_mps must not exceed ADOM's 0.30 m/s limit"
+                "rule planner max_speed_mps must not exceed the downstream control limit"
             )
         self._planner = PlannerConfig(
             wheelbase_m=float(self.p["wheelbase_m"]),
@@ -89,6 +97,9 @@ class RulePlannerNode(Node):
         self._cmd_pub = self.create_publisher(Twist, str(self.p["cmd_vel_topic"]), 10)
         self._path_pub = self.create_publisher(
             Path, str(self.p["local_path_topic"]), 1
+        )
+        self._speed_pub = self.create_publisher(
+            Float32, str(self.p["planned_speed_topic"]), 10
         )
         self._marker_pub = self.create_publisher(
             Marker, str(self.p["path_marker_topic"]), 10
@@ -169,6 +180,7 @@ class RulePlannerNode(Node):
         self._log_state_transition("stopped", reason=reason)
         if bool(self.p["publish_cmd_vel"]):
             self._cmd_pub.publish(Twist())
+        self._speed_pub.publish(Float32(data=0.0))
         self._publish_path(np.empty((0, 2), dtype=np.float64))
         status = String()
         status.data = json.dumps({"state": "stopped", "reason": reason}, sort_keys=True)
@@ -281,6 +293,7 @@ class RulePlannerNode(Node):
         )
         if bool(self.p["publish_cmd_vel"]):
             self._cmd_pub.publish(command)
+        self._speed_pub.publish(Float32(data=float(plan.speed_mps)))
         self._publish_path(plan.path_xy)
         if bool(self.p["publish_cmd_vel"]):
             self._publish_action_latency("blocked" if plan.blocked else "driving")

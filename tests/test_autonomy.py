@@ -1,10 +1,14 @@
 import math
+from pathlib import Path
 import unittest
 
 import numpy as np
+import yaml
 
 from adom.autonomy import (
     CostmapConfig,
+    ImuSpeedEstimator,
+    ImuSpeedEstimatorConfig,
     PathControlConfig,
     PlannerConfig,
     build_costmap,
@@ -12,6 +16,7 @@ from adom.autonomy import (
     gps_speed_mps,
     local_gps_xy_m,
     plan_corridor,
+    speed_to_pwm_us,
 )
 from adom.autonomy.costmap import project_mask_depth
 from adom.perception import COST4_PALETTE_BGR, colorize_mask
@@ -190,6 +195,100 @@ class RulePlannerTests(unittest.TestCase):
 
 
 class LocalPathControlTests(unittest.TestCase):
+    def test_ros_speed_limits_are_consistent_across_pipeline(self):
+        root = Path(__file__).resolve().parents[1]
+        planner = yaml.safe_load(
+            (root / "ros2_ws/src/adom_planning/config/rule_planner.yaml").read_text()
+        )["rule_planner"]["ros__parameters"]
+        local = yaml.safe_load(
+            (root / "ros2_ws/src/adom_control/config/local_path_control.yaml").read_text()
+        )["local_path_control"]["ros__parameters"]
+        vehicle = yaml.safe_load(
+            (root / "ros2_ws/src/adom_control/config/vehicle.yaml").read_text()
+        )
+        pca = vehicle["pca9685_control"]["ros__parameters"]
+        gamepad = vehicle["gamepad_control"]["ros__parameters"]
+
+        self.assertEqual(planner["min_speed_mps"], 0.25)
+        self.assertEqual(planner["max_speed_mps"], 3.0)
+        self.assertEqual(local["min_speed_mps"], planner["min_speed_mps"])
+        self.assertEqual(local["max_speed_mps"], planner["max_speed_mps"])
+        self.assertEqual(
+            planner["downstream_max_speed_mps"], gamepad["max_forward_speed_mps"]
+        )
+        self.assertEqual(
+            local["downstream_max_speed_mps"], pca["max_speed_mps"]
+        )
+        self.assertEqual(pca["max_speed_mps"], 12.0)
+        self.assertEqual(pca["esc_neutral_us"], 1500.0)
+        self.assertEqual(pca["esc_forward_max_us"], 2000.0)
+
+    def test_nominal_forward_speed_maps_linearly_to_pwm(self):
+        def pulse(speed_mps):
+            return speed_to_pwm_us(
+                speed_mps,
+                max_forward_speed_mps=12.0,
+                max_reverse_speed_mps=3.0,
+                neutral_us=1500.0,
+                forward_max_us=2000.0,
+                reverse_max_us=1000.0,
+            )
+
+        self.assertEqual(pulse(0.0), 1500.0)
+        self.assertAlmostEqual(pulse(0.25), 1510.4166667)
+        self.assertEqual(pulse(3.0), 1625.0)
+        self.assertEqual(pulse(12.0), 2000.0)
+
+    def test_planner_speed_profile_is_preserved(self):
+        command = control_local_path(
+            np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
+            0.0,
+            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.25, speed_kp=0.0),
+            planned_speed_mps=2.4,
+        )
+        self.assertAlmostEqual(command.speed_mps, 2.4)
+
+    def test_planner_stop_overrides_nonempty_path(self):
+        command = control_local_path(
+            np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
+            0.0,
+            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.25, speed_kp=0.0),
+            planned_speed_mps=0.0,
+        )
+        self.assertEqual(command.speed_mps, 0.0)
+
+    def test_imu_stationary_updates_learn_bias_and_zero_velocity(self):
+        estimator = ImuSpeedEstimator(
+            ImuSpeedEstimatorConfig(bias_learning_rate=0.5)
+        )
+        first = estimator.update(0.2, 0, stationary=True)
+        second = estimator.update(0.2, 10_000_000, stationary=True)
+        self.assertTrue(first.stationary_update)
+        self.assertAlmostEqual(first.bias_mps2, 0.2)
+        self.assertAlmostEqual(second.bias_mps2, 0.2)
+        self.assertEqual(second.speed_mps, 0.0)
+
+    def test_imu_integrates_bias_corrected_acceleration_while_driving(self):
+        estimator = ImuSpeedEstimator(
+            ImuSpeedEstimatorConfig(
+                initial_bias_mps2=0.2,
+                velocity_leak_per_sec=0.0,
+            )
+        )
+        estimator.update(0.2, 0, stationary=True)
+        estimate = estimator.update(1.2, 100_000_000, stationary=False)
+        self.assertAlmostEqual(estimate.corrected_accel_mps2, 1.0)
+        self.assertAlmostEqual(estimate.speed_mps, 0.1)
+
+    def test_imu_feedback_reduces_command_when_estimate_is_above_target(self):
+        command = control_local_path(
+            np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
+            2.0,
+            PathControlConfig(max_speed_mps=3.0, speed_kp=0.15),
+            planned_speed_mps=1.5,
+        )
+        self.assertAlmostEqual(command.speed_mps, 1.425)
+
     def test_short_safe_path_commands_stop(self):
         command = control_local_path(
             np.asarray([[0.2, 0.0], [0.4, 0.0]]),

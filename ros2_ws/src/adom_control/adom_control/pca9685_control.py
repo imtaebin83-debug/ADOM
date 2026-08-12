@@ -8,6 +8,8 @@ from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from std_msgs.msg import Bool, Float64MultiArray
 
+from adom.autonomy import speed_to_pwm_us
+
 
 def clamp(value, lower, upper):
     return max(lower, min(upper, value))
@@ -18,8 +20,8 @@ class Pca9685Control(Node):
         super().__init__("pca9685_control")
         defaults = {
             "wheelbase_m": 0.33,
-            "max_speed_mps": 0.3,
-            "max_reverse_speed_mps": 0.0,
+            "max_speed_mps": 12.0,
+            "max_reverse_speed_mps": 3.0,
             "max_steering_angle_deg": 25.7831,
             "command_rate_hz": 50.0,
             "command_timeout_sec": 0.25,
@@ -32,8 +34,8 @@ class Pca9685Control(Node):
             "esc_channel": 0,
             "steering_channel": 1,
             "esc_neutral_us": 1500.0,
-            "esc_forward_max_us": 1600.0,
-            "esc_reverse_max_us": 1400.0,
+            "esc_forward_max_us": 2000.0,
+            "esc_reverse_max_us": 1000.0,
             "steering_center_us": 1500.0,
             "steering_left_us": 1300.0,
             "steering_right_us": 1700.0,
@@ -132,12 +134,14 @@ class Pca9685Control(Node):
         self._write(self._speed_to_pwm(linear), self._steering_to_pwm(steering))
 
     def _speed_to_pwm(self, speed):
-        neutral = float(self.p["esc_neutral_us"])
-        if speed >= 0.0:
-            ratio = speed / max(float(self.p["max_speed_mps"]), 1e-6)
-            return neutral + ratio * (float(self.p["esc_forward_max_us"]) - neutral)
-        ratio = abs(speed) / max(float(self.p["max_reverse_speed_mps"]), 1e-6)
-        return neutral + ratio * (float(self.p["esc_reverse_max_us"]) - neutral)
+        return speed_to_pwm_us(
+            speed,
+            max_forward_speed_mps=float(self.p["max_speed_mps"]),
+            max_reverse_speed_mps=float(self.p["max_reverse_speed_mps"]),
+            neutral_us=float(self.p["esc_neutral_us"]),
+            forward_max_us=float(self.p["esc_forward_max_us"]),
+            reverse_max_us=float(self.p["esc_reverse_max_us"]),
+        )
 
     def _steering_to_pwm(self, angle_deg):
         center = float(self.p["steering_center_us"])

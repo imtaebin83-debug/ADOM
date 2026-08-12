@@ -2,7 +2,7 @@ pca9685_control:
   ros__parameters:
     wheelbase_m: 0.33
     # Nominal open-loop command range; this is not measured vehicle speed.
-    max_speed_mps: 6.0
+    max_speed_mps: 12.0
     # Disabled until the XL-5 brake/reverse sequence is tested on this vehicle.
     max_reverse_speed_mps: 3.0
     # User-facing angle settings use degrees; ROS messages remain in radians.
@@ -54,7 +54,7 @@ gamepad_control:
     throttle_axis_scale: 1.0
     stick_deadzone: 0.10
 
-    max_forward_speed_mps: 6.0
+    max_forward_speed_mps: 12.0
     max_reverse_speed_mps: 3.0
     max_steering_angle_deg: 24.0
     wheelbase_m: 0.33

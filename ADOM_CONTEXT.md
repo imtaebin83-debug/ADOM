@@ -49,12 +49,12 @@ Ackermann 가능한 좌/직진/우 방향을 다단계로 전개하고 매 cycle
 직진과 근거리 장애물 회피를 수행한다. GPS는 localization, planning, control 입력으로
 사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
 
-자율주행 세션은 perception 판단, semantic costmap, 선택 path/tree 상태, `/cmd_vel`,
-`/drive`, PWM 상태, IMU, raw GPS fix와 logging-only GPS trail을 bounded rosbag으로
-기록한다. Semantic20 mask는 판단 재현을 위해 포함하지만 고대역폭 confidence와 BGR
-overlay는 live autonomy bag에서 제외한다. 기존 RGB-only 학습 데이터 수집 bag과
-autonomy evidence bag은 목적과 저장 경로를 분리한다. 상세 계약은 decision records
-0010과 0011을 따른다.
+자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
+`/drive`, PWM, E-stop과 raw GPS fix를 경량 bounded rosbag으로 기록한다. 카메라,
+Semantic20 mask/confidence/overlay, semantic costmap grid, path, 고주기 IMU, TF와 누적
+GPS trail은 live autonomy bag에서 제외한다. GPS 경로는 raw fix 시계열로 재구성한다.
+기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
+분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016을 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -138,7 +138,7 @@ held-out test를 이 문서와 새 decision record에 함께 기록한다. 그 �
 
 | 항목 | 초기값 | 규칙 |
 | --- | ---: | --- |
-| 최대 자율 속도 | 0.30 m/s | 실제 속도는 open-loop이므로 저속 실측 필요 |
+| planner command profile | 0.25..3.0 m/s | nominal control ceiling 12.0 m/s = 2000 us; 실제 속도는 지상 주행 전 실측 필요 |
 | target | 미동결 | Semantic20 IDs 0..18 전체를 먼저 검토 |
 | ROI | 하단 중앙 trapezoid 후보 | padding 제외 source-image 좌표로 카메라 장착 후 고정 |
 | target area ratio | 미동결 | 선택 class validation에서 조정 |
@@ -176,6 +176,7 @@ control node에서 담당자가 검증하기 전까지 확정값으로 간주하
 | semantic mask | `/adom/perception/semantic_mask` | `sensor_msgs/Image` (`mono8`) | 가형 | 제안 |
 | target area ratio | `/adom/perception/target_area_ratio` | `std_msgs/Float32` | 가형 | 제안 |
 | target detected | `/adom/perception/target_detected` | `std_msgs/Bool` | 가형·명섭 | 제안 |
+| planner speed profile | `/adom/navigation/planned_speed` | `std_msgs/Float32` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
 | autonomous command | `/drive/autonomous` | `ackermann_msgs/AckermannDriveStamped` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
 | final actuator command | `/drive` | `ackermann_msgs/AckermannDriveStamped` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
 | emergency stop | `/emergency_stop` | `std_msgs/Bool` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
@@ -586,6 +587,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: Jetson 실측에서 recorder 실행 시 camera→perception 지연이 약 58 ms 증가했다.
   판단 재현에 필요한 Semantic20 mask와 상태·costmap·path·command·GPS는 유지하고,
   미구독 진단 영상의 후처리와 DDS/disk 부하를 제거한다.
+- **[2026-08-12] t2 autonomy bag을 수치·상태 evidence로 경량화**
+  이유: recorder가 mask, costmap, path, IMU, TF를 추가 구독하면 t5와 같은 Jetson에서
+  직렬화·복사·disk I/O가 늘어 timeout 위험이 생긴다. 회피와 속도 분석에는 작은
+  status/command 토픽을 사용하고 GPS 경로는 raw `/fix` 시계열로 보존한다. RGB 학습
+  데이터용 `rec`는 변경하지 않는다. 상세 근거는 decision record 0016을 따른다.
 - **[2026-08-12] planner의 camera source age 폐기 기준을 0.40초에서 0.80초로 완화**
   이유: 정상 처리 지연은 대체로 기준 이내였지만 Jetson에서 간헐적인 0.4초 초과
   costmap이 관측돼 현장 진단을 위해 허용 범위를 늘린다. 수신 갱신 watchdog과
@@ -595,6 +601,18 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   동작을 제거한다. 원래 lethal cell과 geometric obstacle은 계속 정지 seed이며,
   주변 inflation ring은 감속·회피 비용으로 유지한다. 상세 근거는 decision record
   0013을 따른다.
+- **[2026-08-12] planner 속도 profile을 local control까지 보존**
+  이유: planner가 계산한 0.25..3.0 m/s가 geometry-only Path 경계에서 유실되어 local
+  controller의 0.25 m/s로 대체되고 있었다. `/adom/navigation/planned_speed`를 추가해
+  speed freshness watchdog과 함께 `/cmd_vel`로 전달하고, 이후에는 기존 gamepad/PCA9685
+  당시 6.0 m/s control ceiling과 PWM 파라미터를 적용했다. 상세 근거는 decision record 0014를
+  따른다.
+- **[2026-08-12] 2000 us를 nominal 12 m/s로 재정의하고 IMU 단기 보정을 활성화**
+  이유: control calibration 요청에 따라 forward PWM 1500..2000 us를 0..12 m/s로 선형
+  대응한다. Planner의 0.25..3.0 m/s profile은 유지한다. 최종 `/drive`가 0으로 0.5초
+  유지될 때 IMU x축 bias와 zero velocity를 온라인 갱신하고, 주행 중 bias 보정 가속도 적분값으로 제한된 P
+  feedback을 적용한다. IMU만으로 등속 절대 속도는 관측할 수 없으므로 12 m/s는 실측값이
+  아닌 nominal mapping이다. 상세 근거는 decision record 0015를 따른다.
 
 ## 17. Primary References
 

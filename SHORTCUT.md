@@ -24,7 +24,7 @@ source ~/.bashrc
 | `up` | 없음 | 로컬 변경 삭제 후 `origin/jetson` 갱신 | 실행 전 주의 |
 | `t0` | `adom_sensors` | ZED 2i 및 GNSS 센서 | `Ctrl-C` |
 | `t1` | `adom_description` | 차량 URDF와 TF | `Ctrl-C` |
-| `t2` | `adom_logging` 및 의존 패키지 | GPS trail과 autonomy rosbag 자동 기록 | `Ctrl-C` |
+| `t2` | `adom_logging` 및 의존 패키지 | GPS·모드·회피·속도 경량 rosbag 자동 기록 | `Ctrl-C` |
 | `t3` | `adom_control` | 게임패드, safety mux와 PCA9685 실출력 제어 | `Ctrl-C` |
 | `t4` | `adom_perception_ros` | Semantic20 CUDA perception | `Ctrl-C` |
 | `t5` | `adom_costmap_ros`, `adom_planning`, `adom_control` | Semantic20 costmap, direction-tree planner, controller | `Ctrl-C` |
@@ -39,7 +39,7 @@ source ~/.bashrc
 ```text
 t0  ZED RGB/depth/IMU + GNSS /fix
 t1  vehicle description + camera/base_link TF
-t2  GPS trail + autonomy rosbag recorder
+t2  GPS + autonomy numeric/status rosbag recorder
 t3  gamepad safety mux + PCA9685
 t4  Semantic20 perception
 t5  semantic costmap + 3-depth direction tree + local controller
@@ -257,7 +257,7 @@ ros2 launch adom_description description.launch.py
 
 차량 URDF를 읽고 `robot_state_publisher`를 실행한다.
 
-## `t2` — GPS trail과 autonomy rosbag
+## `t2` — GPS와 경량 autonomy rosbag
 
 ```bash
 t2
@@ -285,10 +285,16 @@ launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 �
 ~/ADOM/data/autonomy_bags/autonomy_<timestamp>/rosbag/
 ```
 
-기록 대상은 perception mask/status, semantic costmap, local path와 선택 tree,
-`/cmd_vel`, `/drive`, control/PWM/E-stop, IMU, raw `/fix`, GPS trail과 TF다. confidence와
-BGR overlay는 live 성능을 위해 제외한다. 이 bag은 기존 RGB 학습 데이터용
-`data/captures`와 분리된다.
+기록 대상은 perception/costmap 상태, 선택 tree의 상태·조향 시퀀스·속도·clearance,
+controller의 명령/추정 속도와 watchdog 상태, control mode, `/cmd_vel`,
+`/drive/autonomous`, 최종 `/drive`, PWM, E-stop, raw `/fix`와 GPS 품질 상태다.
+
+카메라와 Semantic20 mask/confidence/overlay, semantic costmap grid, local/rule path,
+고주기 IMU, TF 및 누적 `/adom/logging/gps_path`는 기록하지 않는다. 특히 mask, costmap,
+path를 rosbag이 추가 구독하지 않으므로 t5의 대용량 메시지 직렬화·복사·disk I/O를
+늘리지 않는다. GPS 이동경로는 작은 raw `/fix` 시계열로 보존하고 사후 재구성한다.
+이 bag은 기존 RGB 학습 데이터용 `rec`의 `data/captures`와 분리되며, `rec`의 동작과
+토픽 구성은 바뀌지 않는다.
 
 ## `t3` — 게임패드와 PCA9685 제어
 
@@ -394,6 +400,26 @@ planner는 기본적으로 `[-20, -10, 0, 10, 20]°` 방향을 3단계 전개한
 확인할 수 있으며, 매 cycle 첫 방향만 실행하고 최신 costmap에서 다시 계획한다.
 
 `adom_control` 코드를 수정한 경우 `t3`와 `t5`를 모두 종료한 뒤 순서대로 다시 실행한다.
+
+속도 프로파일은 planner의 `/adom/navigation/planned_speed`에서 시작해
+`/cmd_vel.linear.x` → `/drive.drive.speed` → `/adom/control/pwm_us`의 첫 값(ESC CH0)으로
+흐른다. 아래 명령으로 각 경계를 비교한다.
+
+```bash
+ros2 topic echo /adom/navigation/planned_speed
+ros2 topic echo /adom/control/local_path_status
+ros2 topic echo /cmd_vel
+ros2 topic echo /adom/control/mode
+ros2 topic echo /drive
+ros2 topic echo /adom/control/pwm_us
+```
+
+현재 planner의 `0.25..3.0 m/s`를 local controller가 받고 IMU 추정 오차로 제한 보정한다.
+Control의 nominal `12.0 m/s -> 2000 us`, neutral `1500 us` 선형 변환에 따라 planner
+범위는 약 `1510.4..1625 us`가 된다. `/planned_speed`는 양수인데 `/cmd_vel`이 0이면
+`local_path_status.reason`의
+path/IMU/speed watchdog을 확인하고, `/cmd_vel`은 양수인데 `/drive`가 0이면 A 버튼으로
+autonomous mode가 승인됐는지 확인한다.
 
 ## 문제 발생 시 재빌드 원칙
 

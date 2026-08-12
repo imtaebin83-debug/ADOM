@@ -101,6 +101,7 @@ def control_local_path(
     path_xy: np.ndarray,
     measured_speed_mps: float,
     config: PathControlConfig,
+    planned_speed_mps: float | None = None,
 ) -> PathControlCommand:
     target = select_lookahead_point(path_xy, config.lookahead_m)
     distance_squared = max(float(np.dot(target, target)), 1e-6)
@@ -109,22 +110,26 @@ def control_local_path(
     steering_limit = math.radians(config.max_steering_deg)
     steering = max(-steering_limit, min(steering_limit, steering))
 
-    target_speed = config.max_speed_mps / (
-        1.0 + config.curvature_speed_gain * abs(curvature)
-    )
     segments = np.diff(
         np.vstack((np.zeros((1, 2), dtype=np.float64), path_xy)), axis=0
     )
     available_path_m = float(np.sum(np.linalg.norm(segments, axis=1)))
-    distance_speed_scale = min(
-        1.0,
-        max(0.0, available_path_m - config.path_stop_distance_m)
-        / max(config.path_slow_distance_m - config.path_stop_distance_m, 1e-3),
-    )
-    target_speed *= distance_speed_scale
     if available_path_m <= config.path_stop_distance_m:
         target_speed = 0.0
+    elif planned_speed_mps is not None:
+        if not math.isfinite(planned_speed_mps):
+            raise ValueError("planned_speed_mps must be finite")
+        target_speed = max(0.0, min(config.max_speed_mps, planned_speed_mps))
     else:
+        target_speed = config.max_speed_mps / (
+            1.0 + config.curvature_speed_gain * abs(curvature)
+        )
+        distance_speed_scale = min(
+            1.0,
+            max(0.0, available_path_m - config.path_stop_distance_m)
+            / max(config.path_slow_distance_m - config.path_stop_distance_m, 1e-3),
+        )
+        target_speed *= distance_speed_scale
         target_speed = max(
             config.min_speed_mps, min(config.max_speed_mps, target_speed)
         )

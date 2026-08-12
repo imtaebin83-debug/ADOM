@@ -66,10 +66,14 @@ ros2 launch adom_planning semantic20_local_planning.launch.py
 가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.80초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
-기본 최대 속도 0.25 m/s는 `adom_control`의 0.30 m/s 안전 제한보다 낮다. controller의
-`/cmd_vel`은 gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로 전달되며
-PCA9685에 직접 연결하지 않는다. camera source stamp부터 controller command까지의
-지연은 `/adom/control/local_path_status`의 `source_to_command_ms`로 확인한다.
+Planner의 현재 속도 profile은 0.25..3.0 m/s이며
+`/adom/navigation/planned_speed`로 local controller에 전달된다. Controller는 이를
+`/cmd_vel`에 보존하고, gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로
+전달한다. PCA9685에 직접 연결하지 않는다. Downstream gamepad/PCA9685 nominal ceiling은
+`vehicle.yaml`의 12.0 m/s이며, camera source stamp부터 controller command까지의 지연은
+`/adom/control/local_path_status`의 `source_to_command_ms`로 확인한다. 엔코더가 없어
+PWM 속도 대응은 nominal open-loop이다. Local controller는 정지 중 IMU bias를 학습하고
+주행 중 short-horizon 적분 속도로 제한된 feedback 보정을 수행한다.
 
 ```bash
 ros2 launch adom_planning rule_planning.launch.py

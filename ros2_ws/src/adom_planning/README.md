@@ -63,7 +63,7 @@ ros2 launch adom_planning semantic20_local_planning.launch.py
 
 `rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는
 방향 tree를 평가한다. 가장 낮은 비용의 root-to-leaf path를 local path로 발행하며,
-가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.40초 이상 오래된 센서
+가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.80초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
 기본 최대 속도 0.25 m/s는 `adom_control`의 0.30 m/s 안전 제한보다 낮다. controller의

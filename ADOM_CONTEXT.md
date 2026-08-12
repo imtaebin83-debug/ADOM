@@ -586,6 +586,10 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: Jetson 실측에서 recorder 실행 시 camera→perception 지연이 약 58 ms 증가했다.
   판단 재현에 필요한 Semantic20 mask와 상태·costmap·path·command·GPS는 유지하고,
   미구독 진단 영상의 후처리와 DDS/disk 부하를 제거한다.
+- **[2026-08-12] planner의 camera source age 폐기 기준을 0.40초에서 0.80초로 완화**
+  이유: 정상 처리 지연은 대체로 기준 이내였지만 Jetson에서 간헐적인 0.4초 초과
+  costmap이 관측돼 현장 진단을 위해 허용 범위를 늘린다. 수신 갱신 watchdog과
+  actuator command timeout은 유지하며, 실차 검증 후 더 짧은 값으로 되돌릴 수 있다.
 
 ## 17. Primary References
 

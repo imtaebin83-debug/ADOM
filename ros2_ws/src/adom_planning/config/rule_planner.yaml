@@ -13,7 +13,8 @@ rule_planner:
     publish_rate_hz: 20.0
     # Shorter than the existing 0.25 s gamepad/PCA9685 command watchdog chain.
     costmap_timeout_sec: 0.20
-    max_source_age_sec: 0.40
+    # Temporary field tolerance for observed camera/DDS latency spikes.
+    max_source_age_sec: 0.80
 
     wheelbase_m: 0.33
     max_steering_deg: 20.0

@@ -11,6 +11,11 @@
       depth_mode: NEURAL_LIGHT
       depth_stabilization: 0
       point_cloud_freq: 5.0
+      publish_depth_map: true
+      publish_depth_info: false
+      publish_point_cloud: false
+      publish_depth_confidence: false
+      publish_disparity: false
     pos_tracking:
       pos_tracking_enabled: false
       imu_fusion: false
@@ -20,8 +25,8 @@
       publish_map_tf: false
     sensors:
       publish_imu: true
-      publish_imu_raw: true
-      publish_mag: true
+      publish_imu_raw: false
+      publish_mag: false
       publish_imu_tf: true
     gnss_fusion:
       # ADOM initially uses robot_localization. Do not enable both fusion paths.

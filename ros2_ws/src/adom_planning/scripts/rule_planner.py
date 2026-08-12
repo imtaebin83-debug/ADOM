@@ -30,7 +30,7 @@ class RulePlannerNode(Node):
             "action_latency_window": 300,
             "publish_rate_hz": 20.0,
             "costmap_timeout_sec": 0.20,
-            "max_source_age_sec": 0.40,
+            "max_source_age_sec": 0.80,
             "wheelbase_m": 0.33,
             "max_steering_deg": 20.0,
             "lookahead_m": 3.0,

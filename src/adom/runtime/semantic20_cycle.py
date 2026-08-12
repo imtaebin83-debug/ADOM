@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,10 +43,14 @@ GATE_UPDATES = {"smoke": 50, "mini": 500}
 EXPECTED_SPLIT_COUNTS = {
     "e0": {"train": 4435, "val": 900, "test": 899},
     "e1": {"train": 9868, "val": 900, "test": 899},
+    "ta0": {"train": 4435, "val": 900, "test": 899},
+    "ta1": {"train": 4568, "val": 900, "test": 899},
+    "ta2": {"train": 10001, "val": 900, "test": 899},
 }
 PRODUCTION_CANONICAL_EVAL_COUNTS = {"val": 900, "test": 899}
 CANONICAL_EVAL_COUNTS = PRODUCTION_CANONICAL_EVAL_COUNTS.copy()
-COMBINED_EXPERIMENTS = {"e1", "e2"}
+TA_EXPERIMENTS = {"ta0", "ta1", "ta2"}
+COMBINED_EXPERIMENTS = {"e1", "e2"} | TA_EXPERIMENTS
 EXPECTED_E1_MANIFEST_COUNT = 14421
 EXPECTED_E1_MAIN_SOURCE_COUNTS = Counter(
     {"rellis3d": 6234, "rugd": 4779, "ycor": 654}
@@ -53,6 +58,21 @@ EXPECTED_E1_MAIN_SOURCE_COUNTS = Counter(
 EXPECTED_E1_MANIFEST_SOURCE_COUNTS = Counter(
     {"rellis3d": 6234, "rugd": 7436, "ycor": 751}
 )
+EXPECTED_TA_MANIFEST_SOURCE_COUNTS = Counter(
+    {"rellis3d": 6234, "rugd": 7436, "ycor": 751, "adom_zed2i": 215}
+)
+EXPECTED_TA_MAIN_SOURCE_COUNTS = {
+    "ta0": Counter({"rellis3d": 6234}),
+    "ta1": Counter({"rellis3d": 6234, "adom_zed2i": 133}),
+    "ta2": Counter(
+        {"rellis3d": 6234, "rugd": 4779, "ycor": 654, "adom_zed2i": 133}
+    ),
+}
+EXPECTED_TA_TRAIN_SOURCES = {
+    "ta0": {"rellis3d"},
+    "ta1": {"rellis3d", "adom_zed2i"},
+    "ta2": {"rellis3d", "rugd", "ycor", "adom_zed2i"},
+}
 ALLOWED_TARGET_IDS = set(range(19)) | {255}
 
 
@@ -183,6 +203,64 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def validate_ta_initial_checkpoint(
+    checkpoint_path: Path,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    checkpoint_path = checkpoint_path.expanduser().resolve()
+    expected = expected_sha256.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("Expected initial checkpoint SHA-256 must be 64 hex characters")
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"Initial B0-E0 checkpoint is missing: {checkpoint_path}")
+    actual = _file_sha256(checkpoint_path)
+    if actual != expected:
+        raise RuntimeError(
+            f"Initial checkpoint SHA-256 mismatch: actual={actual}, expected={expected}"
+        )
+
+    import torch
+
+    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    state_dict = checkpoint.get("state_dict") if isinstance(checkpoint, dict) else None
+    if not isinstance(state_dict, dict) or not state_dict:
+        raise RuntimeError("Initial checkpoint has no non-empty state_dict")
+    head_keys = [
+        key for key in state_dict if key.endswith("decode_head.conv_seg.weight")
+    ]
+    if len(head_keys) != 1:
+        raise RuntimeError(
+            "Initial checkpoint must contain exactly one Semantic20 decode head weight"
+        )
+    head_shape = tuple(state_dict[head_keys[0]].shape)
+    if len(head_shape) != 4 or head_shape[0] != 19 or head_shape[1] != 256:
+        raise RuntimeError(
+            f"Initial checkpoint is not the 19-class SegFormer head contract: {head_shape}"
+        )
+
+    blocks: dict[int, set[int]] = {stage: set() for stage in range(4)}
+    pattern = re.compile(r"backbone\.layers\.(\d+)\.1\.(\d+)\.")
+    for key in state_dict:
+        match = pattern.search(key)
+        if match:
+            stage, block = (int(value) for value in match.groups())
+            if stage in blocks:
+                blocks[stage].add(block)
+    block_counts = [max(blocks[stage]) + 1 if blocks[stage] else 0 for stage in range(4)]
+    if block_counts != [2, 2, 2, 2]:
+        raise RuntimeError(
+            f"Initial checkpoint is not a SegFormer-B0 encoder: blocks={block_counts}"
+        )
+    return {
+        "path": str(checkpoint_path),
+        "sha256": actual,
+        "architecture": "segformer_b0",
+        "num_classes": 19,
+        "decode_head_weight_shape": list(head_shape),
+        "backbone_blocks": block_counts,
+    }
+
+
 def _mapping_digests(experiment: str) -> dict[str, str]:
     paths = [
         resource_path("rellis", "config", "class_mapping.yaml")
@@ -204,9 +282,11 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         split: _read_split(REFERENCE_SPLITS / f"{split}.txt")
         for split in ("train", "val", "test")
     }
+    train_filename = f"{experiment}_train.txt" if experiment in TA_EXPERIMENTS else "train.txt"
     actual = {
-        split: _read_split(dataset_root / "splits" / f"{split}.txt")
-        for split in ("train", "val", "test")
+        "train": _read_split(dataset_root / "splits" / train_filename),
+        "val": _read_split(dataset_root / "splits" / "val.txt"),
+        "test": _read_split(dataset_root / "splits" / "test.txt"),
     }
     actual_counts = {key: len(value) for key, value in actual.items()}
     if experiment in EXPECTED_SPLIT_COUNTS and (
@@ -254,9 +334,13 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
                 f"{experiment.upper()} does not contain the canonical RELLIS train split"
             )
         sources = {value.split("/", 1)[0] for value in actual["train"]}
-        required_sources = {"rellis3d", "rugd", "ycor"}
+        required_sources = (
+            EXPECTED_TA_TRAIN_SOURCES[experiment]
+            if experiment in TA_EXPERIMENTS
+            else {"rellis3d", "rugd", "ycor"}
+        )
         if experiment == "e2":
-            required_sources.add("goose")
+            required_sources = required_sources | {"goose"}
         if sources != required_sources:
             raise RuntimeError(
                 f"{experiment.upper()} train sources must be "
@@ -305,6 +389,13 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
                 f"{len(manifest_rows)} != {EXPECTED_E1_MANIFEST_COUNT}"
             )
         manifest_sources = Counter(key.split("/", 1)[0] for key in manifest_rows)
+        if experiment in TA_EXPERIMENTS and (
+            manifest_sources != EXPECTED_TA_MANIFEST_SOURCE_COUNTS
+        ):
+            raise RuntimeError(
+                "TA manifest source counts differ from contract: "
+                f"{dict(manifest_sources)}"
+            )
         if experiment == "e2":
             required_manifest_sources = {"rellis3d", "rugd", "ycor", "goose"}
             if set(manifest_sources) != required_manifest_sources:
@@ -374,6 +465,13 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
                 )
         if main_source_counts["goose"] <= 0:
             raise RuntimeError("E2 main train contains no GOOSE samples")
+    if experiment in TA_EXPERIMENTS and (
+        main_source_counts != EXPECTED_TA_MAIN_SOURCE_COUNTS[experiment]
+    ):
+        raise RuntimeError(
+            f"{experiment.upper()} main split source counts differ from contract: "
+            f"{dict(main_source_counts)}"
+        )
 
     digest = hashlib.sha256()
     for split in ("train", "val", "test"):
@@ -436,6 +534,9 @@ def _config(model: str, stage: str, experiment: str) -> Path:
         "e0": "e0_rellis",
         "e1": "e1_combined",
         "e2": "e2_combined_goose",
+        "ta0": "ta0",
+        "ta1": "ta1",
+        "ta2": "ta2",
     }[experiment]
     return CONFIG_DIR / f"segformer_{model}_{stage}_{suffix}.py"
 
@@ -452,6 +553,7 @@ def _probe_batch(
     env: dict[str, str],
     train_tool: Path,
     resume: bool,
+    load_from: Path | None = None,
 ) -> tuple[int, int]:
     plan_path = output_root / model / "batch_plan.json"
     if resume and plan_path.is_file():
@@ -481,6 +583,8 @@ def _probe_batch(
             "train_cfg.val_interval=3",
             "default_hooks.checkpoint.interval=3",
         ]
+        if load_from is not None:
+            command.append(f"load_from={load_from}")
         with log_path.open("w", encoding="utf-8") as log:
             result = subprocess.run(
                 command,
@@ -574,6 +678,18 @@ def _train_stage(
     elif load_from is not None:
         command.extend(["--cfg-options", f"load_from={load_from}"])
     stage_env = _stage_env(env, gate=gate, stage=stage, work_dir=work_dir)
+    if checkpoint is not None:
+        import torch
+
+        checkpoint_payload = torch.load(checkpoint, map_location="cpu")
+        checkpoint_meta = checkpoint_payload.get("meta", {})
+        runner_iterations = int(checkpoint_meta.get("iter", 0))
+        micro_batch = int(stage_env["ADOM_MICRO_BATCH"])
+        stage_env["ADOM_SAMPLER_START_INDEX"] = str(
+            runner_iterations * micro_batch
+        )
+    else:
+        stage_env["ADOM_SAMPLER_START_INDEX"] = "0"
     stage_env["ADOM_EXPERIMENT_TAG"] = f"experiment:{experiment}"
     stage_env["ADOM_MODEL_TAG"] = f"model:{model}"
     stage_env["ADOM_PHASE_TAG"] = f"phase:{stage}"
@@ -612,6 +728,7 @@ def _run_resume_gate(
     output_root: Path,
     env: dict[str, str],
     train_tool: Path,
+    initial_checkpoint: Path | None = None,
 ) -> None:
     work_dir = output_root / model / "resume_check"
     base_env = dict(env)
@@ -635,7 +752,12 @@ def _run_resume_gate(
             str(config),
             "--work-dir",
             str(work_dir),
-        ],
+        ]
+        + (
+            ["--cfg-options", f"load_from={initial_checkpoint}"]
+            if initial_checkpoint is not None
+            else []
+        ),
         artifacts=[work_dir / "last_checkpoint"],
         env=first_env,
         resume=False,
@@ -696,6 +818,36 @@ def run_cycle(args: argparse.Namespace) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     state = CycleState(output_root / "status.json", args.resume)
     dataset_contract = validate_semantic20_dataset(dataset_root, args.experiment)
+    initial_checkpoint: Path | None = None
+    initial_checkpoint_contract: dict[str, Any] | None = None
+    if args.experiment in TA_EXPERIMENTS:
+        if args.initial_checkpoint is None or not args.expected_initial_checkpoint_sha256:
+            raise RuntimeError(
+                "TA experiments require --initial-checkpoint and "
+                "--expected-initial-checkpoint-sha256"
+            )
+        initial_checkpoint_contract = validate_ta_initial_checkpoint(
+            args.initial_checkpoint,
+            args.expected_initial_checkpoint_sha256,
+        )
+        initial_checkpoint = Path(initial_checkpoint_contract["path"])
+    elif args.initial_checkpoint is not None or args.expected_initial_checkpoint_sha256:
+        raise RuntimeError("Initial checkpoint arguments are reserved for TA experiments")
+
+    resume_contract = {
+        "experiment": args.experiment,
+        "seed": args.seed,
+        "dataset_content_sha256": dataset_contract["dataset_content_sha256"],
+        "initial_checkpoint_sha256": (
+            initial_checkpoint_contract["sha256"] if initial_checkpoint_contract else None
+        ),
+    }
+    if args.resume and "resume_contract" in state.value:
+        if state.value["resume_contract"] != resume_contract:
+            raise RuntimeError(
+                "Unsafe resume contract mismatch: "
+                f"stored={state.value['resume_contract']}, requested={resume_contract}"
+            )
     write_json(output_root / "dataset_contract.json", dataset_contract)
     write_json(output_root / "class_support.json", dataset_contract["class_support"])
 
@@ -723,6 +875,8 @@ def run_cycle(args: argparse.Namespace) -> None:
         raise RuntimeError("--models accepts b0 and/or b2")
     if len(models) != len(set(models)):
         raise RuntimeError("--models contains duplicates")
+    if args.experiment in TA_EXPERIMENTS and models != ["b0"]:
+        raise RuntimeError("TA0/TA1/TA2 are locked to --models b0")
 
     doctor_path = output_root / "doctor.json"
     doctor_command = [
@@ -757,6 +911,8 @@ def run_cycle(args: argparse.Namespace) -> None:
             "seed": args.seed,
             "gate": args.gate,
             "dataset_root": str(dataset_root),
+            "initial_checkpoint": initial_checkpoint_contract,
+            "resume_contract": resume_contract,
             "optimizer_update_domain": True,
             "export": "independent/not part of Phase 1 training cycle",
             "test_policy": {
@@ -793,6 +949,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 env=env,
                 train_tool=train_tool,
                 resume=args.resume,
+                load_from=initial_checkpoint,
             )
         if args.gate == "probe":
             continue
@@ -807,6 +964,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 output_root=output_root,
                 env=model_env,
                 train_tool=train_tool,
+                initial_checkpoint=initial_checkpoint,
             )
             continue
         stage1_best = _train_stage(
@@ -819,6 +977,7 @@ def run_cycle(args: argparse.Namespace) -> None:
             env=model_env,
             train_tool=train_tool,
             resume=args.resume,
+            load_from=initial_checkpoint,
         )
         if args.gate != "full":
             continue
@@ -901,10 +1060,14 @@ def run_cycle(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Run Clean v1 E0/E1/E2 Semantic20 SegFormer gates"
+        description="Run Clean v1 E0/E1/E2/TA0/TA1/TA2 Semantic20 SegFormer gates"
     )
     parser.add_argument("--dataset", type=Path)
-    parser.add_argument("--experiment", choices=("e0", "e1", "e2"), required=True)
+    parser.add_argument(
+        "--experiment",
+        choices=("e0", "e1", "e2", "ta0", "ta1", "ta2"),
+        required=True,
+    )
     parser.add_argument("--models", default="b0,b2")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument(
@@ -926,6 +1089,8 @@ def main(argv: list[str] | None = None) -> None:
         "--expected-image-sha",
         help="Require ADOM_GIT_SHA inside the immutable Docker image to match.",
     )
+    parser.add_argument("--initial-checkpoint", type=Path)
+    parser.add_argument("--expected-initial-checkpoint-sha256")
     parser.add_argument(
         "--skip-export",
         action="store_true",

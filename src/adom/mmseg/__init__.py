@@ -8,8 +8,10 @@ from .hooks import (
     FiniteLossHook,
     FreezeBackboneHook,
     MetricArtifactHook,
+    SourceExposureAuditHook,
 )
 from .metrics import AdomSafetyMetric, AdomSemantic20Metric
+from .samplers import SourceWeightedInfiniteSampler
 
 __all__ = [
     "AdomCost4Dataset",
@@ -22,4 +24,6 @@ __all__ = [
     "FiniteLossHook",
     "FreezeBackboneHook",
     "MetricArtifactHook",
+    "SourceExposureAuditHook",
+    "SourceWeightedInfiniteSampler",
 ]

@@ -67,6 +67,41 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
             custom = config["optim_wrapper"]["paramwise_cfg"]["custom_keys"]
             self.assertEqual(custom["decode_head"]["lr_mult"], 10.0)
 
+    def test_target_adaptation_schedules_use_short_update_budgets(self) -> None:
+        expected = {
+            "target_adapt_stage1_head.py": (1000, 50, "FreezeBackboneHook"),
+            "target_adapt_stage2_full.py": (5000, 100, "BackboneAuditHook"),
+        }
+        for filename, (updates, warmup, audit_hook) in expected.items():
+            with patch.dict(
+                os.environ,
+                {"ADOM_ACCUMULATIVE_COUNTS": "2"},
+                clear=False,
+            ):
+                config = _execute_env_config(
+                    CONFIG_ROOT / "_base_" / "schedules" / filename
+                )
+            self.assertEqual(config["train_cfg"]["max_iters"], updates * 2)
+            self.assertEqual(config["param_scheduler"][0]["end"], warmup * 2)
+            hook_types = {hook["type"] for hook in config["custom_hooks"]}
+            self.assertIn(audit_hook, hook_types)
+            self.assertIn("SourceExposureAuditHook", hook_types)
+
+    def test_target_adaptation_dataset_base_is_fail_closed(self) -> None:
+        config = _execute_env_config(
+            CONFIG_ROOT / "_base_" / "datasets" / "ta_target_adaptation.py"
+        )
+        self.assertEqual(
+            config["train_dataloader"]["dataset"]["split"],
+            "splits/TA_CONDITION_NOT_SET.txt",
+        )
+        self.assertEqual(
+            config["train_dataloader"]["sampler"]["type"],
+            "SourceWeightedInfiniteSampler",
+        )
+        self.assertEqual(config["val_dataloader"]["dataset"]["split"], "splits/val.txt")
+        self.assertEqual(config["test_dataloader"]["dataset"]["split"], "splits/test.txt")
+
     def test_checkpoint_interval_scales_with_accumulation(self) -> None:
         runtime = CONFIG_ROOT / "_base_" / "semantic_default_runtime.py"
         for accumulative in (1, 2, 4):
@@ -200,6 +235,39 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
 
 @unittest.skipUnless(HAS_MMENGINE, "MMEngine config import runs in training image")
 class Semantic20ConfigImportTests(unittest.TestCase):
+    def test_target_adaptation_bases_import(self) -> None:
+        from mmengine.config import Config
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {
+                "ADOM_DATA_ROOT": Path(directory).as_posix(),
+                "ADOM_ACCUMULATIVE_COUNTS": "2",
+                "ADOM_SAMPLER_START_INDEX": "32",
+            },
+            clear=False,
+        ):
+            dataset = Config.fromfile(
+                CONFIG_ROOT / "_base_" / "datasets" / "ta_target_adaptation.py",
+                import_custom_modules=False,
+            )
+            model = Config.fromfile(
+                CONFIG_ROOT / "_base_" / "models" / "segformer_b0_ta.py",
+                import_custom_modules=False,
+            )
+            stage1 = Config.fromfile(
+                CONFIG_ROOT / "_base_" / "schedules" / "target_adapt_stage1_head.py",
+                import_custom_modules=False,
+            )
+            stage2 = Config.fromfile(
+                CONFIG_ROOT / "_base_" / "schedules" / "target_adapt_stage2_full.py",
+                import_custom_modules=False,
+            )
+        self.assertEqual(dataset.train_dataloader.sampler.start_index, 32)
+        self.assertIsNone(model.model.backbone.init_cfg)
+        self.assertEqual(stage1.train_cfg.max_iters, 2000)
+        self.assertEqual(stage2.train_cfg.max_iters, 10000)
+
     def test_all_e0_e1_e2_b0_b2_stage_configs_import(self) -> None:
         from mmengine.config import Config
 

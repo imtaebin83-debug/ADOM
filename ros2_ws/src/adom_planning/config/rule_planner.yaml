@@ -14,7 +14,7 @@ rule_planner:
     # Shorter than the existing 0.25 s gamepad/PCA9685 command watchdog chain.
     costmap_timeout_sec: 0.20
     # Temporary field tolerance for observed camera/DDS latency spikes.
-    max_source_age_sec: 0.80
+    max_source_age_sec: 0.40
 
     wheelbase_m: 0.33
     max_steering_deg: 20.0
@@ -27,7 +27,7 @@ rule_planner:
     corridor_half_width_m: 0.18
     unknown_cost: 70.0
     lethal_cost: 90
-    stop_distance_m: 0.75
+    stop_distance_m: 0.30
 
     # Below the hardware control ceiling of 0.30 m/s.
     max_speed_mps: 0.25

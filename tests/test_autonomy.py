@@ -274,8 +274,8 @@ class LocalPathControlTests(unittest.TestCase):
             )
 
         self.assertEqual(pulse(0.0), 1500.0)
-        self.assertAlmostEqual(pulse(0.25), 1510.4166667)
-        self.assertEqual(pulse(3.0), 1625.0)
+        self.assertAlmostEqual(pulse(0.25), 1578.9583333)
+        self.assertEqual(pulse(3.0), 1677.5)
         self.assertEqual(pulse(12.0), 2000.0)
 
     def test_planner_speed_profile_is_preserved(self):

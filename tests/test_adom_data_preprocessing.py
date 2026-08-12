@@ -216,6 +216,169 @@ class AdomDataPreprocessingTests(unittest.TestCase):
                 (output / "results" / "validation_report.json").is_file()
             )
 
+    def test_encoded_source_session_matches_logical_manifest_and_split(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            output = root / "semantic20"
+            split_config = root / "splits.json"
+            sessions = {
+                "train": ("260810", "capture_%2B0900", "capture_+0900"),
+                "val": ("260811_1", "val-session", "val-session"),
+                "test": ("260811_3", "test-session", "test-session"),
+            }
+            write_split_config(
+                split_config,
+                {
+                    split: [f"{date}/{logical}"]
+                    for split, (date, _physical, logical) in sessions.items()
+                },
+            )
+            for date, physical, _logical in sessions.values():
+                relative = Path(physical) / "frame.png"
+                save_png(source / date / "raw" / relative, (1, 1))
+                save_mask(
+                    source / date / "masks" / relative,
+                    [(204, 153, 51)],
+                )
+            write_upload_manifest(source)
+            manifest_path = source / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["dates"]["260810"]["files"][0]["relative_path"] = (
+                "capture_+0900/frame.png"
+            )
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_ROOT / "convert_semantic20.py"),
+                    "--input-root",
+                    str(source),
+                    "--output-root",
+                    str(output),
+                    "--splits",
+                    str(split_config),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(
+                (output / "images/260810/capture_+0900/frame.png").is_file()
+            )
+            manifest_csv = (output / "manifest.csv").read_text(encoding="utf-8")
+            self.assertIn("capture_+0900", manifest_csv)
+            self.assertNotIn("capture_%2B0900", manifest_csv)
+            summary = json.loads(
+                (output / "metadata/conversion_summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            normalization = summary["source_path_normalization"]
+            self.assertEqual(normalization["normalized_paths"], 1)
+            self.assertEqual(
+                normalization["physical_to_logical"][0],
+                {
+                    "source_date": "260810",
+                    "physical_path": "capture_%2B0900/frame.png",
+                    "logical_path": "capture_+0900/frame.png",
+                },
+            )
+
+    def test_encoded_source_path_collision_fails_before_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            output = root / "output"
+            split_config = root / "splits.json"
+            write_split_config(
+                split_config,
+                {
+                    "train": ["date/capture_+0900"],
+                    "val": ["date/val"],
+                    "test": ["date/test"],
+                },
+            )
+            for session in ("capture_+0900", "capture_%2B0900", "val", "test"):
+                relative = Path(session) / "frame.png"
+                save_png(source / "date" / "raw" / relative, (1, 1))
+                save_mask(
+                    source / "date" / "masks" / relative,
+                    [(204, 153, 51)],
+                )
+            write_upload_manifest(source)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_ROOT / "convert_semantic20.py"),
+                    "--input-root",
+                    str(source),
+                    "--output-root",
+                    str(output),
+                    "--splits",
+                    str(split_config),
+                    "--dry-run",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("collide after path normalization", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_encoded_path_separator_fails_before_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            output = root / "output"
+            split_config = root / "splits.json"
+            write_split_config(
+                split_config,
+                {
+                    "train": ["date/train"],
+                    "val": ["date/val"],
+                    "test": ["date/test"],
+                },
+            )
+            for session in ("train%2Fescape", "val", "test"):
+                relative = Path(session) / "frame.png"
+                save_png(source / "date" / "raw" / relative, (1, 1))
+                save_mask(
+                    source / "date" / "masks" / relative,
+                    [(204, 153, 51)],
+                )
+            write_upload_manifest(source)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_ROOT / "convert_semantic20.py"),
+                    "--input-root",
+                    str(source),
+                    "--output-root",
+                    str(output),
+                    "--splits",
+                    str(split_config),
+                    "--dry-run",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("Unsafe decoded path component", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_unknown_mask_color_fails_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

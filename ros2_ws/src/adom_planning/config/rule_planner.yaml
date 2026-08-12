@@ -53,3 +53,6 @@ rule_planner:
     gap_min_width_m: 0.45
     gap_switch_margin_m: 0.25
     gap_unknown_penalty_m: 0.50
+    # Enter BLOCKED immediately, but require three distinct clear costmaps
+    # before motion resumes. The 50 Hz timer must not count one grid repeatedly.
+    blocked_release_clear_frames: 3

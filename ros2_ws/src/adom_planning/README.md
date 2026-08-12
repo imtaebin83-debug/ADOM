@@ -84,4 +84,5 @@ ros2 topic echo /adom/navigation/rule_status
 
 `rule_status`의 `steering_sequence_deg`가 선택된 tree 방향열이고 첫 원소가 이번 cycle의
 실행 조향이다. `gap_selected_side`, 좌·우 `gap_*_width_m`/`gap_*_depth_m`,
-`gap_selected_goal_deg`와 `tree_candidate_count`로 gap 판단을 확인한다.
+`gap_selected_goal_deg`와 `tree_candidate_count`로 gap 판단을 확인한다. BLOCKED는 즉시
+적용하며 서로 다른 clear costmap 3개가 연속된 뒤에만 DRIVING으로 복귀한다.

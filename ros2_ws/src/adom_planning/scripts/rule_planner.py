@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import replace
 import json
 import math
 
@@ -59,6 +60,7 @@ class RulePlannerNode(Node):
             "gap_min_width_m": 0.45,
             "gap_switch_margin_m": 0.25,
             "gap_unknown_penalty_m": 0.50,
+            "blocked_release_clear_frames": 3,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -73,6 +75,8 @@ class RulePlannerNode(Node):
             raise ValueError(
                 "rule planner max_speed_mps must not exceed the downstream control limit"
             )
+        if int(self.p["blocked_release_clear_frames"]) < 1:
+            raise ValueError("blocked_release_clear_frames must be at least one")
         self._planner = PlannerConfig(
             wheelbase_m=float(self.p["wheelbase_m"]),
             max_steering_deg=float(self.p["max_steering_deg"]),
@@ -112,6 +116,10 @@ class RulePlannerNode(Node):
         self._source_action_reported = False
         self._last_logged_state: tuple[str, str | None] | None = None
         self._gap_side = 0
+        self._costmap_generation = 0
+        self._last_debounce_generation = -1
+        self._blocked_latched = False
+        self._blocked_clear_frames = 0
         self._action_latencies_ms: deque[float] = deque(
             maxlen=max(1, int(self.p["action_latency_window"]))
         )
@@ -170,6 +178,7 @@ class RulePlannerNode(Node):
         self._source_stamp_ns = source_ns if source_ns > 0 else None
         self._source_stamp = message.header.stamp
         self._source_action_reported = False
+        self._costmap_generation += 1
 
     def _publish_action_latency(self, state: str) -> None:
         if self._source_action_reported or self._source_stamp_ns is None:
@@ -310,6 +319,29 @@ class RulePlannerNode(Node):
             return
 
         self._gap_side = plan.gap.selected_side if plan.gap.obstacle_detected else 0
+        is_new_costmap = self._costmap_generation != self._last_debounce_generation
+        if is_new_costmap:
+            self._last_debounce_generation = self._costmap_generation
+        if plan.blocked:
+            self._blocked_latched = True
+            self._blocked_clear_frames = 0
+        elif self._blocked_latched:
+            if is_new_costmap:
+                self._blocked_clear_frames += 1
+            if self._blocked_clear_frames >= int(
+                self.p["blocked_release_clear_frames"]
+            ):
+                self._blocked_latched = False
+                self._blocked_clear_frames = 0
+            else:
+                plan = replace(
+                    plan,
+                    speed_mps=0.0,
+                    steering_rad=0.0,
+                    blocked=True,
+                    path_xy=np.empty((0, 2), dtype=np.float64),
+                    steering_sequence_rad=(),
+                )
 
         command = Twist()
         command.linear.x = float(plan.speed_mps)
@@ -375,6 +407,10 @@ class RulePlannerNode(Node):
                 "gap_left_depth_m": round(plan.gap.left_depth_m, 3),
                 "gap_right_depth_m": round(plan.gap.right_depth_m, 3),
                 "tree_candidate_count": plan.candidate_count,
+                "blocked_release_clear_count": self._blocked_clear_frames,
+                "blocked_release_clear_frames": int(
+                    self.p["blocked_release_clear_frames"]
+                ),
             },
             sort_keys=True,
         )

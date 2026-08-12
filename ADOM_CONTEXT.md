@@ -644,6 +644,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   선택 gap 중심각으로 첫 조향을 고정한 뒤 남은 25개 tree를 평가한다. 재현 benchmark의
   P95 추가 비용 최댓값은 0.515 ms로 50 ms 기각 기준 이내였다. 상세 근거는 decision
   record 0019를 따른다.
+- **[2026-08-12] planner BLOCKED 해제에 3-frame clear debounce 적용**
+  이유: sparse costmap에서 lethal cell이 frame마다 나타나고 사라질 때 BLOCKED와
+  DRIVING이 즉시 반복되는 현장을 확인했다. 위험 감지 시 정지는 즉시 적용하되 서로
+  다른 유효 costmap 3개에서 연속으로 안전 경로가 확인된 뒤에만 주행을 재개한다.
+  상세 근거는 decision record 0020을 따른다.
 
 ## 17. Primary References
 

@@ -9,6 +9,7 @@
 
 ```text
 /adom/perception/semantic20_mask  sensor_msgs/Image (mono8, IDs 0..18/255)
+/adom/perception/semantic20_mask_evidence sensor_msgs/Image (mono8, 2 Hz default)
 /adom/perception/confidence       sensor_msgs/Image (mono8, 0..255)
 /adom/perception/overlay          sensor_msgs/Image (bgr8)
 /adom/perception/status           std_msgs/String (JSON latency/counters)
@@ -30,6 +31,17 @@ mailbox의 pending frame을 교체한다. 별도 worker가 현재 추론을 마�
 - `processing_ms`: 변환, 추론, overlay, ROS publish를 포함한 worker 시간
 - `capture_to_perception_output_ms`: 카메라 timestamp부터 mask publish까지
 - `overwritten_frames`: 추론하지 않고 더 최신 frame으로 교체된 누적 frame 수
+- `class_pixel_counts` / `class_pixel_ratios`: 배열 index가 Semantic20 ID `0..18`인
+  프레임별 픽셀 수와 전체 mask 대비 비율
+- `class_names`: 위 배열과 같은 순서의 이름으로 bag 단독 분석 시 ID를 해석하는 계약
+- `present_class_ids`: 픽셀이 하나 이상 나온 class ID 목록. instance/object 검출 수나
+  신뢰도 threshold 통과를 뜻하지 않는다.
+- `ignore_pixel_count` / `ignore_pixel_ratio`: ID `255` 영역 통계
+
+Live autonomy bag은 costmap이 사용하는 full-rate mask를 직접 구독하지 않는다. 대신 같은
+header와 `mono8` payload를 갖는 `semantic20_mask_evidence`를 기본 2 Hz로 발행해 기록한다.
+`evidence_mask_fps:=0.0`이면 이 sample 발행을 끌 수 있다. 클래스 통계는 sample 주기와
+무관하게 inference frame마다 status에 남는다.
 
 카메라 clock과 ROS clock이 같은 time domain이고 header stamp가 0이 아닐 때만
 `capture_to_*` 값이 유효하다. downstream은 mask header를 path까지 그대로 보존한다.

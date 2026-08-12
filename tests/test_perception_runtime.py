@@ -10,6 +10,7 @@ from adom.perception import (
     SEMANTIC20_PALETTE_BGR,
     colorize_semantic20_mask,
     load_semantic20_ontology,
+    semantic20_pixel_statistics,
 )
 
 
@@ -60,6 +61,22 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid IDs"):
             self.ontology.validate_mask(np.asarray([[19]], dtype=np.uint8))
 
+    def test_pixel_statistics_keep_canonical_id_order_and_ignore(self):
+        mask = np.asarray([[0, 0, 18], [1, 255, 18]], dtype=np.uint8)
+
+        statistics = semantic20_pixel_statistics(mask, self.ontology)
+
+        self.assertEqual(statistics["total_pixel_count"], 6)
+        self.assertEqual(statistics["valid_pixel_count"], 5)
+        self.assertEqual(statistics["ignore_pixel_count"], 1)
+        self.assertEqual(statistics["class_names"][0], "dirt")
+        self.assertEqual(statistics["class_names"][18], "rubble")
+        self.assertEqual(statistics["class_pixel_counts"][0], 2)
+        self.assertEqual(statistics["class_pixel_counts"][1], 1)
+        self.assertEqual(statistics["class_pixel_counts"][18], 2)
+        self.assertEqual(statistics["present_class_ids"], [0, 1, 18])
+        self.assertAlmostEqual(statistics["class_pixel_ratios"][18], 2 / 6, 6)
+
     def test_cost4_and_semantic20_ros_configs_are_separate(self):
         config_root = ROOT / "ros2_ws" / "src" / "adom_perception_ros" / "config"
         cost4 = yaml.safe_load((config_root / "perception.yaml").read_text())
@@ -74,8 +91,13 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         )
         self.assertNotIn("bridge_mapping_path", cost4_params)
         self.assertEqual(semantic20_params["target_fps"], 30.0)
+        self.assertEqual(semantic20_params["evidence_mask_fps"], 2.0)
+        self.assertEqual(
+            semantic20_params["evidence_mask_topic"],
+            "/adom/perception/semantic20_mask_evidence",
+        )
 
-    def test_live_autonomy_bag_is_numeric_status_only(self):
+    def test_live_autonomy_bag_includes_bounded_semantic_evidence(self):
         config = yaml.safe_load(
             (
                 ROOT
@@ -92,6 +114,8 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         matcher = re.compile(topic_regex)
         for required_topic in (
             "/adom/perception/status",
+            "/adom/perception/semantic20_mask_evidence",
+            "/adom/navigation/semantic_costmap",
             "/adom/navigation/rule_status",
             "/adom/navigation/planned_speed",
             "/adom/control/local_path_status",
@@ -106,7 +130,8 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
             self.assertIsNotNone(matcher.fullmatch(required_topic))
         for high_load_topic in (
             "/adom/perception/semantic20_mask",
-            "/adom/navigation/semantic_costmap",
+            "/adom/perception/confidence",
+            "/adom/perception/overlay",
             "/adom/navigation/local_path",
             "/adom/navigation/rule_path",
             "/adom/logging/gps_path",
@@ -115,8 +140,6 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
             "/tf_static",
         ):
             self.assertIsNone(matcher.fullmatch(high_load_topic))
-        self.assertNotIn("confidence", topic_regex)
-        self.assertNotIn("overlay", topic_regex)
 
 
 if __name__ == "__main__":

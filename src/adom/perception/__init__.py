@@ -8,6 +8,7 @@ from .semantic20 import (
     colorize_semantic20_mask,
     default_bridge_mapping_path,
     load_semantic20_ontology,
+    semantic20_pixel_statistics,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "colorize_semantic20_mask",
     "default_bridge_mapping_path",
     "load_semantic20_ontology",
+    "semantic20_pixel_statistics",
 ]

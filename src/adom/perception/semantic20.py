@@ -107,3 +107,31 @@ def colorize_semantic20_mask(
     valid = mask != ontology.ignore_index
     output[valid] = SEMANTIC20_PALETTE_BGR[mask[valid]]
     return output
+
+
+def semantic20_pixel_statistics(
+    mask: np.ndarray, ontology: Semantic20Ontology
+) -> dict[str, Any]:
+    """Return compact per-class evidence without retaining another raster."""
+    ontology.validate_mask(mask)
+    counts = np.bincount(mask.reshape(-1), minlength=ontology.ignore_index + 1)
+    class_counts = [int(value) for value in counts[: ontology.num_classes]]
+    ignore_count = int(counts[ontology.ignore_index])
+    total_count = int(mask.size)
+    valid_count = total_count - ignore_count
+    denominator = max(total_count, 1)
+    return {
+        "class_names": list(ontology.classes),
+        "total_pixel_count": total_count,
+        "valid_pixel_count": valid_count,
+        "ignore_pixel_count": ignore_count,
+        "ignore_pixel_ratio": round(ignore_count / denominator, 6),
+        # Array index is the canonical Semantic20 ID 0..18.
+        "class_pixel_counts": class_counts,
+        "class_pixel_ratios": [
+            round(count / denominator, 6) for count in class_counts
+        ],
+        "present_class_ids": [
+            class_id for class_id, count in enumerate(class_counts) if count > 0
+        ],
+    }

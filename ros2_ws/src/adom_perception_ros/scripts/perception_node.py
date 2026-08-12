@@ -19,6 +19,7 @@ from adom.perception import (
     MmsegBackend,
     colorize_semantic20_mask,
     load_semantic20_ontology,
+    semantic20_pixel_statistics,
 )
 
 
@@ -52,6 +53,8 @@ class AdomPerceptionNode(Node):
         defaults = {
             "image_topic": "/zed/zed_node/rgb/color/rect/image",
             "mask_topic": "/adom/perception/semantic20_mask",
+            "evidence_mask_topic": "/adom/perception/semantic20_mask_evidence",
+            "evidence_mask_fps": 2.0,
             "confidence_topic": "/adom/perception/confidence",
             "overlay_topic": "/adom/perception/overlay",
             "status_topic": "/adom/perception/status",
@@ -70,10 +73,17 @@ class AdomPerceptionNode(Node):
         target_fps = float(self.p["target_fps"])
         if target_fps <= 0.0:
             raise ValueError("target_fps must be positive")
+        evidence_mask_fps = float(self.p["evidence_mask_fps"])
+        if evidence_mask_fps < 0.0:
+            raise ValueError("evidence_mask_fps must be non-negative")
 
         mapping_path = str(self.p["bridge_mapping_path"]).strip() or None
         self._ontology = load_semantic20_ontology(mapping_path)
         self._minimum_period = 1.0 / target_fps
+        self._evidence_mask_period = (
+            None if evidence_mask_fps == 0.0 else 1.0 / evidence_mask_fps
+        )
+        self._next_evidence_mask_publish = 0.0
         self._frames = 0
         self._started_at = time.monotonic()
         self._bridge = CvBridge()
@@ -86,6 +96,9 @@ class AdomPerceptionNode(Node):
         self._shutdown = threading.Event()
 
         self._mask_pub = self.create_publisher(Image, str(self.p["mask_topic"]), 1)
+        self._evidence_mask_pub = self.create_publisher(
+            Image, str(self.p["evidence_mask_topic"]), 1
+        )
         self._confidence_pub = self.create_publisher(
             Image, str(self.p["confidence_topic"]), 1
         )
@@ -161,11 +174,23 @@ class AdomPerceptionNode(Node):
                 image, include_confidence=publish_confidence
             )
             inference_finished = time.monotonic()
-            self._ontology.validate_mask(mask)
+            pixel_statistics = semantic20_pixel_statistics(mask, self._ontology)
 
             mask_message = self._bridge.cv2_to_imgmsg(mask, encoding="mono8")
             mask_message.header = message.header
             self._mask_pub.publish(mask_message)
+            evidence_mask_published = False
+            evidence_now = time.monotonic()
+            if (
+                self._evidence_mask_period is not None
+                and self._evidence_mask_pub.get_subscription_count() > 0
+                and evidence_now >= self._next_evidence_mask_publish
+            ):
+                self._evidence_mask_pub.publish(mask_message)
+                self._next_evidence_mask_publish = (
+                    evidence_now + self._evidence_mask_period
+                )
+                evidence_mask_published = True
             if publish_confidence:
                 if confidence is None:
                     raise RuntimeError("backend did not return requested confidence")
@@ -211,6 +236,12 @@ class AdomPerceptionNode(Node):
                 overwritten_frames=self._mailbox.overwritten,
                 confidence_subscribers=self._confidence_pub.get_subscription_count(),
                 overlay_subscribers=self._overlay_pub.get_subscription_count(),
+                evidence_mask_subscribers=(
+                    self._evidence_mask_pub.get_subscription_count()
+                ),
+                evidence_mask_fps=float(self.p["evidence_mask_fps"]),
+                evidence_mask_published=evidence_mask_published,
+                **pixel_statistics,
             )
         except Exception as error:
             self.get_logger().error(f"Perception frame failed: {error}")

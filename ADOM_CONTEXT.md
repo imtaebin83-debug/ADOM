@@ -52,11 +52,14 @@ tree에서 경로를 선택한다. 매 cycle 첫 방향만 실행하며 gap 방�
 사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
 
 자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
-`/drive`, PWM, E-stop과 raw GPS fix를 경량 bounded rosbag으로 기록한다. 카메라,
-Semantic20 mask/confidence/overlay, semantic costmap grid, path, 고주기 IMU, TF와 누적
-GPS trail은 live autonomy bag에서 제외한다. GPS 경로는 raw fix 시계열로 재구성한다.
+`/drive`, PWM, E-stop과 raw GPS fix를 bounded rosbag으로 기록한다. 카메라, full-rate
+Semantic20 mask, confidence/overlay, path, 고주기 IMU, TF와 누적 GPS trail은 live
+autonomy bag에서 제외한다. 대신 2 Hz Semantic20 evidence mask, semantic costmap grid와
+inference frame별 class pixel count/ratio를 보존한다. GPS 경로는 raw fix 시계열로
+재구성한다.
 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
-분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016을 따른다.
+분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020을
+따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -596,6 +599,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   직렬화·복사·disk I/O가 늘어 timeout 위험이 생긴다. 회피와 속도 분석에는 작은
   status/command 토픽을 사용하고 GPS 경로는 raw `/fix` 시계열로 보존한다. RGB 학습
   데이터용 `rec`는 변경하지 않는다. 상세 근거는 decision record 0016을 따른다.
+- **[2026-08-12] sampled semantic evidence를 autonomy bag에 추가**
+  이유: numeric/status-only bag으로는 어떤 Semantic20 class와 공간 cost가 planner 판단에
+  기여했는지 복원할 수 없었다. Full-rate mask 대신 기본 2 Hz evidence mask, 작은
+  semantic costmap grid와 inference-rate class pixel 통계를 기록해 예상 추가 payload를
+  약 0.54 MB/s로 제한한다. Jetson latency 영향은 A/B 실측 전까지 미검증이며 문제가
+  있으면 mask sample부터 비활성화한다. 상세 근거는 decision record 0020을 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

@@ -44,6 +44,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0017](0017-zed-depth-ground-filter.md) | ZED depth and ground-frame filtering | Accepted | NEURAL 0.30--8.0 m, verified 0.21 m mount height |
 | [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Accepted | planner/control hard ceiling 0.75 m/s |
 | [0019](0019-gap-guided-direction-tree.md) | Gap-guided direction tree | Accepted | 중앙 장애물에서 gap 첫 조향 + 25개 tree |
+| [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Accepted | 2 Hz mask sample + costmap grid + per-class status |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

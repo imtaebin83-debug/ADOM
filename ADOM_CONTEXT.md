@@ -193,6 +193,7 @@ QoS, frame ID, timestamp, message frequency도 `ros2 topic info --verbose`,
 
 - NVIDIA Jetson Orin Nano 8GB
 - ZED 2i with polarizer, 2.1 mm lens
+- ZED optical center height: 지면 기준 0.21 m (2026-08-12 정밀 재측정 완료)
 - USB-C dual-screw 0.3 m cable; USB 3 링크로 직접 연결하고 hub를 사용하지 않는다.
 - PCA9685 PWM, ESC/servo, 별도 안정화된 Jetson 전원
 
@@ -532,7 +533,8 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
 ### 배포·시스템
 
 - Jetson runtime Dockerfile와 on-device engine cache
-- depth `NEURAL_LIGHT` 재도입과 semantic-depth projection
+- depth `NEURAL`과 0.30--8.0 m 범위, confidence/texture threshold 50을 사용한
+  semantic-depth projection. `base_link` 높이 -0.05--1.50 m 밖의 점은 제거한다.
 - uncertainty·cost distribution 및 semantic costmap
 - Nav2와 closed-loop obstacle avoidance
 - 모델 export·TensorRT build·CVAT·W&B를 연결한 웹 UI
@@ -592,6 +594,13 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   직렬화·복사·disk I/O가 늘어 timeout 위험이 생긴다. 회피와 속도 분석에는 작은
   status/command 토픽을 사용하고 GPS 경로는 raw `/fix` 시계열로 보존한다. RGB 학습
   데이터용 `rec`는 변경하지 않는다. 상세 근거는 decision record 0016을 따른다.
+- **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
+  이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
+  `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을
+  직접 가정하지 않고 `base_link`로 변환한 Z 높이 -0.05--1.50 m만 costmap에 사용해
+  지면 아래 overshoot와 허공 noise를 줄인다. `NEURAL_PLUS`와 SDK floor plane detection은
+  현재 Jetson 부하 및 positional-tracking 계약을 바꾸므로 실측 전 활성화하지 않는다.
+  상세 근거는 decision record 0017을 따른다.
 - **[2026-08-12] planner의 camera source age 폐기 기준을 0.40초에서 0.80초로 완화**
   이유: 정상 처리 지연은 대체로 기준 이내였지만 Jetson에서 간헐적인 0.4초 초과
   costmap이 관측돼 현장 진단을 위해 허용 범위를 늘린다. 수신 갱신 watchdog과

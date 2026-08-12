@@ -20,3 +20,9 @@ Semantic20 perception과 연결할 때는 `semantic20_costmap.launch.py`를 사�
 launch는 `/adom/perception/semantic20_mask`, registered depth, camera info와 TF를
 결합한다. `semantic20_costs.yaml`의 클래스 비용은 초기 후보이므로 실차 주행 전에
 validation scene에서 동결해야 한다.
+
+투영점은 먼저 camera optical frame에서 `base_link`로 변환된다. 기본 높이 범위
+`-0.05..1.50 m`는 지면 아래로 5 cm보다 크게 overshoot한 stereo noise와 높은 허공
+noise를 제거한다. 지면 자체는 semantic traversability 판단을 위해 남기며, 0.10 m
+이상의 점만 geometric obstacle로 강제한다. 따라서 카메라가 pitch/roll된 경우에도
+optical Y축 부호를 가정하는 별도 픽셀 필터를 추가하지 않는다.

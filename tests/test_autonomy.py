@@ -136,6 +136,45 @@ class SemanticCostmapTests(unittest.TestCase):
         self.assertEqual(len(points), 0)
         self.assertEqual(len(labels), 0)
 
+    def test_below_ground_depth_overshoot_is_rejected_after_tf(self):
+        config = CostmapConfig(sample_stride=1)
+        points, labels = project_mask_depth(
+            np.asarray([[3]], dtype=np.uint8),
+            np.asarray([[1.0]], dtype=np.float32),
+            (1.0, 1.0, 0.0, 0.0),
+            # ROS optical (X right, Y down, Z forward) -> base_link
+            # (X forward, Y left, Z up).
+            np.asarray(
+                [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+            ),
+            np.asarray([0.0, 0.0, -0.06]),
+            config,
+        )
+        self.assertEqual(len(points), 0)
+        self.assertEqual(len(labels), 0)
+
+    def test_zed_depth_config_matches_costmap_range_and_mount_height(self):
+        root = Path(__file__).resolve().parents[1]
+        zed = yaml.safe_load(
+            (root / "ros2_ws/src/adom_sensors/config/zed2i.yaml").read_text()
+        )["/**"]["ros__parameters"]["depth"]
+        costmap = yaml.safe_load(
+            (
+                root
+                / "ros2_ws/src/adom_costmap_ros/config/semantic20_costs.yaml"
+            ).read_text()
+        )["semantic_costmap"]["ros__parameters"]
+        urdf = (
+            root / "ros2_ws/src/adom_description/urdf/adom_vehicle.urdf.xacro"
+        ).read_text()
+
+        self.assertEqual(zed["depth_mode"], "NEURAL")
+        self.assertEqual(zed["min_depth"], costmap["min_range_m"])
+        self.assertEqual(zed["max_depth"], costmap["max_range_m"])
+        self.assertEqual(zed["depth_confidence"], 50)
+        self.assertEqual(zed["depth_texture_conf"], 50)
+        self.assertIn('name="zed_z" default="0.21"', urdf)
+
 
 class RulePlannerTests(unittest.TestCase):
     def setUp(self):

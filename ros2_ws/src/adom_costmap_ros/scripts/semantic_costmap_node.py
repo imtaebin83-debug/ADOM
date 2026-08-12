@@ -51,7 +51,7 @@ class SemanticCostmapNode(Node):
             "min_range_m": 0.30,
             "max_range_m": 8.0,
             "sample_stride": 4,
-            "min_height_m": -0.50,
+            "min_height_m": -0.05,
             "max_height_m": 1.50,
             "class_costs": [0, 15, 60, 100],
             "geometric_obstacle_min_height_m": 0.10,

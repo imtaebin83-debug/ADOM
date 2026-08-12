@@ -8,7 +8,8 @@
   <xacro:arg name="body_height" default="0.16"/>
   <xacro:arg name="zed_x" default="0.12"/>
   <xacro:arg name="zed_y" default="0.0"/>
-  <xacro:arg name="zed_z" default="0.24"/>
+  <!-- Measured optical-center height above ground (verified 2026-08-12). -->
+  <xacro:arg name="zed_z" default="0.21"/>
   <xacro:arg name="zed_pitch_deg" default="-9.9981"/>
   <xacro:arg name="gnss_x" default="0.0"/>
   <xacro:arg name="gnss_y" default="0.0"/>

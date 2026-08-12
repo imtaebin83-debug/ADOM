@@ -13,7 +13,9 @@ class CostmapConfig:
     min_range_m: float = 0.30
     max_range_m: float = 8.0
     sample_stride: int = 4
-    min_height_m: float = -0.50
+    # base_link is ground-referenced. Retain a small tolerance for TF/depth
+    # error, but reject physically impossible points well below the road.
+    min_height_m: float = -0.05
     max_height_m: float = 1.50
     class_costs: tuple[int, ...] = (0, 15, 60, 100)
     geometric_obstacle_min_height_m: float = 0.10

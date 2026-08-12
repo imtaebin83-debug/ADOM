@@ -71,8 +71,8 @@ data_recorder:
     capture_root: data/captures
     # RGB-only collection: never record depth, GNSS, IMU, or control data.
     topic_regex: "^/zed(/.*)?/rgb(/.*)?$"
-    max_size_gb: 10.0
+    max_size_gb: 20.0
     size_check_period_sec: 0.5
-    # Smaller split files bound the overshoot when the 10 GB limit is reached.
+    # Smaller split files bound the overshoot when the 20 GB limit is reached.
     bag_split_size_mb: 1024
     status_topic: /adom/recording/status

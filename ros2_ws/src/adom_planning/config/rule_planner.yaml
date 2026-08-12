@@ -30,11 +30,11 @@ rule_planner:
     lethal_cost: 90
     stop_distance_m: 0.30
 
-    # Current planner command profile; downstream control maps 2000 us to 12.0 m/s.
+    # Current planner command profile; downstream control maps 2000 us to 6.0 m/s.
     max_speed_mps: 1.0
     min_speed_mps: 0.1
     # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
-    downstream_max_speed_mps: 12.0
+    downstream_max_speed_mps: 6.0
     steering_penalty: 8.0
     # Depth-projected obstacle distance weighting.
     distance_decay_m: 1.25

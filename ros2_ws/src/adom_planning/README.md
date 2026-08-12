@@ -62,9 +62,10 @@ ros2 launch adom_planning semantic20_local_planning.launch.py
 ```
 
 `rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는
-방향 tree를 평가한다. 중앙 장애물이 있으면 좌·우 gap 폭과 깊이를 비교해 방향과 첫
-조향을 고정하고 남은 25개 tree path 중 가장 낮은 비용의 경로를 발행한다. 중앙
-장애물이 없으면 기존 125개 tree와 직진 선호를 유지한다.
+방향 tree를 평가한다. 전체 costmap을 좌우 절반으로 나누고 unknown을 포함한 보수적
+누적 cost가 낮은 쪽의 첫 조향을 고정해 25개 tree path를 평가한다. 좌우 cost가 같으면
+기존 125개 tree와 직진 선호를 유지한다. 좌우 cost 비교는 후보 축소만 담당하며
+BLOCKED는 기존처럼 선택된 tree path의 lethal clearance로만 결정한다.
 가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.80초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
@@ -83,6 +84,6 @@ ros2 topic echo /adom/navigation/rule_status
 ```
 
 `rule_status`의 `steering_sequence_deg`가 선택된 tree 방향열이고 첫 원소가 이번 cycle의
-실행 조향이다. `gap_selected_side`, 좌·우 `gap_*_width_m`/`gap_*_depth_m`,
-`gap_selected_goal_deg`와 `tree_candidate_count`로 gap 판단을 확인한다. BLOCKED는 즉시
-적용하며 서로 다른 clear costmap 3개가 연속된 뒤에만 DRIVING으로 복귀한다.
+실행 조향이다. `side_cost_left`, `side_cost_right`, `side_cost_selected_side`와
+`tree_candidate_count`로 보조 판단을 확인한다. BLOCKED는 즉시 적용하며 서로 다른
+clear costmap 3개가 연속된 뒤에만 DRIVING으로 복귀한다.

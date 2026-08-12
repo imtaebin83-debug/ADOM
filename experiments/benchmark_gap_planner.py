@@ -74,7 +74,7 @@ def main() -> None:
         distance_decay_m=2.0,
         slow_distance_m=3.0,
     )
-    full_tree = replace(hybrid, gap_enabled=False)
+    full_tree = replace(hybrid, side_cost_enabled=False)
     worst_increase = float("-inf")
     for name, grid in _scenes(costmap).items():
         baseline_ms, baseline_candidates = _measure(grid, costmap, full_tree)

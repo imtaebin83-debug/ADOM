@@ -51,15 +51,7 @@ class RulePlannerNode(Node):
             "distance_decay_m": 2.0,
             "clearance_penalty": 35.0,
             "slow_distance_m": 3.5,
-            "gap_enabled": True,
-            "gap_field_of_view_deg": 120.0,
-            "gap_ray_count": 41,
-            "gap_detection_half_angle_deg": 12.0,
-            "gap_trigger_distance_m": 3.5,
-            "gap_min_depth_m": 0.8,
-            "gap_min_width_m": 0.45,
-            "gap_switch_margin_m": 0.25,
-            "gap_unknown_penalty_m": 0.50,
+            "side_cost_enabled": True,
             "blocked_release_clear_frames": 3,
         }
         for name, value in defaults.items():
@@ -95,17 +87,7 @@ class RulePlannerNode(Node):
             distance_decay_m=float(self.p["distance_decay_m"]),
             clearance_penalty=float(self.p["clearance_penalty"]),
             slow_distance_m=float(self.p["slow_distance_m"]),
-            gap_enabled=bool(self.p["gap_enabled"]),
-            gap_field_of_view_deg=float(self.p["gap_field_of_view_deg"]),
-            gap_ray_count=int(self.p["gap_ray_count"]),
-            gap_detection_half_angle_deg=float(
-                self.p["gap_detection_half_angle_deg"]
-            ),
-            gap_trigger_distance_m=float(self.p["gap_trigger_distance_m"]),
-            gap_min_depth_m=float(self.p["gap_min_depth_m"]),
-            gap_min_width_m=float(self.p["gap_min_width_m"]),
-            gap_switch_margin_m=float(self.p["gap_switch_margin_m"]),
-            gap_unknown_penalty_m=float(self.p["gap_unknown_penalty_m"]),
+            side_cost_enabled=bool(self.p["side_cost_enabled"]),
         )
         self._grid: np.ndarray | None = None
         self._costmap_config: CostmapConfig | None = None
@@ -115,7 +97,6 @@ class RulePlannerNode(Node):
         self._source_stamp = None
         self._source_action_reported = False
         self._last_logged_state: tuple[str, str | None] | None = None
-        self._gap_side = 0
         self._costmap_generation = 0
         self._last_debounce_generation = -1
         self._blocked_latched = False
@@ -207,7 +188,6 @@ class RulePlannerNode(Node):
         self._latency_pub.publish(message)
 
     def _publish_stop(self, reason: str) -> None:
-        self._gap_side = 0
         self._log_state_transition("stopped", reason=reason)
         if bool(self.p["publish_cmd_vel"]):
             self._cmd_pub.publish(Twist())
@@ -307,18 +287,12 @@ class RulePlannerNode(Node):
             self._publish_stop("empty_costmap")
             return
         try:
-            plan = plan_corridor(
-                self._grid,
-                self._costmap_config,
-                self._planner,
-                preferred_gap_side=self._gap_side,
-            )
+            plan = plan_corridor(self._grid, self._costmap_config, self._planner)
         except Exception as error:
             self.get_logger().error(f"Rule planning failed: {error}")
             self._publish_stop("planner_error")
             return
 
-        self._gap_side = plan.gap.selected_side if plan.gap.obstacle_detected else 0
         is_new_costmap = self._costmap_generation != self._last_debounce_generation
         if is_new_costmap:
             self._last_debounce_generation = self._costmap_generation
@@ -386,26 +360,16 @@ class RulePlannerNode(Node):
                     else round(float(plan.path_xy[-1, 1]), 3)
                 ),
                 "obstacle_clearance_m": round(plan.clearance_m, 3),
-                "gap_obstacle_detected": plan.gap.obstacle_detected,
-                "gap_obstacle_distance_m": (
-                    None
-                    if not plan.gap.obstacle_detected
-                    else round(plan.gap.obstacle_distance_m, 3)
-                ),
-                "gap_selected_side": (
+                "side_cost_active": plan.side_cost.active,
+                "side_cost_selected_side": (
                     "left"
-                    if plan.gap.selected_side > 0
+                    if plan.side_cost.selected_side > 0
                     else "right"
-                    if plan.gap.selected_side < 0
+                    if plan.side_cost.selected_side < 0
                     else "none"
                 ),
-                "gap_selected_goal_deg": round(
-                    math.degrees(plan.gap.selected_goal_angle_rad), 2
-                ),
-                "gap_left_width_m": round(plan.gap.left_width_m, 3),
-                "gap_right_width_m": round(plan.gap.right_width_m, 3),
-                "gap_left_depth_m": round(plan.gap.left_depth_m, 3),
-                "gap_right_depth_m": round(plan.gap.right_depth_m, 3),
+                "side_cost_left": round(plan.side_cost.left_cost, 2),
+                "side_cost_right": round(plan.side_cost.right_cost, 2),
                 "tree_candidate_count": plan.candidate_count,
                 "blocked_release_clear_count": self._blocked_clear_frames,
                 "blocked_release_clear_frames": int(

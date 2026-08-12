@@ -44,12 +44,12 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semant
 ### 현재 post-D-5 개발 범위
 
 인지 모델이 동작하는 현재 increment는 복잡한 global navigation 대신 robot-frame
-Semantic20 costmap에서 실행되는 gap-guided 방향 tree planner를 사용한다. 중앙 장애물이
-없으면 Ackermann 가능한 좌/직진/우 3단계 tree를 평가한다. 중앙 장애물이 감지되면
-좌·우 free-space 폭과 깊이를 비교해 gap 방향과 첫 조향을 고정하고, 남은 2단계 25개
-tree에서 경로를 선택한다. 매 cycle 첫 방향만 실행하며 gap 방향은 작은 score 변화에
-뒤집히지 않도록 hysteresis를 적용한다. GPS는 localization, planning, control 입력으로
-사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
+Semantic20 costmap에서 실행되는 좌우 cost 보조 방향 tree planner를 사용한다. 전체
+costmap을 좌우 절반으로 나눠 unknown을 포함한 보수적 누적 cost가 낮은 쪽의 첫 조향을
+고정하고, 남은 2단계 25개 tree에서 경로를 선택한다. 좌우 cost가 같으면 기존 125개
+tree와 직진 선호를 유지한다. 좌우 비교는 후보 축소만 담당하며 BLOCKED는 6a4db6b 이전
+계약처럼 선택 tree의 lethal clearance와 stop distance로만 결정한다. GPS는 localization,
+planning, control 입력으로 사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
 
 자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
 `/drive`, PWM, E-stop과 raw GPS fix를 bounded rosbag으로 기록한다. 카메라, full-rate
@@ -649,6 +649,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   DRIVING이 즉시 반복되는 현장을 확인했다. 위험 감지 시 정지는 즉시 적용하되 서로
   다른 유효 costmap 3개에서 연속으로 안전 경로가 확인된 뒤에만 주행을 재개한다.
   상세 근거는 decision record 0020을 따른다.
+- **[2026-08-12] gap 폭 판정을 전체 좌우 cost 보조 선택으로 대체**
+  이유: sparse costmap의 gap 폭·거리 판정이 BLOCKED를 추가로 발생시켰다. 전체 costmap의
+  좌우 누적 cost는 25개 tree의 첫 방향만 제한하며 BLOCKED에는 관여하지 않는다.
+  BLOCKED 원판정은 6a4db6b 이전의 선택 경로 clearance 기준을 유지한다. 상세 근거는
+  decision record 0021을 따른다.
 
 ## 17. Primary References
 

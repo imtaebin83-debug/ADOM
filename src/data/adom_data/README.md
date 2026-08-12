@@ -18,7 +18,11 @@ not modify any existing dataset preprocessing code or training config.
   Semantic20 train-ID masks.
 - Map background and unlabelled pixels to `255` ignore.
 - Fail on unknown RGB colors, unreadable images, size mismatches, missing pairs,
-  duplicate keys, unassigned sequences, and sequence leakage across splits.
+  duplicate keys, unassigned sequences, sequence leakage across splits, upload
+  checksum mismatches, and all-ignore training masks.
+- Verify the upload package's `manifest.json` and SHA-256 values before mask
+  conversion. `--skip-upload-manifest-check` is a legacy escape hatch and must
+  not be used for the RunPod source package.
 - Keep each continuous capture sequence wholly within one split.
 - Use `reduce_zero_label=False`, 19 trainable classes (`0..18`), and ignore
   index `255`.
@@ -87,8 +91,15 @@ python3 src/data/adom_data/scripts/convert_semantic20.py \
   --output-root <NEW_SEMANTIC20_ROOT>
 
 python3 src/data/adom_data/scripts/validate_semantic20_package.py \
-  --input-root <NEW_SEMANTIC20_ROOT>
+  --input-root <NEW_SEMANTIC20_ROOT> \
+  --write-success-marker
 ```
+
+On RunPod, the discovered source package is
+`/workspace/adom/datasets/raw/adomdata`; it already contains the required
+`manifest.json`. Validation writes `results/validation_report.json` and writes
+`_SUCCESS` only after all checks pass. Training must consume only packages with
+that marker.
 
 The result is compatible with `AdomSemantic20Dataset` through its manifest
 contract and is shared by SegFormer-B0 and SegFormer-B2:
@@ -99,6 +110,8 @@ contract and is shared by SegFormer-B0 and SegFormer-B2:
 |-- masks/<date>/<session>/frame_XXXXXX.png
 |-- splits/{train,val,test}.txt
 |-- manifest.csv
+|-- _SUCCESS
+|-- results/validation_report.json
 `-- metadata/
     |-- label_mapping.json
     |-- split_sequences.json

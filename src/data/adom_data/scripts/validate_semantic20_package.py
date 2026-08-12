@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from collections import Counter
@@ -29,6 +30,11 @@ ALLOWED_IDS = set(range(19)) | {255}
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-root", required=True, type=Path)
+    parser.add_argument(
+        "--write-success-marker",
+        action="store_true",
+        help="Write _SUCCESS only after all package validation gates pass.",
+    )
     return parser.parse_args()
 
 
@@ -96,6 +102,18 @@ def collect_png_relative_paths(root: Path) -> set[str]:
     }
 
 
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def counter_payload(value: Counter[int]) -> dict[str, int]:
+    return {str(target_id): value[target_id] for target_id in sorted(value)}
+
+
 def validate(root: Path) -> dict[str, object]:
     rows = read_manifest(root)
     split_keys = read_split_keys(root)
@@ -120,7 +138,13 @@ def validate(root: Path) -> dict[str, object]:
     }
     sequence_splits: dict[str, set[str]] = {}
     distribution: Counter[int] = Counter()
-    all_ignore_masks = 0
+    distribution_by_split = {split: Counter() for split in SPLITS}
+    distribution_by_sequence: dict[str, Counter[int]] = {}
+    image_presence_by_split = {split: Counter() for split in SPLITS}
+    image_presence_by_sequence: dict[str, Counter[int]] = {}
+    non_ignore_pixels_by_split: Counter[str] = Counter()
+    non_ignore_pixels_by_sequence: Counter[str] = Counter()
+    all_ignore_by_split = {split: [] for split in SPLITS}
 
     for row in rows:
         split = row["split"]
@@ -159,10 +183,18 @@ def validate(root: Path) -> dict[str, object]:
         for value, count in zip(observed, counts, strict=True):
             target_id = int(value)
             distribution[target_id] += int(count)
+            distribution_by_split[split][target_id] += int(count)
+            distribution_by_sequence.setdefault(sequence, Counter())[target_id] += int(
+                count
+            )
             if target_id != 255:
                 non_ignore += int(count)
+                image_presence_by_split[split][target_id] += 1
+                image_presence_by_sequence.setdefault(sequence, Counter())[target_id] += 1
+        non_ignore_pixels_by_split[split] += non_ignore
+        non_ignore_pixels_by_sequence[sequence] += non_ignore
         if non_ignore == 0:
-            all_ignore_masks += 1
+            all_ignore_by_split[split].append(row["sample_key"])
 
     leaked_sequences = {
         sequence: sorted(splits)
@@ -171,6 +203,11 @@ def validate(root: Path) -> dict[str, object]:
     }
     if leaked_sequences:
         raise ValueError(f"Sequence split leakage: {leaked_sequences}")
+    if all_ignore_by_split["train"]:
+        raise ValueError(
+            "Train contains all-ignore masks: "
+            f"{all_ignore_by_split['train'][:10]}"
+        )
 
     summary_path = root / "metadata" / "conversion_summary.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
@@ -179,12 +216,65 @@ def validate(root: Path) -> dict[str, object]:
     if summary.get("reduce_zero_label") is not False:
         raise ValueError("Conversion summary reduce_zero_label must be false")
 
-    return {
+    actual_split_counts = {split: len(split_keys[split]) for split in SPLITS}
+    actual_distribution = counter_payload(distribution)
+    actual_distribution_by_split = {
+        split: counter_payload(distribution_by_split[split]) for split in SPLITS
+    }
+    actual_distribution_by_sequence = {
+        sequence: counter_payload(value)
+        for sequence, value in sorted(distribution_by_sequence.items())
+    }
+    actual_image_presence_by_split = {
+        split: counter_payload(image_presence_by_split[split]) for split in SPLITS
+    }
+    actual_image_presence_by_sequence = {
+        sequence: counter_payload(value)
+        for sequence, value in sorted(image_presence_by_sequence.items())
+    }
+    actual_non_ignore_by_split = {
+        split: non_ignore_pixels_by_split[split] for split in SPLITS
+    }
+    actual_non_ignore_by_sequence = dict(sorted(non_ignore_pixels_by_sequence.items()))
+    all_ignore_count = sum(len(values) for values in all_ignore_by_split.values())
+    expected_summary_values = {
         "samples": len(rows),
-        "split_counts": {split: len(split_keys[split]) for split in SPLITS},
+        "split_counts": actual_split_counts,
+        "pixel_counts_by_target_id": actual_distribution,
+        "pixel_counts_by_split": actual_distribution_by_split,
+        "pixel_counts_by_sequence": actual_distribution_by_sequence,
+        "image_presence_by_split": actual_image_presence_by_split,
+        "image_presence_by_sequence": actual_image_presence_by_sequence,
+        "non_ignore_pixels_by_split": actual_non_ignore_by_split,
+        "non_ignore_pixels_by_sequence": actual_non_ignore_by_sequence,
+        "all_ignore_masks": all_ignore_count,
+        "all_ignore_by_split": all_ignore_by_split,
+    }
+    for field, expected_value in expected_summary_values.items():
+        if summary.get(field) != expected_value:
+            raise ValueError(
+                f"Conversion summary mismatch for {field}: "
+                f"summary={summary.get(field)}, actual={expected_value}"
+            )
+
+    return {
+        "schema_version": "adom-semantic20-validation-v1",
+        "status": "PASS",
+        "samples": len(rows),
+        "split_counts": actual_split_counts,
         "sequences": len(sequence_splits),
         "observed_target_ids": sorted(distribution),
-        "all_ignore_masks": all_ignore_masks,
+        "pixel_counts_by_target_id": actual_distribution,
+        "pixel_counts_by_split": actual_distribution_by_split,
+        "pixel_counts_by_sequence": actual_distribution_by_sequence,
+        "image_presence_by_split": actual_image_presence_by_split,
+        "image_presence_by_sequence": actual_image_presence_by_sequence,
+        "non_ignore_pixels_by_split": actual_non_ignore_by_split,
+        "non_ignore_pixels_by_sequence": actual_non_ignore_by_sequence,
+        "all_ignore_masks": all_ignore_count,
+        "all_ignore_by_split": all_ignore_by_split,
+        "manifest_sha256": sha256(root / "manifest.csv"),
+        "conversion_summary_sha256": sha256(summary_path),
     }
 
 
@@ -198,6 +288,25 @@ def main() -> int:
         if not root.is_dir():
             raise ValueError(f"INPUT_ROOT is not a directory: {root}")
         report = validate(root)
+        results_root = root / "results"
+        results_root.mkdir(parents=True, exist_ok=True)
+        report_path = results_root / "validation_report.json"
+        report_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        if args.write_success_marker:
+            (root / "_SUCCESS").write_text(
+                json.dumps(
+                    {
+                        "status": "PASS",
+                        "validation_report_sha256": sha256(report_path),
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
         print(json.dumps(report, indent=2, ensure_ascii=False))
         print("✅ ADOM SEMANTIC20 PACKAGE VALID")
         return 0

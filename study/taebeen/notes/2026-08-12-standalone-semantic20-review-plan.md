@@ -445,12 +445,21 @@ train/validation 선택과 분리하고 ZED 실제 장면, 각 target, negative,
 /workspace/adom/datasets/processed/adom_semantic20_rellis_rugd_ycor_v1/manifest.csv
 ```
 
-현재 확인되는 것은 기존 E1 processed package뿐이다. standalone package가
-`/workspace/adom/datasets/processed`에 없으므로 다음 중 하나다.
+후속 discovery에서 RGB-mask upload source가 다음 위치에 확인됐다.
 
-1. RGB-mask upload source만 있고 PR #32 변환을 아직 실행하지 않음
-2. 다른 `/workspace` 경로에 upload/processed package가 있음
-3. upload가 다른 Network Volume 또는 Pod volume에 있음
+```text
+/workspace/adom/datasets/raw/adomdata/
+|-- manifest.json
+|-- 260810/
+`-- 260811_1/ ... 260811_8/
+```
+
+따라서 상태는 **원본 upload package 존재, standalone Semantic20 변환 미실행**으로
+확정한다. 원본은 444 MiB이며 기존 E1 processed package는 11 GiB이다. standalone
+tar/zip archive는 없지만 Network Volume 내부 변환에는 필요하지 않다. 기존
+`/workspace/adom/datasets/.staging/semantic20/adom_semantic20_rellis_rugd_ycor_v1`가
+13 GiB를 차지하므로 재전처리 전에 `_SUCCESS`, process 유무와 기존 release의
+관계를 확인하되 자동 삭제하지 않는다.
 
 TA 구현·학습 전에 아래 read-only discovery를 실행한다.
 
@@ -477,6 +486,27 @@ du -h --max-depth=3 /workspace/adom/datasets 2>/dev/null \
 
 원본 위치가 확인되면 PR #32 변환과 Q0-Q3를 먼저 수행한다. 현재 상태에서 TA1/TA2
 학습을 시작하면 안 된다.
+
+실행할 변환 경로는 서로 다른 새 디렉터리로 고정한다.
+
+```bash
+python3 src/data/adom_data/scripts/convert_semantic20.py \
+  --input-root /workspace/adom/datasets/raw/adomdata \
+  --output-root /workspace/adom/datasets/processed/adom_zed2i_semantic20_v1 \
+  --dry-run
+
+python3 src/data/adom_data/scripts/convert_semantic20.py \
+  --input-root /workspace/adom/datasets/raw/adomdata \
+  --output-root /workspace/adom/datasets/processed/adom_zed2i_semantic20_v1
+
+python3 src/data/adom_data/scripts/validate_semantic20_package.py \
+  --input-root /workspace/adom/datasets/processed/adom_zed2i_semantic20_v1 \
+  --write-success-marker
+```
+
+converter는 이제 원본 `manifest.json`의 날짜·pair·상대경로·SHA-256을 변환 전에
+검증한다. checksum mismatch 또는 train all-ignore mask가 있으면 output 생성 전에
+실패한다.
 
 ## 12. 114 ms pre-inference latency 진단
 

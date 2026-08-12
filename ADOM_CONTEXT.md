@@ -563,6 +563,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: review 시작을 별도 PR 요청이나 외부 장비 검증 완료에 종속시키지 않는다.
   미완료 검증은 PR 본문에 merge blocker로 명시하고, Draft는 명시 요청 또는 변경이
   아직 review 가능한 단위가 아닐 때만 사용한다.
+- **[2026-08-12] B0-E0 기반 target-adaptation을 TA0/TA1/TA2 병렬 비교로 고정**
+  이유: 추가 optimizer update 효과, standalone 데이터 효과, 기존 multi-source와의
+  결합 효과를 분리해야 한다. 세 실험은 동일한 frozen B0-E0 checkpoint, canonical
+  RELLIS val/test, update budget과 seed를 공유하며 공통 기반 commit에서 각각의
+  브랜치로 분기한다. 상세 계약은 decision record 0009를 따른다.
 
 ## 17. Primary References
 

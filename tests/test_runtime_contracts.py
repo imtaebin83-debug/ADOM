@@ -102,6 +102,14 @@ class RuntimeContractTests(unittest.TestCase):
                 self.assertIn('dict(type="Resize"', text)
                 self.assertIn("keep_ratio=True", text)
                 self.assertIn('dict(type="Pad"', text)
+                self.assertIn("model_input_size_hw", text)
+                self.assertIn("pipeline_size_wh", text)
+        for profile in ("384x384", "640x384"):
+            deploy_text = (
+                REPO_ROOT / "configs" / "deployment" / f"mmseg_onnxruntime_{profile}.py"
+            ).read_text(encoding="utf-8")
+            self.assertIn("opset_version=13", deploy_text)
+            self.assertIn("input_shape=None", deploy_text)
         cycle_text = (REPO_ROOT / "src" / "adom" / "runtime" / "cycle.py").read_text(
             encoding="utf-8"
         )

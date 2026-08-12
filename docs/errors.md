@@ -17,6 +17,44 @@ RunPod, Docker, dataset, training 및 배포 과정에서 재현된 오류와 �
 - 수정 내용, 회귀 테스트 및 운영 복구 절차
 - 남아 있는 검증 항목
 
+## ERR-2026-08-07-009: Semantic20 ONNX export와 Jetson TensorRT hand-off 오류
+
+- 상태: export/parity 및 target Jetson FP16 engine build 검증 완료
+- 환경: RunPod A100, image Git SHA `e49ad806`; Jetson Orin Nano 8GB,
+  JetPack 7.2, TensorRT 10.16.2
+- 영향: B0 E0 Semantic20 ONNX export와 TensorRT engine build
+
+### 재현된 오류와 원인
+
+1. wheel 설치 MMDeploy에는 `.mim/tools/deploy.py`가 없었다. package 내부 경로를
+   가정하지 않고 공개 API `mmdeploy.apis.torch2onnx`를 사용해야 한다.
+2. opset 11 export는 `aten::unflatten`을 지원하지 않아 실패했다. opset 13에서
+   export와 ONNX checker가 통과했다.
+3. `(384, 640)` 하나를 MMSeg preprocessor와 MMCV pipeline에 공용으로 전달해
+   `640x640` tensor가 만들어졌다. `SegDataPreProcessor.size`는 H,W이고
+   `Resize.scale`/`Pad.size`는 W,H다. 각각 `(384,640)`과 `(640,384)`로 분리했다.
+4. MMDeploy `onnx_config.input_shape=[640,384]`는 pipeline의 keep-ratio를 무시하고
+   direct resize를 강제했다. `input_shape=None`으로 두고 pipeline이 resize와 static
+   right/bottom padding을 수행하게 했다.
+5. PyTorch CUDA(A100)와 ONNX Runtime CPU 비교는 최대 logits 오차가 약
+   `0.01~0.1`이었지만, 동일 CPU backend 비교는 12장 모두 argmax 100% 및 최대
+   절대오차 `0.0001034737`이었다. 공식 graph parity는 CPU↔CPU로 기록한다.
+6. TensorRT build script의 `--memPoolSize=workspace:1024MiB`는 TensorRT 10.16에서
+   `0.000976562 MiB`로 해석돼 attention tactic이 요구한 1280–1536 MiB를 모두
+   제외했다. 숫자는 MiB 단위이므로 `workspace:2048`로 수정했다.
+
+### 검증 결과와 영구 수정
+
+- ONNX: FP32 raw logits, opset 13, input `1x3x384x640`, output
+  `1x19x384x640`, embedded argmax 없음
+- CPU parity: 12장, overall/minimum per-image argmax 100%, finite logits,
+  최대 절대오차 `0.0001034737`
+- TensorRT: target Jetson에서 FP16, workspace 2048 MiB로 build,
+  `&&&& PASSED TensorRT.trtexec`, exit code 0
+- H,W/W,H config, 공개 API exporter, 검증형 packager, 0-byte engine을 거부하는
+  TensorRT builder를 추가했다.
+- 전원 종료로 engine SHA, ONNX↔TensorRT parity 및 latency benchmark는 아직 미실측
+
 ## ERR-2026-08-06-008: code-smoke가 프로젝트 의존성을 설치하지 않음
 
 - 상태: 수정 및 PR CI 검증 완료

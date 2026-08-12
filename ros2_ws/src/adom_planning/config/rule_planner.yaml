@@ -34,7 +34,7 @@ rule_planner:
     max_speed_mps: 1.0
     min_speed_mps: 0.1
     # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
-    downstream_max_speed_mps: 6.0
+    downstream_max_speed_mps: 15.0
     steering_penalty: 8.0
     # Depth-projected obstacle distance weighting.
     distance_decay_m: 1.25

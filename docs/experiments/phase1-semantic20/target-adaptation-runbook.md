@@ -12,6 +12,11 @@ TA checkpoint를 서로 이어 학습하거나 평균·ensemble하지 않는다.
 standalone converter/validator가 133 train, 21 val, 61 test와 `_SUCCESS`를 만든 뒤
 공통 superset을 한 번만 생성한다.
 
+2026-08-12 실제 Network Volume snapshot과 lookup 명령은
+[RunPod dataset inventory](../../status/runpod-dataset-inventory-2026-08-12.md)에
+기록돼 있다. 당시 E1은 release 완료, ADOM standalone과 TA superset은 미생성 상태였고,
+marker 없는 18 GB E1 staging tree는 학습 입력에서 제외됐다.
+
 ```bash
 export E1_ROOT=/workspace/adom/datasets/processed/adom_semantic20_rellis_rugd_ycor_v1
 export ADOM_ROOT=/workspace/adom/datasets/processed/adom_zed2i_semantic20_v1

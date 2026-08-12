@@ -101,6 +101,10 @@ On RunPod, the discovered source package is
 `_SUCCESS` only after all checks pass. Training must consume only packages with
 that marker.
 
+The verified 2026-08-12 Network Volume layout, ownership, release-marker status,
+and lookup commands are recorded in
+[`docs/status/runpod-dataset-inventory-2026-08-12.md`](../../../docs/status/runpod-dataset-inventory-2026-08-12.md).
+
 The result is compatible with `AdomSemantic20Dataset` through its manifest
 contract and is shared by SegFormer-B0 and SegFormer-B2:
 

@@ -10,6 +10,7 @@
 | --- | --- | --- | --- | --- | --- |
 | D-5 RC Car live stop PoC | P0 | Active | 전원 | Jetson file inference + control hardware 독립 통과 | [status](d5-poc.md) |
 | Phase 1 Semantic20 Clean v1 | P1 | Paused for PoC | 태빈 | E2 package 확정 후 paired seeds | [TODO](../TODO.md), [registry](../experiments/phase1-semantic20/README.md) |
+| TA0/TA1/TA2 dataset readiness | P1 | Active | 태빈 | ADOM standalone conversion + TA superset validation | [RunPod inventory](runpod-dataset-inventory-2026-08-12.md), [runbook](../experiments/phase1-semantic20/target-adaptation-runbook.md) |
 | Semantic23 unified dataset | P2 | Backlog | 미지정 | ontology/provenance/license audit | [Source of Truth](../../ADOM_CONTEXT.md#15-발표-이후-1015일-목표) |
 | Deployment/MLOps web UI | P2 | Backlog | 태빈 | PoC artifact contract 동결 | [Source of Truth](../../ADOM_CONTEXT.md#15-발표-이후-1015일-목표) |
 

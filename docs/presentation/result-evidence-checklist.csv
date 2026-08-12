@@ -1,0 +1,18 @@
+priority,workstream,evidence,status,required_fields,acceptance_or_use,owner
+P0,Model,TA0/TA1/TA2 controlled results,In progress,"3 seeds; checkpoint SHA; update; OverallSupported; RareRisk-4; AugmentedRisk-2; class IoU/Recall; FP rate","Separate data effect from continued training",Model/Data
+P0,Model,TA-final confirmatory run,Planned,"selected recipe; fresh E0 start; 3 seeds; mean±std; immutable artifacts","Final model claim",Model/Data
+P0,Data,Public-source distribution,Partially complete,"source counts; mapped classes; pixel share; sampler draw counts; license/provenance","Explain multi-source diversity",Data
+P0,Data,Standalone ZED dataset card,Partially complete,"215 frames; 133/21/61; sequences; locations; target/negative counts; QC report","Prove direct collection and leakage-safe split",Data
+P0,Perception,E0 vs TA-final fixed-scene A/B,Planned,"same camera pose/light/distance; RGB; masks; target metric; unedited video","Show task-relevant improvement",Model/Data
+P0,Deployment,PyTorch to ONNX parity,Complete,"12 images; 100% argmax; max error 0.0001034737","Graph conversion evidence",Model/Edge
+P0,Deployment,ONNX to TensorRT parity,Complete,"12 images; 99.9816% overall valid; 99.9521% worst; 0.0318%p class-area delta","Target-device semantic preservation",Edge
+P0,Deployment,Engine identity,Complete,"SHA256 3e815c93a3f6b63265e449d85174c0a3164f636d5bce8e5fcbb1bc9ba272735d; 9244628 bytes; TRT 10.16.2","Reproducible hand-off",Edge
+P0,Deployment,HD720 30/60 latest-frame benchmark,Pending,"3x60s after warm-up; source/received/processed/overwritten; frame age; stage p50/p95/p99; power/temp/RAM","Live real-time claim",Edge
+P0,Control,Watchdog and neutral tests,Pending,"wheels-off; process kill; camera loss; command timeout; repetitions","Safety claim",Sensor/Control
+P0,System,Repeated target/negative trials,Pending,"n; success; false stop; command p95; stop distance; frozen ROI/threshold","End-to-end claim",All
+P1,Hardware,RC Car photo set,Pending,"front; side; wiring; ZED/Jetson/PCA9685/ESC callouts","Effort and integration evidence",Sensor/Control
+P1,Data,Field collection photo set,Pending,"date/location; capture setup; sequence ID; no sensitive metadata","Effort and domain evidence",Data/Presentation
+P1,Engineering,Two-week timeline,Partially complete,"dated gates; owners; artifacts; three representative failures/fixes","Demonstrate work without vanity metrics",All
+P1,Reproducibility,Artifact identity table,Partially complete,"Git SHA; dataset digest; checkpoint SHA; ONNX SHA; engine SHA; configs","Research reproducibility",Model/Edge
+P2,Ontology,Semantic23 mapping and dataset card,Planned,"IDs; source mapping; coverage; ignore policy; license; version","Post-presentation roadmap",Data
+P2,MLOps,Web visualization and automation,Planned,"actual screenshot or clearly labeled mockup; workflow boundary","Post-presentation roadmap",Model/Data

@@ -4,6 +4,13 @@ Phase 1 Semantic20 B0/B2 gate는 `run_semantic20_cycle.sh`로 실행한다. 데�
 root는 `--dataset` 또는 `ADOM_DATA_ROOT`로 전달하며 ONNX export는 학습과
 분리되어 있다. 자세한 명령은 `docs/semantic20-runpod-gates.md`에 있다.
 
+Semantic20 B0 E0 배포는 다음 재사용 entry point를 사용한다.
+
+- `export_semantic20_onnx.sh`: 공개 MMDeploy API로 opset 13 raw-logits ONNX export
+- `package_semantic20_handoff.sh`: checkpoint/parity/reference I/O 검증 후 package 생성
+- `build_semantic20_tensorrt.sh`: target Jetson에서 FP16 engine 생성. workspace는
+  TensorRT 10.x의 MiB 숫자 계약에 따라 기본 `2048`이며 `MiB` suffix를 붙이지 않는다.
+
 반복 가능한 운영 진입점만 둔다. 데이터 로직은 `src/adom/data`, MMSeg 확장은
 `src/adom/mmseg`, 실행 상태 관리는 `src/adom/runtime`에 있다.
 

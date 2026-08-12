@@ -18,9 +18,9 @@
 | --- | --- | --- | --- | --- |
 | B0/B2 E0 training | 태빈 | Complete | canonical test와 class table 확보 | B0 checkpoint/export 입력 동결 |
 | RC Car hardware assembly | 명섭 | Complete | Jetson, ZED 2i, PWM, battery 장착 보고 | wheels-off neutral/watchdog 실측 |
-| Jetson software stack | 가형 | Active / Unverified | JetPack 7.2 설치 보고 | L4T/CUDA/TRT/ZED/ROS audit 결과 기록 |
-| B0 ONNX hand-off | 태빈 | Active | 640x384 export config 존재 | 후보 shape parity 후 package와 SHA 전달 |
-| TensorRT FP16 engine | 가형 | Planned | 없음 | target Jetson에서 build, file inference 통과 |
+| Jetson software stack | 가형 | Active | JetPack 7.2, CUDA 13.2.78, TRT 10.16.2 실측 | ZED/ROS audit 결과 기록 |
+| B0 ONNX hand-off | 태빈 | Complete | 12장 CPU parity 100%, max error 0.0001035, package SHA 검증 | engine parity 지원 |
+| TensorRT FP16 engine | 가형 | Active | target Jetson `trtexec` build PASS | engine SHA 후 file inference/parity |
 | ZED live perception ROS | 가형·명섭 | Planned | 없음 | 실제 image topic/QoS 확인 후 live mask |
 | Go/Stop safety reflex | 명섭 | Planned | control node 기반 존재 보고 | shadow mode→wheels-off 순서 검증 |
 | target discovery | 태빈·명섭 | Active | E0 class table과 target 미동결 결정 | 19-class overlay/per-class ROI로 후보 장면 확인 |
@@ -42,8 +42,8 @@
 
 | Severity | Risk | Current evidence | Owner | Unblock condition |
 | --- | --- | --- | --- | --- |
-| P0 | JetPack/CUDA/TRT 조합 불일치 가능성 | 설치 보고만 있고 package audit 없음 | 가형 | L4T 39.2, CUDA 13.2.x, TRT 10.16.x 또는 일관된 대안 확인 |
-| P0 | ONNX preprocessing과 Jetson preprocessing 불일치 | 512x512 train/test와 640x384 후보가 공존 | 태빈·가형 | reference tensor/padding dump와 parity 통과 |
+| P0 | JetPack/CUDA/TRT 조합 불일치 가능성 | JetPack 7.2/CUDA 13.2/TRT 10.16 실측 | 가형 | L4T package audit 기록 |
+| P0 | ONNX preprocessing과 Jetson preprocessing 불일치 | MMSeg right/bottom padding 동결, ONNX parity 통과 | 태빈·가형 | Jetson 구현과 reference tensor 비교 |
 | P0 | ROS topic/QoS를 문서가 잘못 단정할 위험 | 제안 topic만 존재 | 가형·명섭 | 실제 graph와 callback 측정 후 문서 갱신 |
 | P1 | target을 현장 evidence 없이 고를 위험 | canonical split의 class support가 불균형 | 태빈 | 전체 overlay와 실패·시나리오·재현성 근거로 동결 |
 | P1 | 얇은 target은 resize 후 소실될 수 있음 | pole 등 작은 구조 후보 존재 | 태빈 | 20-frame preview로 보존 여부 판정 |
@@ -60,3 +60,5 @@
 - 2026-08-06 — D-5 PoC를 P0로 등록하고 알려진 완료 상태와 미검증 항목을 분리함.
 - 2026-08-06 — 640x384, JetPack stack, ROS topic을 담당자 실측 전까지 Unverified로 유지함.
 - 2026-08-07 — target을 미동결로 전환하고 Semantic20 전체 현장 시각화 뒤 선택하도록 변경함.
+- 2026-08-07 — B0 E0 raw-logits ONNX opset 13을 12장 CPU parity로 검증하고 hand-off함.
+- 2026-08-07 — Jetson TensorRT 10.16.2에서 FP16 engine build가 통과함. engine parity와 latency는 전원 복구 후 수행함.

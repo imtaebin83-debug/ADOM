@@ -42,11 +42,27 @@
 - Selection evidence: validation mIoU `51.07` at iter 6,000; canonical test was
   executed with the same checkpoint
 - `checkpoint_selection.json`: not produced by this pre-Clean-v1 legacy run
-- Checkpoint SHA256: pending direct calculation on the Network Volume
+- Checkpoint SHA256:
+  `d76229ff623eb382fd48011decf54c342d88a113bcbe650fb58cc20e42cabe73`
 
 The immutable image revision, W&B run, exact checkpoint path, selection rule, and
 SHA256 must all be copied into the ONNX export report. The later Clean-v1
 `checkpoint_selection.json` contract must not be retroactively attributed to this run.
+
+### Deployment export evidence
+
+- Immutable export image Git SHA: `e49ad8067331c91791c69eb1dac85acd070d336d`
+- ONNX: opset 13, FP32 raw logits, static input `1x3x384x640`, output
+  `1x19x384x640`, no embedded argmax
+- Preprocess: keep-ratio resize to W,H `(640,384)`, right/bottom raw-zero pad,
+  RGB normalization with the MMSeg training mean/std
+- PyTorch CPU↔ONNX Runtime CPU parity: 12 reference images, overall and minimum
+  per-image pixel argmax agreement `1.0`, maximum absolute logits error
+  `0.00010347366333007812`, all logits finite
+- CUDA PyTorch↔CPU ONNX Runtime comparison is retained only as a cross-backend
+  diagnostic because its maximum absolute error was approximately `0.01–0.1`.
+- Target Jetson TensorRT 10.16.2 FP16 engine build: PASS with 2048 MiB workspace.
+  ONNX↔TensorRT parity and latency remain pending after the Jetson power interruption.
 
 ## Aggregate results
 

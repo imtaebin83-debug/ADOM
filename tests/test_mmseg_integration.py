@@ -59,11 +59,11 @@ class MMSegIntegrationTests(unittest.TestCase):
         from mmengine.config import Config
 
         expected_sizes = {
-            "384x384": (384, 384),
-            "640x384": (384, 640),
+            "384x384": ((384, 384), (384, 384)),
+            "640x384": ((384, 640), (640, 384)),
         }
         for model in ("b0", "b2"):
-            for profile, expected_size in expected_sizes.items():
+            for profile, (expected_hw, expected_wh) in expected_sizes.items():
                 path = (
                     REPO_ROOT
                     / "configs"
@@ -74,10 +74,11 @@ class MMSegIntegrationTests(unittest.TestCase):
                 config = Config.fromfile(path)
                 self.assertEqual(config.model.decode_head.num_classes, 19)
                 self.assertEqual(config.model.decode_head.ignore_index, 255)
-                self.assertEqual(tuple(config.model.data_preprocessor.size), expected_size)
+                self.assertEqual(tuple(config.model.data_preprocessor.size), expected_hw)
                 resize = config.test_pipeline[1]
                 self.assertTrue(resize.keep_ratio)
-                self.assertEqual(tuple(config.test_pipeline[2].size), expected_size)
+                self.assertEqual(tuple(resize.scale), expected_wh)
+                self.assertEqual(tuple(config.test_pipeline[2].size), expected_wh)
 
     def test_semantic20_wandb_backend_respects_mode(self) -> None:
         from mmengine.config import Config

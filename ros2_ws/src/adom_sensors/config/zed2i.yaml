@@ -10,8 +10,8 @@
     depth:
       # Field-tuning candidates: prefer reliable near-field measurements over
       # maximum depth density. Validate these against a fixed 1 m reference.
-      depth_mode: NEURAL
-      depth_stabilization: 30
+      depth_mode: NEURAL_LIGHT
+      depth_stabilization: 0
       # In the ZED ROS 2 wrapper, lower thresholds reject more uncertain data.
       # Invalidated pixels remain preferable to false 0.4 m lethal obstacles.
       depth_confidence: 50

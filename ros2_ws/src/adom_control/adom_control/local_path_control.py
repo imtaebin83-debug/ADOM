@@ -69,7 +69,7 @@ class LocalPathControlNode(Node):
             "imu_stationary_hold_sec": 0.50,
             "drive_feedback_timeout_sec": 0.25,
             "stuck_recovery_enabled": True,
-            "stuck_command_min_mps": 0.25,
+            "stuck_command_min_mps": 0.12,
             "stuck_max_estimated_speed_mps": 0.08,
             "stuck_max_abs_yaw_rate_rps": 0.08,
             "stuck_min_abs_steering_deg": 12.0,

@@ -17,7 +17,7 @@ def speed_to_pwm_us(
         raise ValueError("max_reverse_speed_mps must be non-negative")
     if speed_mps > 0.0:
         ratio = min(1.0, speed_mps / max_forward_speed_mps)
-        forward_min_us = 1560.0
+        forward_min_us = 1570.0
         return forward_min_us + ratio * (forward_max_us - forward_min_us)
     if speed_mps == 0.0:
         return neutral_us

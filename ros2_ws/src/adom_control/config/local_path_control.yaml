@@ -19,7 +19,7 @@ local_path_control:
     # Match the planner and hard-cap the final autonomous command at 1.00 m/s.
     max_speed_mps: 1.00
     min_speed_mps: 0.25
-    downstream_max_speed_mps: 15.0
+    downstream_max_speed_mps: 12.0
     curvature_speed_gain: 1.5
     # Bounded IMU feedback correction. IMU-only velocity remains a short-horizon
     # estimate and is not an absolute-speed measurement.
@@ -43,7 +43,7 @@ local_path_control:
     # with little longitudinal speed and yaw response. Empty/blocked paths and
     # every watchdog still stop before this logic is evaluated.
     stuck_recovery_enabled: true
-    stuck_command_min_mps: 0.25
+    stuck_command_min_mps: 0.12
     stuck_max_estimated_speed_mps: 0.08
     stuck_max_abs_yaw_rate_rps: 0.08
     stuck_min_abs_steering_deg: 12.0

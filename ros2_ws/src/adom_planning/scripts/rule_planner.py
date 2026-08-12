@@ -45,7 +45,7 @@ class RulePlannerNode(Node):
             "stop_distance_m": 0.75,
             "max_speed_mps": 1.0,
             "min_speed_mps": 0.10,
-            "downstream_max_speed_mps": 15.0,
+            "downstream_max_speed_mps": 12.0,
             "steering_penalty": 8.0,
             "distance_decay_m": 2.0,
             "clearance_penalty": 35.0,

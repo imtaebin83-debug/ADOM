@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import deque
 import json
+import time
 
 import cv2
 from cv_bridge import CvBridge
@@ -154,6 +155,7 @@ class SemanticCostmapNode(Node):
         self._status_pub.publish(message)
 
     def _on_mask(self, mask_message: Image) -> None:
+        processing_started = time.monotonic()
         if self._camera_info is None:
             self._publish_status("waiting", reason="camera_info")
             return
@@ -210,12 +212,22 @@ class SemanticCostmapNode(Node):
             output.info.origin.orientation.w = 1.0
             output.data = grid.reshape(-1).astype(np.int8).tolist()
             self._costmap_pub.publish(output)
+            output_ns = self.get_clock().now().nanoseconds
+            source_ns = stamp_ns(mask_message)
             self._publish_status(
                 "ok",
                 ontology=self._ontology,
                 projected_points=int(len(points)),
                 observed_cells=int(np.count_nonzero(grid >= 0)),
                 sync_error_sec=round(sync_error, 3),
+                processing_ms=round(
+                    (time.monotonic() - processing_started) * 1000.0, 2
+                ),
+                source_to_costmap_output_ms=(
+                    None
+                    if source_ns <= 0 or output_ns < source_ns
+                    else round((output_ns - source_ns) / 1e6, 2)
+                ),
             )
         except TransformException as error:
             self._publish_status("waiting", reason="transform", message=str(error))

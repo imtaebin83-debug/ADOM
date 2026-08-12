@@ -51,8 +51,10 @@ Ackermann 가능한 좌/직진/우 방향을 다단계로 전개하고 매 cycle
 
 자율주행 세션은 perception 판단, semantic costmap, 선택 path/tree 상태, `/cmd_vel`,
 `/drive`, PWM 상태, IMU, raw GPS fix와 logging-only GPS trail을 bounded rosbag으로
-기록한다. 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장
-경로를 분리한다. 상세 계약은 decision record 0010을 따른다.
+기록한다. Semantic20 mask는 판단 재현을 위해 포함하지만 고대역폭 confidence와 BGR
+overlay는 live autonomy bag에서 제외한다. 기존 RGB-only 학습 데이터 수집 bag과
+autonomy evidence bag은 목적과 저장 경로를 분리한다. 상세 계약은 decision records
+0010과 0011을 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -580,6 +582,10 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: 현재 목표는 GPS/Nav2 기반 전역 자율주행이 아니라 Semantic20 costmap에서의
   직진·근거리 회피다. GPS를 control feedback에서 제거하고 이동경로 evidence로만
   기록하며, perception/planning/control/GPS를 같은 시간축의 rosbag으로 보존한다.
+- **[2026-08-12] live autonomy bag에서 confidence와 BGR overlay를 제외**
+  이유: Jetson 실측에서 recorder 실행 시 camera→perception 지연이 약 58 ms 증가했다.
+  판단 재현에 필요한 Semantic20 mask와 상태·costmap·path·command·GPS는 유지하고,
+  미구독 진단 영상의 후처리와 DDS/disk 부하를 제거한다.
 
 ## 17. Primary References
 

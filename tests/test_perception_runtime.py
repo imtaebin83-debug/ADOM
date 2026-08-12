@@ -74,6 +74,24 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         self.assertNotIn("bridge_mapping_path", cost4_params)
         self.assertEqual(semantic20_params["target_fps"], 30.0)
 
+    def test_live_autonomy_bag_keeps_mask_but_drops_diagnostic_images(self):
+        config = yaml.safe_load(
+            (
+                ROOT
+                / "ros2_ws"
+                / "src"
+                / "adom_logging"
+                / "config"
+                / "autonomy_logging.yaml"
+            ).read_text()
+        )
+        topic_regex = config["autonomy_data_recorder"]["ros__parameters"][
+            "topic_regex"
+        ]
+        self.assertIn("semantic20_mask", topic_regex)
+        self.assertNotIn("confidence", topic_regex)
+        self.assertNotIn("overlay", topic_regex)
+
 
 if __name__ == "__main__":
     unittest.main()

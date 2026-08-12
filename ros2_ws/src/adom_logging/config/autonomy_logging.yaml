@@ -17,4 +17,6 @@ autonomy_data_recorder:
     size_check_period_sec: 0.5
     bag_split_size_mb: 1024
     status_topic: /adom/recording/status
-    topic_regex: "^/(adom/perception/(semantic20_mask|confidence|overlay|status)|adom/navigation/(semantic_costmap|costmap_status|local_path|rule_path|rule_status|action_latency)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/(gps_path|gps_status)|cmd_vel|drive|emergency_stop|fix|tf|tf_static|zed/zed_node/imu/data)$"
+    # Keep decision evidence, but exclude high-bandwidth diagnostic images
+    # (confidence and BGR overlay) from the live autonomy bag.
+    topic_regex: "^/(adom/perception/(semantic20_mask|status)|adom/navigation/(semantic_costmap|costmap_status|local_path|rule_path|rule_status|action_latency)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/(gps_path|gps_status)|cmd_vel|drive|emergency_stop|fix|tf|tf_static|zed/zed_node/imu/data)$"

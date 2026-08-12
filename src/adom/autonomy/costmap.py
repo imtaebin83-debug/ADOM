@@ -154,6 +154,7 @@ def build_costmap(
         100,
         costs,
     )
-    for row, column, cost in zip(lateral[valid], forward[valid], costs):
-        grid[row, column] = max(int(grid[row, column]), int(cost))
+    # Multiple projected pixels can land in one cell. np.maximum.at preserves
+    # the highest cost without a Python loop over tens of thousands of points.
+    np.maximum.at(grid, (lateral[valid], forward[valid]), costs.astype(np.int8))
     return _inflate(grid, config)

@@ -154,24 +154,35 @@ class AdomPerceptionNode(Node):
         inference_started_ros_ns = self.get_clock().now().nanoseconds
         try:
             image = self._bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
+            publish_confidence = self._confidence_pub.get_subscription_count() > 0
+            publish_overlay = self._overlay_pub.get_subscription_count() > 0
             inference_started = time.monotonic()
-            mask, confidence = self._backend.infer(image)
+            mask, confidence = self._backend.infer(
+                image, include_confidence=publish_confidence
+            )
             inference_finished = time.monotonic()
             self._ontology.validate_mask(mask)
-            colors = colorize_semantic20_mask(mask, self._ontology)
-            alpha = min(1.0, max(0.0, float(self.p["overlay_alpha"])))
-            overlay = cv2.addWeighted(image, 1.0 - alpha, colors, alpha, 0.0)
 
             mask_message = self._bridge.cv2_to_imgmsg(mask, encoding="mono8")
-            confidence_message = self._bridge.cv2_to_imgmsg(
-                confidence, encoding="mono8"
-            )
-            overlay_message = self._bridge.cv2_to_imgmsg(overlay, encoding="bgr8")
-            for output in (mask_message, confidence_message, overlay_message):
-                output.header = message.header
+            mask_message.header = message.header
             self._mask_pub.publish(mask_message)
-            self._confidence_pub.publish(confidence_message)
-            self._overlay_pub.publish(overlay_message)
+            if publish_confidence:
+                if confidence is None:
+                    raise RuntimeError("backend did not return requested confidence")
+                confidence_message = self._bridge.cv2_to_imgmsg(
+                    confidence, encoding="mono8"
+                )
+                confidence_message.header = message.header
+                self._confidence_pub.publish(confidence_message)
+            if publish_overlay:
+                colors = colorize_semantic20_mask(mask, self._ontology)
+                alpha = min(1.0, max(0.0, float(self.p["overlay_alpha"])))
+                overlay = cv2.addWeighted(image, 1.0 - alpha, colors, alpha, 0.0)
+                overlay_message = self._bridge.cv2_to_imgmsg(
+                    overlay, encoding="bgr8"
+                )
+                overlay_message.header = message.header
+                self._overlay_pub.publish(overlay_message)
 
             output_ros_ns = self.get_clock().now().nanoseconds
             finished = time.monotonic()
@@ -198,6 +209,8 @@ class AdomPerceptionNode(Node):
                 capture_to_perception_output_ms=elapsed_ms(output_ros_ns, source_ns),
                 received_frames=self._mailbox.received,
                 overwritten_frames=self._mailbox.overwritten,
+                confidence_subscribers=self._confidence_pub.get_subscription_count(),
+                overlay_subscribers=self._overlay_pub.get_subscription_count(),
             )
         except Exception as error:
             self.get_logger().error(f"Perception frame failed: {error}")

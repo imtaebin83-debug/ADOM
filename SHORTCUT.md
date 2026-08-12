@@ -285,9 +285,10 @@ launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 �
 ~/ADOM/data/autonomy_bags/autonomy_<timestamp>/rosbag/
 ```
 
-기록 대상은 perception mask/confidence/status, semantic costmap, local path와 선택 tree,
-`/cmd_vel`, `/drive`, control/PWM/E-stop, IMU, raw `/fix`, GPS trail과 TF다. 이 bag은
-기존 RGB 학습 데이터용 `data/captures`와 분리된다.
+기록 대상은 perception mask/status, semantic costmap, local path와 선택 tree,
+`/cmd_vel`, `/drive`, control/PWM/E-stop, IMU, raw `/fix`, GPS trail과 TF다. confidence와
+BGR overlay는 live 성능을 위해 제외한다. 이 bag은 기존 RGB 학습 데이터용
+`data/captures`와 분리된다.
 
 ## `t3` — 게임패드와 PCA9685 제어
 

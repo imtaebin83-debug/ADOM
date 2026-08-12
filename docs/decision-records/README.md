@@ -35,6 +35,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0008b](0008-semantic20-perception-foundation.md) | Semantic20 autonomous perception foundation | Accepted | ontology별 runtime topic 분리 |
 | [0009](0009-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Superseded in part | 방향 선택/control은 0010 우선 |
 | [0010](0010-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Accepted | 현재 local planning/control/logging 계약 |
+| [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Accepted | confidence/overlay 제외, mask 판단 근거 유지 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

@@ -62,10 +62,11 @@ ros2 launch adom_planning semantic20_local_planning.launch.py
 ```
 
 `rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는
-방향 tree를 평가한다. 전체 costmap을 좌우 절반으로 나누고 unknown을 포함한 보수적
-누적 cost가 낮은 쪽의 첫 조향을 고정해 25개 tree path를 평가한다. 좌우 cost가 같으면
-기존 125개 tree와 직진 선호를 유지한다. 좌우 cost 비교는 후보 축소만 담당하며
-BLOCKED는 기존처럼 선택된 tree path의 lethal clearance로만 결정한다.
+방향 tree를 평가한다. 기본은 단일 직진 경로다. 직진 corridor의 depth-projected lethal
+장애물이 0.30 m 초과 1.50 m 이하에 들어오면 avoid mode를 켜고, 전체 costmap을 좌우
+절반으로 나눠 unknown을 포함한 보수적 누적 cost가 낮은 쪽의 첫 조향을 고정해 25개
+tree path를 평가한다. 좌우 cost가 같으면 왼쪽으로 고정해 항상 25개를 유지한다.
+직진 장애물이 0.30 m 이하이면 BLOCKED다.
 가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.80초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
@@ -85,5 +86,6 @@ ros2 topic echo /adom/navigation/rule_status
 
 `rule_status`의 `steering_sequence_deg`가 선택된 tree 방향열이고 첫 원소가 이번 cycle의
 실행 조향이다. `side_cost_left`, `side_cost_right`, `side_cost_selected_side`와
-`tree_candidate_count`로 보조 판단을 확인한다. BLOCKED는 즉시 적용하며 서로 다른
-clear costmap 3개가 연속된 뒤에만 DRIVING으로 복귀한다.
+`tree_candidate_count`, `planner_mode`, `straight_obstacle_distance_m`로 보조 판단을
+확인한다. BLOCKED는 즉시 적용하며 서로 다른 clear costmap 3개가 연속된 뒤에만
+DRIVING으로 복귀한다.

@@ -45,7 +45,9 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Accepted | planner/control hard ceiling 0.75 m/s |
 | [0019](0019-gap-guided-direction-tree.md) | Gap-guided direction tree | Superseded | 0021이 gap 폭/거리와 no-gap BLOCKED를 제거 |
 | [0020](0020-blocked-release-debounce.md) | BLOCKED release debounce | Superseded in part | release 유지; no-gap trigger는 0021이 제거 |
-| [0021](0021-side-cost-assisted-tree.md) | Side-cost-assisted direction tree | Accepted | 좌우 전체 cost로 25개 후보 제한; BLOCKED 불변 |
+| [0021](0021-side-cost-assisted-tree.md) | Side-cost-assisted direction tree | Superseded in part | 좌우 cost 선택 유지; activation은 0022 우선 |
+| [0022](0022-straight-avoid-blocked-modes.md) | Straight/avoid/blocked modes | Accepted | 직진 장애물 거리로 mode 전환 |
+| [0023](0023-avoid-trigger-distance-tuning.md) | Avoid trigger distance tuning | Accepted | AVOID 진입 거리 3.50 m → 1.50 m |
 | [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Accepted | 2 Hz mask sample + costmap grid + per-class status |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별

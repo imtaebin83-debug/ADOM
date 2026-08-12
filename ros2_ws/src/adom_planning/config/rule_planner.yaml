@@ -45,6 +45,9 @@ rule_planner:
     # The lower-cost side fixes the first action, leaving 5^2=25 tree paths.
     # This helper never decides BLOCKED; selected-path clearance does.
     side_cost_enabled: true
+    # Straight above this distance; avoidance in (0.30, 1.50] m; BLOCKED at
+    # stop_distance_m or nearer along the straight vehicle corridor.
+    avoid_trigger_distance_m: 1.5
     # Enter BLOCKED immediately, but require three distinct clear costmaps
     # before motion resumes. The 50 Hz timer must not count one grid repeatedly.
     blocked_release_clear_frames: 3

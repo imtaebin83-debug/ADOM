@@ -155,7 +155,7 @@ class SemanticCostmapTests(unittest.TestCase):
         self.assertEqual(len(points), 0)
         self.assertEqual(len(labels), 0)
 
-    def test_zed_depth_config_matches_costmap_range_and_mount_height(self):
+    def test_zed_depth_config_and_costmap_range_match_field_contract(self):
         root = Path(__file__).resolve().parents[1]
         zed = yaml.safe_load(
             (root / "ros2_ws/src/adom_sensors/config/zed2i.yaml").read_text()
@@ -171,8 +171,8 @@ class SemanticCostmapTests(unittest.TestCase):
         ).read_text()
 
         self.assertEqual(zed["depth_mode"], "NEURAL_LIGHT")
-        self.assertEqual(zed["min_depth"], costmap["min_range_m"])
-        self.assertEqual(zed["max_depth"], costmap["max_range_m"])
+        self.assertEqual(costmap["min_range_m"], 0.30)
+        self.assertEqual(costmap["max_range_m"], 8.0)
         self.assertEqual(zed["depth_confidence"], 50)
         self.assertEqual(zed["depth_texture_conf"], 50)
         self.assertIn('name="zed_z" default="0.21"', urdf)
@@ -238,7 +238,8 @@ class RulePlannerTests(unittest.TestCase):
     def test_lower_left_half_cost_fixes_first_action_and_reduces_tree_to_25(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         center = self.costmap.columns // 2
-        grid[:center, :] = 100
+        grid[center - 2 : center + 3, 15:17] = 100
+        grid[:center, 20:30] = 75
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertTrue(plan.side_cost.active)
         self.assertEqual(plan.side_cost.selected_side, 1)
@@ -249,7 +250,8 @@ class RulePlannerTests(unittest.TestCase):
     def test_lower_right_half_cost_fixes_first_action_and_reduces_tree_to_25(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         center = self.costmap.columns // 2
-        grid[center:, :] = 100
+        grid[center - 2 : center + 3, 15:17] = 100
+        grid[center:, 20:30] = 75
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertTrue(plan.side_cost.active)
         self.assertEqual(plan.side_cost.selected_side, -1)
@@ -269,12 +271,49 @@ class RulePlannerTests(unittest.TestCase):
         self.assertFalse(plan.blocked)
         self.assertEqual(plan.candidate_count, 25)
 
-    def test_clear_scene_keeps_full_tree_and_straight_path(self):
+    def test_clear_scene_uses_single_straight_path(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertFalse(plan.side_cost.active)
-        self.assertEqual(plan.candidate_count, 125)
+        self.assertEqual(plan.side_cost.mode, "straight")
+        self.assertEqual(plan.candidate_count, 1)
         self.assertAlmostEqual(plan.steering_rad, 0.0)
+
+    def test_symmetric_avoidance_tie_still_reduces_tree_to_25(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 2 : center + 2, 15:17] = 100
+        plan = plan_corridor(grid, self.costmap, self.planner)
+        self.assertEqual(plan.side_cost.mode, "avoid")
+        self.assertTrue(plan.side_cost.active)
+        self.assertEqual(plan.side_cost.selected_side, 1)
+        self.assertEqual(plan.candidate_count, 25)
+
+    def test_far_straight_obstacle_does_not_enable_avoidance(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 2 : center + 3, 36:38] = 100
+        plan = plan_corridor(
+            grid,
+            self.costmap,
+            PlannerConfig(lookahead_m=4.0, avoid_trigger_distance_m=1.5),
+        )
+        self.assertEqual(plan.side_cost.mode, "straight")
+        self.assertFalse(plan.side_cost.active)
+        self.assertEqual(plan.candidate_count, 1)
+
+    def test_straight_obstacle_at_stop_distance_blocks_before_avoidance(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        center = self.costmap.columns // 2
+        grid[center - 2 : center + 3, 1:3] = 100
+        plan = plan_corridor(
+            grid,
+            self.costmap,
+            PlannerConfig(stop_distance_m=0.30, avoid_trigger_distance_m=1.5),
+        )
+        self.assertEqual(plan.side_cost.mode, "blocked")
+        self.assertTrue(plan.blocked)
+        self.assertEqual(plan.candidate_count, 0)
 
 
 class LocalPathControlTests(unittest.TestCase):
@@ -300,13 +339,14 @@ class LocalPathControlTests(unittest.TestCase):
         self.assertEqual(planner["lookahead_m"], 4.0)
         self.assertEqual(planner["slow_distance_m"], 3.0)
         self.assertTrue(planner["side_cost_enabled"])
+        self.assertEqual(planner["avoid_trigger_distance_m"], 1.5)
         self.assertEqual(
             planner["downstream_max_speed_mps"], gamepad["max_forward_speed_mps"]
         )
         self.assertEqual(
             local["downstream_max_speed_mps"], pca["max_speed_mps"]
         )
-        self.assertEqual(pca["max_speed_mps"], 15.0)
+        self.assertEqual(pca["max_speed_mps"], 12.0)
         self.assertEqual(pca["esc_neutral_us"], 1500.0)
         self.assertEqual(pca["esc_forward_max_us"], 2000.0)
 

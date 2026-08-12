@@ -21,7 +21,7 @@ class PlannerConfig:
     corridor_half_width_m: float = 0.18
     unknown_cost: float = 70.0
     lethal_cost: int = 90
-    stop_distance_m: float = 0.75
+    stop_distance_m: float = 0.30
     max_speed_mps: float = 0.25
     min_speed_mps: float = 0.08
     steering_penalty: float = 8.0
@@ -29,14 +29,17 @@ class PlannerConfig:
     clearance_penalty: float = 35.0
     slow_distance_m: float = 2.0
     side_cost_enabled: bool = True
+    avoid_trigger_distance_m: float = 1.5
 
 
 @dataclass(frozen=True)
 class SideCostAnalysis:
     active: bool = False
+    mode: str = "straight"
     selected_side: int = 0
     left_cost: float = 0.0
     right_cost: float = 0.0
+    straight_obstacle_distance_m: float = math.inf
 
 
 @dataclass(frozen=True)
@@ -128,9 +131,8 @@ def analyze_side_costs(
     """Choose the lower-cost half of the complete robot-frame costmap.
 
     Positive lateral rows are ``left``. Unknown cells use the same conservative
-    cost as tree scoring. Equal halves provide no directional constraint so a
-    clear symmetric scene keeps the original straight-preferring 125 trees.
-    This helper never decides BLOCKED.
+    cost as tree scoring. A tie deterministically selects left so AVOID mode
+    always evaluates 25 trees. This helper never decides BLOCKED.
     """
     if not planner.side_cost_enabled:
         return SideCostAnalysis()
@@ -140,9 +142,9 @@ def analyze_side_costs(
     center = costs.shape[0] // 2
     right_cost = float(np.sum(costs[:center]))
     left_cost = float(np.sum(costs[-center:]))
-    selected_side = 1 if left_cost < right_cost else -1 if right_cost < left_cost else 0
+    selected_side = 1 if left_cost <= right_cost else -1
     return SideCostAnalysis(
-        active=selected_side != 0,
+        active=True,
         selected_side=selected_side,
         left_cost=left_cost,
         right_cost=right_cost,
@@ -159,10 +161,47 @@ def plan_corridor(
         raise ValueError(
             f"grid shape {grid.shape} does not match {(costmap.columns, costmap.rows)}"
         )
-    side_cost = analyze_side_costs(grid, planner)
     actions = _steering_actions(planner)
+    straight_sequence = (0.0,) * planner.tree_depth
+    straight_path = _tree_path(straight_sequence, planner)
+    straight_costs = _sample_costs(grid, straight_path, costmap, planner)
+    straight_step_costs = np.max(straight_costs, axis=1)
+    straight_distances = np.linalg.norm(straight_path, axis=1)
+    straight_lethal = np.flatnonzero(straight_step_costs >= planner.lethal_cost)
+    straight_obstacle_distance = (
+        float(straight_distances[int(straight_lethal[0])])
+        if len(straight_lethal)
+        else math.inf
+    )
+    if straight_obstacle_distance <= planner.stop_distance_m:
+        return RulePlan(
+            0.0,
+            0.0,
+            math.inf,
+            True,
+            np.empty((0, 2), dtype=np.float64),
+            straight_obstacle_distance,
+            side_cost=SideCostAnalysis(
+                mode="blocked",
+                straight_obstacle_distance_m=straight_obstacle_distance,
+            ),
+            candidate_count=0,
+        )
+
+    avoid_active = straight_obstacle_distance <= planner.avoid_trigger_distance_m
+    side_cost = (
+        analyze_side_costs(grid, planner) if avoid_active else SideCostAnalysis()
+    )
+    side_cost = SideCostAnalysis(
+        active=avoid_active and side_cost.active,
+        mode="avoid" if avoid_active else "straight",
+        selected_side=side_cost.selected_side if avoid_active else 0,
+        left_cost=side_cost.left_cost,
+        right_cost=side_cost.right_cost,
+        straight_obstacle_distance_m=straight_obstacle_distance,
+    )
     first_side_action = None
-    if side_cost.selected_side:
+    if side_cost.active:
         side_actions = [
             action for action in actions if action * side_cost.selected_side > 1e-9
         ]
@@ -179,7 +218,13 @@ def plan_corridor(
         ]
     ] = []
     for sequence in product(actions, repeat=planner.tree_depth):
-        if first_side_action is not None and sequence[0] != first_side_action:
+        if not avoid_active and sequence != straight_sequence:
+            continue
+        if (
+            avoid_active
+            and first_side_action is not None
+            and sequence[0] != first_side_action
+        ):
             continue
         path = _tree_path(sequence, planner)
         costs = _sample_costs(grid, path, costmap, planner)

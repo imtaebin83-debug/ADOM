@@ -43,7 +43,7 @@ class RulePlannerNode(Node):
             "corridor_half_width_m": 0.18,
             "unknown_cost": 70.0,
             "lethal_cost": 90,
-            "stop_distance_m": 0.75,
+            "stop_distance_m": 0.30,
             "max_speed_mps": 1.0,
             "min_speed_mps": 0.10,
             "downstream_max_speed_mps": 12.0,
@@ -52,6 +52,7 @@ class RulePlannerNode(Node):
             "clearance_penalty": 35.0,
             "slow_distance_m": 3.5,
             "side_cost_enabled": True,
+            "avoid_trigger_distance_m": 1.5,
             "blocked_release_clear_frames": 3,
         }
         for name, value in defaults.items():
@@ -69,6 +70,10 @@ class RulePlannerNode(Node):
             )
         if int(self.p["blocked_release_clear_frames"]) < 1:
             raise ValueError("blocked_release_clear_frames must be at least one")
+        if float(self.p["avoid_trigger_distance_m"]) <= float(
+            self.p["stop_distance_m"]
+        ):
+            raise ValueError("avoid_trigger_distance_m must exceed stop_distance_m")
         self._planner = PlannerConfig(
             wheelbase_m=float(self.p["wheelbase_m"]),
             max_steering_deg=float(self.p["max_steering_deg"]),
@@ -88,6 +93,7 @@ class RulePlannerNode(Node):
             clearance_penalty=float(self.p["clearance_penalty"]),
             slow_distance_m=float(self.p["slow_distance_m"]),
             side_cost_enabled=bool(self.p["side_cost_enabled"]),
+            avoid_trigger_distance_m=float(self.p["avoid_trigger_distance_m"]),
         )
         self._grid: np.ndarray | None = None
         self._costmap_config: CostmapConfig | None = None
@@ -361,6 +367,14 @@ class RulePlannerNode(Node):
                 ),
                 "obstacle_clearance_m": round(plan.clearance_m, 3),
                 "side_cost_active": plan.side_cost.active,
+                "planner_mode": plan.side_cost.mode,
+                "straight_obstacle_distance_m": (
+                    None
+                    if not math.isfinite(
+                        plan.side_cost.straight_obstacle_distance_m
+                    )
+                    else round(plan.side_cost.straight_obstacle_distance_m, 3)
+                ),
                 "side_cost_selected_side": (
                     "left"
                     if plan.side_cost.selected_side > 0

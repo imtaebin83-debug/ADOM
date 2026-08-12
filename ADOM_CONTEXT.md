@@ -44,12 +44,13 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semant
 ### 현재 post-D-5 개발 범위
 
 인지 모델이 동작하는 현재 increment는 복잡한 global navigation 대신 robot-frame
-Semantic20 costmap에서 실행되는 좌우 cost 보조 방향 tree planner를 사용한다. 전체
-costmap을 좌우 절반으로 나눠 unknown을 포함한 보수적 누적 cost가 낮은 쪽의 첫 조향을
-고정하고, 남은 2단계 25개 tree에서 경로를 선택한다. 좌우 cost가 같으면 기존 125개
-tree와 직진 선호를 유지한다. 좌우 비교는 후보 축소만 담당하며 BLOCKED는 6a4db6b 이전
-계약처럼 선택 tree의 lethal clearance와 stop distance로만 결정한다. GPS는 localization,
-planning, control 입력으로 사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
+Semantic20 costmap에서 실행되는 좌우 cost 보조 방향 tree planner를 사용한다. 기본은
+단일 직진 경로다. 직진 corridor의 depth-projected lethal obstacle이 0.30 m 초과
+1.50 m 이하에 들어오면 avoid mode를 켜고, 전체 costmap의 좌우 누적 cost가 낮은 쪽의
+첫 조향을 고정해 25개 tree에서 회피 경로를 선택한다. 좌우 cost 동률은 왼쪽으로
+고정한다. 0.30 m 이하이면 BLOCKED다.
+GPS는 localization, planning, control 입력으로 사용하지 않고 이동경로 기록과 rosbag
+분석에만 사용한다.
 
 자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
 `/drive`, PWM, E-stop과 raw GPS fix를 bounded rosbag으로 기록한다. 카메라, full-rate
@@ -654,6 +655,16 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   좌우 누적 cost는 25개 tree의 첫 방향만 제한하며 BLOCKED에는 관여하지 않는다.
   BLOCKED 원판정은 6a4db6b 이전의 선택 경로 clearance 기준을 유지한다. 상세 근거는
   decision record 0021을 따른다.
+- **[2026-08-12] 직진 장애물 거리에 따른 STRAIGHT/AVOID/BLOCKED 상태를 채택**
+  이유: 좌우 cost 차이만으로 항상 회피 tree가 활성화되는 동작을 제거한다. 직진 경로의
+  첫 depth-projected lethal obstacle이 3.50 m보다 멀면 단일 직진, 0.30--3.50 m이면
+  좌우 cost 보조 25-tree 회피, 0.30 m 이하면 BLOCKED를 적용한다. 좌우 cost 동률은
+  왼쪽으로 고정해 회피 후보가 125개로 증가하지 않게 한다. 상세 근거는 decision record
+  0022를 따른다.
+- **[2026-08-12] AVOID 진입 거리를 1.50 m로 조정**
+  이유: 평상시 직진을 더 오래 유지하고 가까운 직진 장애물에만 회피 tree를 활성화하도록
+  `avoid_trigger_distance_m`을 초기 3.50 m에서 1.50 m로 조정한다. 모드 구조와 0.30 m
+  BLOCKED 기준은 유지한다. 상세 근거는 decision record 0023을 따른다.
 
 ## 17. Primary References
 

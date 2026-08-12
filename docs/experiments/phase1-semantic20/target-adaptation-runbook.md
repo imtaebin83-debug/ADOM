@@ -1,7 +1,8 @@
 # TA0/TA1/TA2 parallel RunPod runbook
 
-이 문서는 decision record 0009의 실행 계약이다. 세 condition은 같은 B0-E0 selected
-checkpoint, dataset package, image SHA, seed와 optimizer-update budget을 사용한다.
+이 문서는 decision record 0009와 0010의 실행 계약이다. 세 condition은 같은 B0-E0
+selected checkpoint, 선택된 TA recipe, dataset package, image SHA, seed와
+optimizer-update budget을 사용한다.
 TA checkpoint를 서로 이어 학습하거나 평균·ensemble하지 않는다.
 
 ## 1. Immutable package
@@ -43,10 +44,11 @@ export IMAGE=<dockerhub-user>/adom-mmseg:${IMAGE_SHA}
 ```
 
 The runtime rejects a missing/mismatched SHA, a non-B0 encoder, or a decode head other
-than 19 classes. Stage 1 loads E0, freezes the encoder and adapts the head; Stage 2 loads
-the selected Stage 1 checkpoint and updates the full B0 model. Default budgets are 1,000
-and 5,000 optimizer updates. The experiment branches may change only their train split,
-fixed source weights and identity.
+than 19 classes. The common scaffold currently supports a 1,000-update frozen-encoder
+stage followed by a 5,000-update full-model stage. These are provisional ceilings until
+the TA0 method-selection gate is complete. The selected recipe must use equal total
+optimizer-update budgets across its controls. After the recipe is frozen, condition
+branches may change only their train split, fixed source weights and identity.
 
 ## 3. Parallel gates
 

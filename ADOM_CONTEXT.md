@@ -568,6 +568,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   결합 효과를 분리해야 한다. 세 실험은 동일한 frozen B0-E0 checkpoint, canonical
   RELLIS val/test, update budget과 seed를 공유하며 공통 기반 commit에서 각각의
   브랜치로 분기한다. 상세 계약은 decision record 0009를 따른다.
+- **[2026-08-12] TA0를 공통 fine-tuning recipe의 method control로 확장**
+  이유: crop/input, 전처리, 불균형 대응과 two-stage 최적화를 TA0 RELLIS-only
+  ablation에서 먼저 선택하고 동일 recipe를 TA1/TA2가 상속해야 방법 효과와 데이터
+  효과를 분리할 수 있다. 구체 방법은 ablation 전에는 제안이며, recipe selection 후
+  commit SHA로 동결한다. 상세 계약은 decision record 0010을 따른다.
 
 ## 17. Primary References
 

@@ -161,14 +161,18 @@ def _widest_ray_gap(
         physical_width = obstacle_distance_m * angular_width
         reach = float(np.mean(ranges[start:stop]))
         observed = float(np.mean(observed_ratios[start:stop]))
-        effective_width = max(
-            0.0, physical_width - unknown_penalty_m * (1.0 - observed)
+        # Sparse depth projection leaves much of the costmap unknown. Unknown
+        # evidence may rank an otherwise equal gap lower, but must not shrink
+        # its geometric opening and falsely declare both sides impassable.
+        score = (
+            physical_width
+            + 0.25 * max(0.0, reach - required_range_m)
+            - unknown_penalty_m * (1.0 - observed)
         )
-        score = effective_width + 0.25 * max(0.0, reach - required_range_m)
         center_angle = float(np.mean(angles[start:stop]))
         best = max(
             best,
-            (effective_width, reach, score, center_angle),
+            (physical_width, reach, score, center_angle),
             key=lambda value: value[2],
         )
         start = None

@@ -285,6 +285,25 @@ class RulePlannerTests(unittest.TestCase):
         self.assertGreater(plan.steering_rad, 0.0)
         self.assertEqual(plan.candidate_count, 25)
 
+    def test_sparse_costmap_does_not_shrink_geometric_gap_width(self):
+        sparse = np.full(
+            (self.costmap.columns, self.costmap.rows), -1, dtype=np.int8
+        )
+        center = self.costmap.columns // 2
+        sparse[center - 2 : center + 3, 6:8] = 100
+        observed = np.zeros_like(sparse)
+        observed[center - 2 : center + 3, 6:8] = 100
+        sparse_plan = plan_corridor(sparse, self.costmap, self.planner)
+        observed_plan = plan_corridor(observed, self.costmap, self.planner)
+        self.assertTrue(sparse_plan.gap.obstacle_detected)
+        self.assertAlmostEqual(
+            sparse_plan.gap.left_width_m, observed_plan.gap.left_width_m
+        )
+        self.assertAlmostEqual(
+            sparse_plan.gap.right_width_m, observed_plan.gap.right_width_m
+        )
+        self.assertLess(sparse_plan.gap.left_score, observed_plan.gap.left_score)
+
     def test_clear_scene_keeps_full_tree_and_straight_path(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         plan = plan_corridor(grid, self.costmap, self.planner)

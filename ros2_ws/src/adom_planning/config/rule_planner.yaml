@@ -11,7 +11,7 @@ rule_planner:
     # First /cmd_vel causally produced from each camera-stamped costmap.
     action_latency_topic: /adom/navigation/action_latency
     action_latency_window: 300
-    publish_rate_hz: 20.0
+    publish_rate_hz: 50.0
     # Shorter than the existing 0.25 s gamepad/PCA9685 command watchdog chain.
     costmap_timeout_sec: 0.20
     # Temporary field tolerance for observed camera/DDS latency spikes.
@@ -30,8 +30,8 @@ rule_planner:
     lethal_cost: 90
     stop_distance_m: 0.30
 
-    # Current planner command profile; downstream control maps 2000 us to 6.0 m/s.
-    max_speed_mps: 1.0
+    # Current autonomous planner command profile: 0.10..1.00 m/s.
+    max_speed_mps: 1.00
     min_speed_mps: 0.1
     # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
     downstream_max_speed_mps: 15.0

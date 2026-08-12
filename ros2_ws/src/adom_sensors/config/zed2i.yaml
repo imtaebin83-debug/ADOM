@@ -4,9 +4,20 @@
       camera_model: zed2i
       grab_resolution: HD720
       grab_frame_rate: 30
+      grab_compute_capping_fps: 0.0
       pub_resolution: CUSTOM
       pub_downscale_factor: 2.0
       pub_frame_rate: 30.0
+      async_image_retrieval: false
+    
+    video:
+      enable_24bit_output: true
+      publish_rgb: true
+      publish_left_right: false
+      publish_raw: false
+      publish_gray: false
+      publish_stereo: false
+
     depth:
       # Field-tuning candidates: prefer reliable near-field measurements over
       # maximum depth density. Validate these against a fixed 1 m reference.

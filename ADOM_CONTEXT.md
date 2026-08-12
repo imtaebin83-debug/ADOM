@@ -138,7 +138,7 @@ held-out test를 이 문서와 새 decision record에 함께 기록한다. 그 �
 
 | 항목 | 초기값 | 규칙 |
 | --- | ---: | --- |
-| planner command profile | 0.25..3.0 m/s | nominal control ceiling 12.0 m/s = 2000 us; 실제 속도는 지상 주행 전 실측 필요 |
+| planner command profile | 0.10..0.75 m/s | 2026-08-12 bag latency에 맞춘 autonomous ceiling; 실제 속도는 지상 주행 전 실측 필요 |
 | target | 미동결 | Semantic20 IDs 0..18 전체를 먼저 검토 |
 | ROI | 하단 중앙 trapezoid 후보 | padding 제외 source-image 좌표로 카메라 장착 후 고정 |
 | target area ratio | 미동결 | 선택 class validation에서 조정 |
@@ -622,6 +622,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   유지될 때 IMU x축 bias와 zero velocity를 온라인 갱신하고, 주행 중 bias 보정 가속도 적분값으로 제한된 P
   feedback을 적용한다. IMU만으로 등속 절대 속도는 관측할 수 없으므로 12 m/s는 실측값이
   아닌 nominal mapping이다. 상세 근거는 decision record 0015를 따른다.
+- **[2026-08-12] rosbag 지연 근거로 autonomous 상한을 0.75 m/s로 제한**
+  이유: 정상 종료된 autonomy bag 두 개에서 camera source부터 control command까지의
+  지연 중앙값이 약 0.33초, 95 percentile이 약 0.43초였고 perception 출력은 약
+  10.2 Hz였다. 현장 설정 1.0 m/s의 75%인 0.75 m/s를 planner와 local controller의
+  hard ceiling으로 적용한다. 상세 근거는 decision record 0018을 따른다.
 
 ## 17. Primary References
 

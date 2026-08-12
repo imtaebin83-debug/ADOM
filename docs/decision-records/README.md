@@ -42,6 +42,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0015](0015-imu-aided-12mps-pwm-calibration.md) | IMU-aided nominal 12 m/s PWM calibration | Accepted | 1500..2000 us = 0..12 m/s, IMU bias/ZUPT/P-feedback |
 | [0016](0016-lightweight-autonomy-evidence-bag.md) | Lightweight autonomy evidence bag | Accepted | t2는 수치·상태·raw GPS만 기록; rec는 RGB 전용 유지 |
 | [0017](0017-zed-depth-ground-filter.md) | ZED depth and ground-frame filtering | Accepted | NEURAL 0.30--8.0 m, verified 0.21 m mount height |
+| [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Accepted | planner/control hard ceiling 0.75 m/s |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

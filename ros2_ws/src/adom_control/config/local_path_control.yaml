@@ -8,7 +8,7 @@ local_path_control:
     drive_topic: /drive
     base_frame: base_link
 
-    control_rate_hz: 20.0
+    control_rate_hz: 50.0
     path_timeout_sec: 0.25
     planned_speed_timeout_sec: 0.25
     imu_timeout_sec: 0.25
@@ -16,9 +16,8 @@ local_path_control:
     wheelbase_m: 0.33
     lookahead_m: 0.80
     max_steering_deg: 20.0
-    # Preserve the planner's current 0.25..3.0 m/s profile. The downstream
-    # gamepad/PCA9685 control ceiling is 12.0 m/s in vehicle.yaml.
-    max_speed_mps: 3.0
+    # Match the planner and hard-cap the final autonomous command at 1.00 m/s.
+    max_speed_mps: 1.00
     min_speed_mps: 0.25
     downstream_max_speed_mps: 12.0
     curvature_speed_gain: 1.5

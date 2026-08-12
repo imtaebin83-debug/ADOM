@@ -11,7 +11,9 @@
       async_image_retrieval: false
     
     video:
-      enable_24bit_output: true
+      # Keep the wrapper's compatible BGRA path. The 24-bit SDK path produced
+      # empty RGB messages with the installed ZED/cv_bridge runtime.
+      enable_24bit_output: false
       publish_rgb: true
       publish_left_right: false
       publish_raw: false

@@ -10,6 +10,8 @@ Semantic20 B0 E0 배포는 다음 재사용 entry point를 사용한다.
 - `package_semantic20_handoff.sh`: checkpoint/parity/reference I/O 검증 후 package 생성
 - `build_semantic20_tensorrt.sh`: target Jetson에서 FP16 engine 생성. workspace는
   TensorRT 10.x의 MiB 숫자 계약에 따라 기본 `2048`이며 `MiB` suffix를 붙이지 않는다.
+- `validate_semantic20_tensorrt.sh`: target Jetson engine을 hand-off의 10장 이상
+  ONNX reference I/O와 비교하고 file inference 시각화·latency JSON을 생성한다.
 
 반복 가능한 운영 진입점만 둔다. 데이터 로직은 `src/adom/data`, MMSeg 확장은
 `src/adom/mmseg`, 실행 상태 관리는 `src/adom/runtime`에 있다.

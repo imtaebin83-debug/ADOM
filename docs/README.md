@@ -10,6 +10,7 @@
 2. [Project status](status/README.md) — 무엇이 끝났고 무엇이 막혔는가
 3. [Decision records](decision-records/README.md) — 중요한 결정의 근거와 대안
 4. [Experiment registry](experiments/README.md) — 어떤 조건으로 무엇을 측정했는가
+5. [Final presentation](presentation/README.md) — 최종 발표의 주장, 구성, 필요 evidence
 
 ## Document map
 
@@ -24,6 +25,7 @@
 | `metrics/` | benchmark와 metric 정의 | 개별 run 결과 |
 | `system-architecture/` | 안정화된 시스템 설계와 interface | 실측 전 topic/버전의 확정 표현 |
 | `setup-guides/` | 재현 가능한 환경 구축·운영 절차 | 특정 개인 PC의 임시 설정 |
+| `presentation/` | 발표 스토리보드, 결과 준비표, claim/evidence 경계 | 프로젝트 현재 상태의 원본, 생성된 대용량 미디어 |
 
 ## Minimum update workflow
 

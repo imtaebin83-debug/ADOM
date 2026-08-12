@@ -30,8 +30,8 @@ rule_planner:
     stop_distance_m: 0.60
 
     # Below the hardware control ceiling of 0.30 m/s.
-    max_speed_mps: 0.25
-    min_speed_mps: 0.08
+    max_speed_mps: 3.0
+    min_speed_mps: 0.25
     steering_penalty: 8.0
     # Depth-projected obstacle distance weighting.
     distance_decay_m: 1.25

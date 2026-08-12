@@ -1,0 +1,158 @@
+dataset_name: adom_cost4_rellis_rugd_ycor_goose_v1
+mapping_version: v1.0
+num_classes: 4
+ignore_index: 255
+reduce_zero_label: false
+
+target_classes:
+  0: paved
+  1: natural_low
+  2: medium
+  3: high_obstacle
+  255: ignore
+
+rellis:
+  # RELLIS raw IDs are normalized by src/data/rellis into contiguous
+  # Semantic20 IDs before this bridge applies the equivalent Cost4 policy.
+  input_contract: semantic20_indexed_mask
+  source_to_target:
+    0: {source_class: dirt, target_class: natural_low, target_id: 1}
+    1: {source_class: grass, target_class: natural_low, target_id: 1}
+    2: {source_class: tree, target_class: high_obstacle, target_id: 3}
+    3: {source_class: pole, target_class: high_obstacle, target_id: 3}
+    4: {source_class: water, target_class: high_obstacle, target_id: 3}
+    5: {source_class: sky, target_class: ignore, target_id: 255}
+    6: {source_class: vehicle, target_class: high_obstacle, target_id: 3}
+    7: {source_class: object, target_class: high_obstacle, target_id: 3}
+    8: {source_class: asphalt, target_class: paved, target_id: 0}
+    9: {source_class: building, target_class: high_obstacle, target_id: 3}
+    10: {source_class: log, target_class: high_obstacle, target_id: 3}
+    11: {source_class: person, target_class: high_obstacle, target_id: 3}
+    12: {source_class: fence, target_class: high_obstacle, target_id: 3}
+    13: {source_class: bush, target_class: medium, target_id: 2}
+    14: {source_class: concrete, target_class: paved, target_id: 0}
+    15: {source_class: barrier, target_class: high_obstacle, target_id: 3}
+    16: {source_class: puddle, target_class: medium, target_id: 2}
+    17: {source_class: mud, target_class: medium, target_id: 2}
+    18: {source_class: rubble, target_class: high_obstacle, target_id: 3}
+    255: {source_class: ignore, target_class: ignore, target_id: 255}
+
+rugd:
+  input_contract: original_index_label_mask
+  source_to_target:
+    0: {source_class: void_or_unlabelled, target_class: ignore, target_id: 255}
+    1: {source_class: dirt, target_class: natural_low, target_id: 1}
+    2: {source_class: sand, target_class: medium, target_id: 2}
+    3: {source_class: grass, target_class: natural_low, target_id: 1}
+    4: {source_class: tree, target_class: high_obstacle, target_id: 3}
+    5: {source_class: pole, target_class: high_obstacle, target_id: 3}
+    6: {source_class: water, target_class: high_obstacle, target_id: 3}
+    7: {source_class: sky, target_class: ignore, target_id: 255}
+    8: {source_class: vehicle, target_class: high_obstacle, target_id: 3}
+    9: {source_class: container_or_generic_object, target_class: high_obstacle, target_id: 3}
+    10: {source_class: asphalt, target_class: paved, target_id: 0}
+    11: {source_class: gravel, target_class: natural_low, target_id: 1}
+    12: {source_class: building, target_class: high_obstacle, target_id: 3}
+    13: {source_class: mulch, target_class: medium, target_id: 2}
+    14: {source_class: rock_bed, target_class: medium, target_id: 2}
+    15: {source_class: log, target_class: high_obstacle, target_id: 3}
+    16: {source_class: bicycle, target_class: high_obstacle, target_id: 3}
+    17: {source_class: person, target_class: high_obstacle, target_id: 3}
+    18: {source_class: fence, target_class: high_obstacle, target_id: 3}
+    19: {source_class: bush, target_class: medium, target_id: 2}
+    20: {source_class: sign, target_class: high_obstacle, target_id: 3}
+    21: {source_class: rock, target_class: high_obstacle, target_id: 3}
+    22: {source_class: bridge, target_class: high_obstacle, target_id: 3}
+    23: {source_class: concrete, target_class: paved, target_id: 0}
+    24: {source_class: picnic_table, target_class: high_obstacle, target_id: 3}
+
+ycor:
+  input_contract: original_palette_mask
+  source_palette_rgb:
+    0: [255, 255, 255]
+    1: [40, 80, 0]
+    2: [128, 255, 0]
+    3: [178, 176, 153]
+    4: [255, 0, 0]
+    5: [1, 88, 255]
+    6: [156, 76, 30]
+    7: [255, 0, 128]
+    8: [0, 160, 0]
+  source_to_target:
+    0: {source_class: background_or_unlabelled, target_class: ignore, target_id: 255}
+    1: {source_class: high_vegetation, target_class: high_obstacle, target_id: 3}
+    2: {source_class: traversable_grass, target_class: natural_low, target_id: 1}
+    3: {source_class: smooth_trail, target_class: natural_low, target_id: 1}
+    4: {source_class: obstacle, target_class: high_obstacle, target_id: 3}
+    5: {source_class: sky, target_class: ignore, target_id: 255}
+    6: {source_class: rough_trail, target_class: medium, target_id: 2}
+    7: {source_class: puddle, target_class: medium, target_id: 2}
+    8: {source_class: non_traversable_low_vegetation, target_class: high_obstacle, target_id: 3}
+
+goose:
+  input_contract: goose_native_64_class
+  source_to_target:
+    0: {source_class: undefined, target_class: ignore, target_id: 255}
+    1: {source_class: traffic_cone, target_class: high_obstacle, target_id: 3}
+    2: {source_class: snow, target_class: medium, target_id: 2}
+    3: {source_class: cobble, target_class: paved, target_id: 0}
+    4: {source_class: obstacle, target_class: high_obstacle, target_id: 3}
+    5: {source_class: leaves, target_class: medium, target_id: 2}
+    6: {source_class: street_light, target_class: high_obstacle, target_id: 3}
+    7: {source_class: bikeway, target_class: paved, target_id: 0}
+    8: {source_class: ego_vehicle, target_class: ignore, target_id: 255}
+    9: {source_class: pedestrian_crossing, target_class: paved, target_id: 0}
+    10: {source_class: road_block, target_class: high_obstacle, target_id: 3}
+    11: {source_class: road_marking, target_class: paved, target_id: 0}
+    12: {source_class: car, target_class: high_obstacle, target_id: 3}
+    13: {source_class: bicycle, target_class: high_obstacle, target_id: 3}
+    14: {source_class: person, target_class: high_obstacle, target_id: 3}
+    15: {source_class: bus, target_class: high_obstacle, target_id: 3}
+    16: {source_class: forest, target_class: high_obstacle, target_id: 3}
+    17: {source_class: bush, target_class: medium, target_id: 2}
+    18: {source_class: moss, target_class: medium, target_id: 2}
+    19: {source_class: traffic_light, target_class: high_obstacle, target_id: 3}
+    20: {source_class: motorcycle, target_class: high_obstacle, target_id: 3}
+    21: {source_class: sidewalk, target_class: paved, target_id: 0}
+    22: {source_class: curb, target_class: high_obstacle, target_id: 3}
+    23: {source_class: asphalt, target_class: paved, target_id: 0}
+    24: {source_class: gravel, target_class: natural_low, target_id: 1}
+    25: {source_class: boom_barrier, target_class: high_obstacle, target_id: 3}
+    26: {source_class: rail_track, target_class: high_obstacle, target_id: 3}
+    27: {source_class: tree_crown, target_class: high_obstacle, target_id: 3}
+    28: {source_class: tree_trunk, target_class: high_obstacle, target_id: 3}
+    29: {source_class: debris, target_class: high_obstacle, target_id: 3}
+    30: {source_class: crops, target_class: medium, target_id: 2}
+    31: {source_class: soil, target_class: natural_low, target_id: 1}
+    32: {source_class: rider, target_class: high_obstacle, target_id: 3}
+    33: {source_class: animal, target_class: high_obstacle, target_id: 3}
+    34: {source_class: truck, target_class: high_obstacle, target_id: 3}
+    35: {source_class: on_rails, target_class: high_obstacle, target_id: 3}
+    36: {source_class: caravan, target_class: high_obstacle, target_id: 3}
+    37: {source_class: trailer, target_class: high_obstacle, target_id: 3}
+    38: {source_class: building, target_class: high_obstacle, target_id: 3}
+    39: {source_class: wall, target_class: high_obstacle, target_id: 3}
+    40: {source_class: rock, target_class: high_obstacle, target_id: 3}
+    41: {source_class: fence, target_class: high_obstacle, target_id: 3}
+    42: {source_class: guard_rail, target_class: high_obstacle, target_id: 3}
+    43: {source_class: bridge, target_class: high_obstacle, target_id: 3}
+    44: {source_class: tunnel, target_class: high_obstacle, target_id: 3}
+    45: {source_class: pole, target_class: high_obstacle, target_id: 3}
+    46: {source_class: traffic_sign, target_class: high_obstacle, target_id: 3}
+    47: {source_class: misc_sign, target_class: high_obstacle, target_id: 3}
+    48: {source_class: barrier_tape, target_class: high_obstacle, target_id: 3}
+    49: {source_class: kick_scooter, target_class: high_obstacle, target_id: 3}
+    50: {source_class: low_grass, target_class: natural_low, target_id: 1}
+    51: {source_class: high_grass, target_class: medium, target_id: 2}
+    52: {source_class: scenery_vegetation, target_class: high_obstacle, target_id: 3}
+    53: {source_class: sky, target_class: ignore, target_id: 255}
+    54: {source_class: water, target_class: high_obstacle, target_id: 3}
+    55: {source_class: wire, target_class: high_obstacle, target_id: 3}
+    56: {source_class: outlier, target_class: ignore, target_id: 255}
+    57: {source_class: heavy_machinery, target_class: high_obstacle, target_id: 3}
+    58: {source_class: container, target_class: high_obstacle, target_id: 3}
+    59: {source_class: hedge, target_class: high_obstacle, target_id: 3}
+    60: {source_class: barrel, target_class: high_obstacle, target_id: 3}
+    61: {source_class: pipe, target_class: high_obstacle, target_id: 3}
+    62: {source_class: tree_root, target_class: high_obstacle, target_id: 3}
+    63: {source_class: military_vehicle, target_class: high_obstacle, target_id: 3}

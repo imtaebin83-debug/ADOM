@@ -1,0 +1,73 @@
+{
+  "format_version": 1,
+  "ontology": "ADOM Semantic20",
+  "num_classes": 19,
+  "ignore_index": 255,
+  "reduce_zero_label": false,
+  "target_classes": {
+    "0": "dirt",
+    "1": "grass",
+    "2": "tree",
+    "3": "pole",
+    "4": "water",
+    "5": "sky",
+    "6": "vehicle",
+    "7": "object",
+    "8": "asphalt",
+    "9": "building",
+    "10": "log",
+    "11": "person",
+    "12": "fence",
+    "13": "bush",
+    "14": "concrete",
+    "15": "barrier",
+    "16": "puddle",
+    "17": "mud",
+    "18": "rubble",
+    "255": "ignore"
+  },
+  "rgb_to_target": [
+    {
+      "rgb": [0, 0, 0],
+      "source_label": "background_or_unlabelled",
+      "target_id": 255,
+      "target_label": "ignore"
+    },
+    {
+      "rgb": [50, 183, 250],
+      "source_label": "dirt",
+      "target_id": 0,
+      "target_label": "dirt"
+    },
+    {
+      "rgb": [204, 153, 51],
+      "source_label": "log",
+      "target_id": 10,
+      "target_label": "log"
+    },
+    {
+      "rgb": [61, 61, 245],
+      "source_label": "human",
+      "target_id": 11,
+      "target_label": "person"
+    },
+    {
+      "rgb": [36, 179, 83],
+      "source_label": "bush",
+      "target_id": 13,
+      "target_label": "bush"
+    },
+    {
+      "rgb": [202, 88, 23],
+      "source_label": "rubble_legacy",
+      "target_id": 18,
+      "target_label": "rubble"
+    },
+    {
+      "rgb": [178, 80, 80],
+      "source_label": "rubble",
+      "target_id": 18,
+      "target_label": "rubble"
+    }
+  ]
+}

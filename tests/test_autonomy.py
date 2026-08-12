@@ -11,6 +11,8 @@ from adom.autonomy import (
     ImuSpeedEstimatorConfig,
     PathControlConfig,
     PlannerConfig,
+    StuckRecoveryConfig,
+    StuckRecoveryGate,
     build_costmap,
     control_local_path,
     gps_speed_mps,
@@ -248,17 +250,20 @@ class LocalPathControlTests(unittest.TestCase):
         pca = vehicle["pca9685_control"]["ros__parameters"]
         gamepad = vehicle["gamepad_control"]["ros__parameters"]
 
-        self.assertEqual(planner["min_speed_mps"], 0.25)
-        self.assertEqual(planner["max_speed_mps"], 3.0)
-        self.assertEqual(local["min_speed_mps"], planner["min_speed_mps"])
+        self.assertEqual(planner["min_speed_mps"], 0.10)
+        self.assertEqual(planner["max_speed_mps"], 1.0)
         self.assertEqual(local["max_speed_mps"], planner["max_speed_mps"])
+        self.assertEqual(planner["max_steering_deg"], 24.0)
+        self.assertEqual(local["max_steering_deg"], planner["max_steering_deg"])
+        self.assertEqual(planner["lookahead_m"], 4.0)
+        self.assertEqual(planner["slow_distance_m"], 3.5)
         self.assertEqual(
             planner["downstream_max_speed_mps"], gamepad["max_forward_speed_mps"]
         )
         self.assertEqual(
             local["downstream_max_speed_mps"], pca["max_speed_mps"]
         )
-        self.assertEqual(pca["max_speed_mps"], 12.0)
+        self.assertEqual(pca["max_speed_mps"], 15.0)
         self.assertEqual(pca["esc_neutral_us"], 1500.0)
         self.assertEqual(pca["esc_forward_max_us"], 2000.0)
 
@@ -373,6 +378,62 @@ class LocalPathControlTests(unittest.TestCase):
         east, north = local_gps_xy_m(0.0, 0.0, 0.000001, 0.000002)
         self.assertAlmostEqual(east, 0.222, places=2)
         self.assertAlmostEqual(north, 0.111, places=2)
+
+
+class StuckRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.gate = StuckRecoveryGate(
+            StuckRecoveryConfig(hold_sec=1.0, duration_sec=0.75)
+        )
+
+    def update(
+        self,
+        time_sec,
+        *,
+        path_valid=True,
+        speed=0.4,
+        steering_deg=18.0,
+        estimated_speed=0.0,
+        yaw_rate=0.0,
+    ):
+        return self.gate.update(
+            int(time_sec * 1e9),
+            path_valid=path_valid,
+            commanded_speed_mps=speed,
+            steering_rad=math.radians(steering_deg),
+            estimated_speed_mps=estimated_speed,
+            yaw_rate_rps=yaw_rate,
+        )
+
+    def test_stable_turn_with_no_motion_gets_one_bounded_attempt(self):
+        self.assertEqual(self.update(0.0).state, "candidate")
+        self.assertEqual(self.update(0.5).state, "candidate")
+        active = self.update(1.0)
+        self.assertTrue(active.active)
+        self.assertEqual(active.state, "active")
+        self.assertTrue(self.update(1.5).active)
+        exhausted = self.update(1.8)
+        self.assertFalse(exhausted.active)
+        self.assertEqual(exhausted.state, "exhausted")
+        self.assertEqual(self.update(3.0).state, "exhausted")
+
+    def test_straight_path_never_triggers_recovery(self):
+        self.assertEqual(self.update(0.0, steering_deg=0.0).state, "inactive")
+        self.assertEqual(self.update(2.0, steering_deg=0.0).state, "inactive")
+
+    def test_motion_evidence_rearms_after_an_attempt(self):
+        self.update(0.0)
+        self.assertTrue(self.update(1.0).active)
+        moving = self.update(1.1, estimated_speed=0.2)
+        self.assertEqual(moving.state, "moving")
+        self.assertFalse(moving.active)
+        self.assertEqual(self.update(1.2).state, "candidate")
+
+    def test_invalid_or_blocked_path_cancels_candidate(self):
+        self.update(0.0)
+        stopped = self.update(1.0, path_valid=False)
+        self.assertEqual(stopped.state, "inactive")
+        self.assertFalse(stopped.active)
 
 
 if __name__ == "__main__":

@@ -18,12 +18,12 @@ rule_planner:
     max_source_age_sec: 0.40
 
     wheelbase_m: 0.33
-    max_steering_deg: 20.0
-    lookahead_m: 3.0
+    max_steering_deg: 24.0
+    lookahead_m: 4.0
     path_step_m: 0.10
-    # Receding-horizon direction tree: 5 actions (-20,-10,0,10,20) per level.
+    # Receding-horizon direction tree: 5 actions (-24,-12,0,12,24) per level.
     tree_depth: 3
-    tree_branch_steering_deg: 10.0
+    tree_branch_steering_deg: 12.0
     steering_change_penalty: 4.0
     corridor_half_width_m: 0.18
     unknown_cost: 70.0
@@ -36,7 +36,7 @@ rule_planner:
     # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
     downstream_max_speed_mps: 15.0
     steering_penalty: 8.0
-    # Depth-projected obstacle distance weighting.
-    distance_decay_m: 1.25
+    # Keep farther depth-projected risk relevant and start slowing early.
+    distance_decay_m: 2.0
     clearance_penalty: 35.0
-    slow_distance_m: 2.0
+    slow_distance_m: 3.0

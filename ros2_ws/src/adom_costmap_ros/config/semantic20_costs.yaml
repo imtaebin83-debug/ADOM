@@ -14,7 +14,9 @@ semantic_costmap:
     width_m: 6.0
     min_range_m: 0.30
     max_range_m: 8.0
-    sample_stride: 4
+    # Denser depth sampling improves the chance of retaining distant obstacles;
+    # validate the added CPU cost against the costmap latency status.
+    sample_stride: 3
     # Height is evaluated in ground-referenced base_link after applying the
     # measured ZED extrinsic; reject below-ground stereo overshoot.
     min_height_m: -0.05

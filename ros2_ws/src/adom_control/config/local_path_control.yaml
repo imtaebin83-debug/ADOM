@@ -15,11 +15,11 @@ local_path_control:
 
     wheelbase_m: 0.33
     lookahead_m: 0.80
-    max_steering_deg: 20.0
+    max_steering_deg: 24.0
     # Match the planner and hard-cap the final autonomous command at 1.00 m/s.
     max_speed_mps: 1.00
     min_speed_mps: 0.25
-    downstream_max_speed_mps: 12.0
+    downstream_max_speed_mps: 15.0
     curvature_speed_gain: 1.5
     # Bounded IMU feedback correction. IMU-only velocity remains a short-horizon
     # estimate and is not an absolute-speed measurement.
@@ -38,3 +38,16 @@ local_path_control:
     imu_stationary_command_threshold_mps: 0.02
     imu_stationary_hold_sec: 0.50
     drive_feedback_timeout_sec: 0.25
+
+    # One bounded escape attempt is allowed only on a persistent turning path
+    # with little longitudinal speed and yaw response. Empty/blocked paths and
+    # every watchdog still stop before this logic is evaluated.
+    stuck_recovery_enabled: true
+    stuck_command_min_mps: 0.25
+    stuck_max_estimated_speed_mps: 0.08
+    stuck_max_abs_yaw_rate_rps: 0.08
+    stuck_min_abs_steering_deg: 12.0
+    stuck_steering_stability_deg: 5.0
+    stuck_hold_sec: 1.50
+    stuck_recovery_duration_sec: 0.75
+    stuck_recovery_speed_mps: 1.00

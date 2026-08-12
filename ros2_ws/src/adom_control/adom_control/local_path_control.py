@@ -17,6 +17,9 @@ from adom.autonomy import (
     ImuSpeedEstimator,
     ImuSpeedEstimatorConfig,
     PathControlConfig,
+    StuckRecoveryConfig,
+    StuckRecoveryDecision,
+    StuckRecoveryGate,
     control_local_path,
 )
 
@@ -41,14 +44,14 @@ class LocalPathControlNode(Node):
             "status_topic": "/adom/control/local_path_status",
             "drive_topic": "/drive",
             "base_frame": "base_link",
-            "control_rate_hz": 20.0,
+            "control_rate_hz": 50.0,
             "path_timeout_sec": 0.25,
             "planned_speed_timeout_sec": 0.25,
             "imu_timeout_sec": 0.25,
             "wheelbase_m": 0.33,
             "lookahead_m": 0.80,
-            "max_steering_deg": 20.0,
-            "max_speed_mps": 3.0,
+            "max_steering_deg": 24.0,
+            "max_speed_mps": 1.0,
             "min_speed_mps": 0.25,
             "downstream_max_speed_mps": 12.0,
             "curvature_speed_gain": 1.5,
@@ -65,6 +68,15 @@ class LocalPathControlNode(Node):
             "imu_stationary_command_threshold_mps": 0.02,
             "imu_stationary_hold_sec": 0.50,
             "drive_feedback_timeout_sec": 0.25,
+            "stuck_recovery_enabled": True,
+            "stuck_command_min_mps": 0.25,
+            "stuck_max_estimated_speed_mps": 0.08,
+            "stuck_max_abs_yaw_rate_rps": 0.08,
+            "stuck_min_abs_steering_deg": 12.0,
+            "stuck_steering_stability_deg": 5.0,
+            "stuck_hold_sec": 1.50,
+            "stuck_recovery_duration_sec": 0.75,
+            "stuck_recovery_speed_mps": 1.0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -76,6 +88,12 @@ class LocalPathControlNode(Node):
         ):
             raise ValueError(
                 "local path controller max_speed_mps must not exceed the downstream control limit"
+            )
+        if not 0.0 < float(self.p["stuck_recovery_speed_mps"]) <= float(
+            self.p["max_speed_mps"]
+        ):
+            raise ValueError(
+                "stuck_recovery_speed_mps must be positive and not exceed max_speed_mps"
             )
         self._config = PathControlConfig(
             wheelbase_m=float(self.p["wheelbase_m"]),
@@ -99,6 +117,23 @@ class LocalPathControlNode(Node):
                 max_integration_dt_sec=float(self.p["imu_max_integration_dt_sec"]),
                 speed_limit_mps=float(self.p["imu_estimated_speed_limit_mps"]),
                 velocity_leak_per_sec=float(self.p["imu_velocity_leak_per_sec"]),
+            )
+        )
+        self._stuck_recovery = StuckRecoveryGate(
+            StuckRecoveryConfig(
+                command_min_mps=float(self.p["stuck_command_min_mps"]),
+                max_estimated_speed_mps=float(
+                    self.p["stuck_max_estimated_speed_mps"]
+                ),
+                max_abs_yaw_rate_rps=float(
+                    self.p["stuck_max_abs_yaw_rate_rps"]
+                ),
+                min_abs_steering_deg=float(self.p["stuck_min_abs_steering_deg"]),
+                steering_stability_deg=float(
+                    self.p["stuck_steering_stability_deg"]
+                ),
+                hold_sec=float(self.p["stuck_hold_sec"]),
+                duration_sec=float(self.p["stuck_recovery_duration_sec"]),
             )
         )
         self._path_xy: np.ndarray | None = None
@@ -227,8 +262,11 @@ class LocalPathControlNode(Node):
         self._status_pub.publish(message)
 
     def _stop(self, reason: str, **fields) -> None:
+        self._stuck_recovery.reset()
         self._publish(0.0, 0.0)
-        self._publish_status("stopped", reason=reason, **fields)
+        self._publish_status(
+            "stopped", reason=reason, stuck_recovery_state="inactive", **fields
+        )
 
     def _update(self) -> None:
         now_ns = self.get_clock().now().nanoseconds
@@ -268,7 +306,25 @@ class LocalPathControlNode(Node):
             self.get_logger().error(f"Local path control failed: {error}")
             self._stop("controller_error", message=str(error), **common)
             return
-        self._publish(command.speed_mps, command.steering_rad)
+        recovery = StuckRecoveryDecision("disabled", False, 0.0)
+        if bool(self.p["stuck_recovery_enabled"]):
+            recovery = self._stuck_recovery.update(
+                now_ns,
+                path_valid=(
+                    command.speed_mps > 0.0
+                    and command.available_path_m > self._config.path_stop_distance_m
+                ),
+                commanded_speed_mps=command.speed_mps,
+                steering_rad=command.steering_rad,
+                estimated_speed_mps=self._estimated_speed_mps,
+                yaw_rate_rps=self._yaw_rate_rps,
+            )
+        published_speed_mps = (
+            float(self.p["stuck_recovery_speed_mps"])
+            if recovery.active
+            else command.speed_mps
+        )
+        self._publish(published_speed_mps, command.steering_rad)
         source_to_command_ms = (
             None
             if self._path_source_ns is None or now_ns < self._path_source_ns
@@ -277,7 +333,8 @@ class LocalPathControlNode(Node):
         self._publish_status(
             "tracking",
             **common,
-            speed_command_mps=round(command.speed_mps, 3),
+            speed_command_mps=round(published_speed_mps, 3),
+            nominal_speed_command_mps=round(command.speed_mps, 3),
             planned_speed_mps=round(self._planned_speed_mps, 3),
             estimated_speed_mps=round(self._estimated_speed_mps, 3),
             speed_feedback_error_mps=round(
@@ -293,6 +350,9 @@ class LocalPathControlNode(Node):
             target_y_m=round(command.target_y_m, 3),
             available_path_m=round(command.available_path_m, 3),
             source_to_command_ms=source_to_command_ms,
+            stuck_recovery_state=recovery.state,
+            stuck_recovery_active=recovery.active,
+            stuck_candidate_age_sec=round(recovery.candidate_age_sec, 3),
         )
 
     def destroy_node(self):

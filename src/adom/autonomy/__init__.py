@@ -13,6 +13,11 @@ from .path_control import (
     select_lookahead_point,
 )
 from .rule_planner import PlannerConfig, RulePlan, plan_corridor
+from .stuck_recovery import (
+    StuckRecoveryConfig,
+    StuckRecoveryDecision,
+    StuckRecoveryGate,
+)
 
 __all__ = [
     "CostmapConfig",
@@ -23,6 +28,9 @@ __all__ = [
     "PathControlCommand",
     "PathControlConfig",
     "RulePlan",
+    "StuckRecoveryConfig",
+    "StuckRecoveryDecision",
+    "StuckRecoveryGate",
     "build_costmap",
     "control_local_path",
     "gps_speed_mps",

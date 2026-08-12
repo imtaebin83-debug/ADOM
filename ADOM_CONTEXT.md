@@ -1,7 +1,7 @@
 # ADOM Project Context — D-5 PoC Single Source of Truth
 
 > 상태: **ACTIVE / 발표 시연 우선**
-> 기준일: **2026-08-07**
+> 기준일: **2026-08-12**
 > 권위: 이 파일이 ADOM의 유일한 프로젝트 Source of Truth다. 기존 설계 문서나
 > 회의 기록과 충돌하면 이 문서를 우선한다.
 > 변경 규칙: 범위, 인터페이스, 담당자, 성공 기준을 변경할 때는 이 파일의
@@ -40,6 +40,19 @@ merge blocker로 관리하며, 그 사실만으로 Draft로 두지는 않는다.
 
 ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semantic perception이
 차량의 안전 정지로 이어지는 end-to-end 온보드 파이프라인을 시연한다.
+
+### 현재 post-D-5 개발 범위
+
+인지 모델이 동작하는 현재 increment는 복잡한 global navigation 대신 robot-frame
+Semantic20 costmap에서 실행되는 저수준 방향 tree planner를 사용한다. planner는
+Ackermann 가능한 좌/직진/우 방향을 다단계로 전개하고 매 cycle 첫 방향만 실행해
+직진과 근거리 장애물 회피를 수행한다. GPS는 localization, planning, control 입력으로
+사용하지 않고 이동경로 기록과 rosbag 분석에만 사용한다.
+
+자율주행 세션은 perception 판단, semantic costmap, 선택 path/tree 상태, `/cmd_vel`,
+`/drive`, PWM 상태, IMU, raw GPS fix와 logging-only GPS trail을 bounded rosbag으로
+기록한다. 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장
+경로를 분리한다. 상세 계약은 decision record 0010을 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -563,6 +576,10 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: review 시작을 별도 PR 요청이나 외부 장비 검증 완료에 종속시키지 않는다.
   미완료 검증은 PR 본문에 merge blocker로 명시하고, Draft는 명시 요청 또는 변경이
   아직 review 가능한 단위가 아닐 때만 사용한다.
+- **[2026-08-12] 저수준 방향 tree planning과 autonomy rosbag을 채택**
+  이유: 현재 목표는 GPS/Nav2 기반 전역 자율주행이 아니라 Semantic20 costmap에서의
+  직진·근거리 회피다. GPS를 control feedback에서 제거하고 이동경로 evidence로만
+  기록하며, perception/planning/control/GPS를 같은 시간축의 rosbag으로 보존한다.
 
 ## 17. Primary References
 

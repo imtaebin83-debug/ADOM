@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import product
 import math
 
 import numpy as np
@@ -12,9 +13,11 @@ from .costmap import CostmapConfig
 class PlannerConfig:
     wheelbase_m: float = 0.33
     max_steering_deg: float = 20.0
-    steering_step_deg: float = 4.0
     lookahead_m: float = 3.0
     path_step_m: float = 0.10
+    tree_depth: int = 3
+    tree_branch_steering_deg: float = 10.0
+    steering_change_penalty: float = 4.0
     corridor_half_width_m: float = 0.18
     unknown_cost: float = 70.0
     lethal_cost: int = 90
@@ -35,19 +38,47 @@ class RulePlan:
     blocked: bool
     path_xy: np.ndarray
     clearance_m: float
+    steering_sequence_rad: tuple[float, ...] = ()
 
 
-def _candidate_path(angle: float, config: PlannerConfig) -> np.ndarray:
-    distance = np.arange(
-        config.path_step_m, config.lookahead_m + config.path_step_m, config.path_step_m
+def _steering_actions(config: PlannerConfig) -> tuple[float, ...]:
+    if config.tree_depth < 1:
+        raise ValueError("tree_depth must be at least one")
+    if config.tree_branch_steering_deg <= 0.0:
+        raise ValueError("tree_branch_steering_deg must be positive")
+    actions = np.arange(
+        -config.max_steering_deg,
+        config.max_steering_deg + config.tree_branch_steering_deg * 0.5,
+        config.tree_branch_steering_deg,
     )
-    if abs(angle) < 1e-6:
-        return np.stack((distance, np.zeros_like(distance)), axis=1)
-    radius = config.wheelbase_m / math.tan(angle)
-    heading = distance / radius
-    return np.stack(
-        (radius * np.sin(heading), radius * (1.0 - np.cos(heading))), axis=1
-    )
+    actions = np.append(actions, [-config.max_steering_deg, 0.0, config.max_steering_deg])
+    unique = sorted({round(float(value), 9) for value in actions})
+    return tuple(math.radians(value) for value in unique)
+
+
+def _tree_path(sequence: tuple[float, ...], config: PlannerConfig) -> np.ndarray:
+    """Integrate one root-to-leaf sequence with the Ackermann bicycle model."""
+    segment_m = config.lookahead_m / config.tree_depth
+    steps = max(1, int(round(segment_m / config.path_step_m)))
+    step_m = segment_m / steps
+    x = y = heading = 0.0
+    points: list[tuple[float, float]] = []
+    for steering in sequence:
+        if abs(steering) < 1e-9:
+            for _ in range(steps):
+                x += step_m * math.cos(heading)
+                y += step_m * math.sin(heading)
+                points.append((x, y))
+            continue
+        radius = config.wheelbase_m / math.tan(steering)
+        delta_heading = step_m / radius
+        for _ in range(steps):
+            next_heading = heading + delta_heading
+            x += radius * (math.sin(next_heading) - math.sin(heading))
+            y -= radius * (math.cos(next_heading) - math.cos(heading))
+            heading = next_heading
+            points.append((x, y))
+    return np.asarray(points, dtype=np.float64)
 
 
 def _sample_costs(
@@ -87,17 +118,20 @@ def plan_corridor(
         raise ValueError(
             f"grid shape {grid.shape} does not match {(costmap.columns, costmap.rows)}"
         )
-    angles_deg = np.arange(
-        -planner.max_steering_deg,
-        planner.max_steering_deg + planner.steering_step_deg * 0.5,
-        planner.steering_step_deg,
-    )
+    actions = _steering_actions(planner)
     candidates: list[
-        tuple[float, float, np.ndarray, np.ndarray, float, float, int | None]
+        tuple[
+            float,
+            tuple[float, ...],
+            np.ndarray,
+            np.ndarray,
+            float,
+            float,
+            int | None,
+        ]
     ] = []
-    for angle_deg in angles_deg:
-        angle = math.radians(float(angle_deg))
-        path = _candidate_path(angle, planner)
+    for sequence in product(actions, repeat=planner.tree_depth):
+        path = _tree_path(sequence, planner)
         costs = _sample_costs(grid, path, costmap, planner)
         step_costs = np.max(costs, axis=1)
         distances = np.linalg.norm(path, axis=1)
@@ -111,16 +145,26 @@ def plan_corridor(
             else planner.lookahead_m + planner.path_step_m
         )
         clearance_ratio = min(1.0, clearance_m / max(planner.lookahead_m, 1e-3))
+        steering_magnitudes = [abs(math.degrees(value)) for value in sequence]
+        steering_changes = [
+            abs(math.degrees(current - previous))
+            for previous, current in zip((0.0, *sequence[:-1]), sequence)
+        ]
         score = (
             0.45 * float(np.max(step_costs))
             + 0.40 * distance_weighted_risk
             + planner.clearance_penalty * (1.0 - clearance_ratio)
-            + planner.steering_penalty * abs(angle_deg) / planner.max_steering_deg
+            + planner.steering_penalty
+            * float(np.mean(steering_magnitudes))
+            / planner.max_steering_deg
+            + planner.steering_change_penalty
+            * float(np.mean(steering_changes))
+            / planner.max_steering_deg
         )
         candidates.append(
             (
                 score,
-                angle,
+                sequence,
                 path,
                 step_costs,
                 clearance_m,
@@ -129,9 +173,10 @@ def plan_corridor(
             )
         )
 
-    score, angle, path, costs, clearance_m, weighted_risk, lethal_index = min(
+    score, sequence, path, costs, clearance_m, weighted_risk, lethal_index = min(
         candidates, key=lambda item: item[0]
     )
+    angle = sequence[0]
     blocked = clearance_m <= planner.stop_distance_m
     if blocked:
         speed = 0.0
@@ -151,4 +196,12 @@ def plan_corridor(
         safe_path = path[:lethal_index]
     else:
         safe_path = path
-    return RulePlan(speed, angle, float(score), blocked, safe_path, clearance_m)
+    return RulePlan(
+        speed,
+        angle,
+        float(score),
+        blocked,
+        safe_path,
+        clearance_m,
+        tuple(sequence),
+    )

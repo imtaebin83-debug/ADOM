@@ -10,6 +10,7 @@ from adom.autonomy import (
     build_costmap,
     control_local_path,
     gps_speed_mps,
+    local_gps_xy_m,
     plan_corridor,
 )
 from adom.autonomy.costmap import project_mask_depth
@@ -147,7 +148,8 @@ class RulePlannerTests(unittest.TestCase):
     def test_near_depth_obstacle_slows_more_than_far_obstacle(self):
         distance_planner = PlannerConfig(
             max_steering_deg=1.0,
-            steering_step_deg=1.0,
+            tree_depth=1,
+            tree_branch_steering_deg=1.0,
         )
         near = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         far = near.copy()
@@ -160,6 +162,16 @@ class RulePlannerTests(unittest.TestCase):
         self.assertLess(near_plan.clearance_m, far_plan.clearance_m)
         self.assertLess(near_plan.speed_mps, far_plan.speed_mps)
         self.assertLess(len(near_plan.path_xy), len(far_plan.path_xy))
+
+    def test_tree_plan_exposes_one_direction_choice_per_depth(self):
+        grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
+        plan = plan_corridor(
+            grid,
+            self.costmap,
+            PlannerConfig(tree_depth=3, tree_branch_steering_deg=10.0),
+        )
+        self.assertEqual(len(plan.steering_sequence_rad), 3)
+        self.assertTrue(all(abs(value) < 1e-9 for value in plan.steering_sequence_rad))
 
 
 class LocalPathControlTests(unittest.TestCase):
@@ -203,6 +215,11 @@ class LocalPathControlTests(unittest.TestCase):
     def test_gps_speed_rejects_implausible_jump(self):
         speed = gps_speed_mps((0.0, 0.0, 0), (0.0, 1.0, 1_000_000_000))
         self.assertIsNone(speed)
+
+    def test_logging_gps_trail_uses_local_east_north_coordinates(self):
+        east, north = local_gps_xy_m(0.0, 0.0, 0.000001, 0.000002)
+        self.assertAlmostEqual(east, 0.222, places=2)
+        self.assertAlmostEqual(north, 0.111, places=2)
 
 
 if __name__ == "__main__":

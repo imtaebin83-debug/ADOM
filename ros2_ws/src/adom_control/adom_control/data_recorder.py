@@ -46,6 +46,8 @@ class DataRecorder(Node):
             "size_check_period_sec": 0.5,
             "bag_split_size_mb": 1024,
             "status_topic": "/adom/recording/status",
+            "auto_start": False,
+            "session_prefix": "",
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -82,6 +84,8 @@ class DataRecorder(Node):
             f"Data recorder ready: Y/button {self.p['record_button']} toggles recording; "
             f"limit={self.p['max_size_gb']} GB, root={self._capture_root}"
         )
+        if bool(self.p["auto_start"]):
+            self.start_recording()
 
     def _validate_parameters(self):
         if int(self.p["record_button"]) < 0:
@@ -131,6 +135,9 @@ class DataRecorder(Node):
             return
 
         timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%z")
+        prefix = str(self.p["session_prefix"]).strip()
+        if prefix:
+            timestamp = f"{prefix}_{timestamp}"
         session_dir = self._unique_session_dir(timestamp)
         bag_path = session_dir / "rosbag"
         session_dir.mkdir(parents=True)

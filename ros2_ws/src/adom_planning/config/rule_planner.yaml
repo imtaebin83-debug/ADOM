@@ -17,9 +17,12 @@ rule_planner:
 
     wheelbase_m: 0.33
     max_steering_deg: 20.0
-    steering_step_deg: 4.0
     lookahead_m: 3.0
     path_step_m: 0.10
+    # Receding-horizon direction tree: 5 actions (-20,-10,0,10,20) per level.
+    tree_depth: 3
+    tree_branch_steering_deg: 10.0
+    steering_change_penalty: 4.0
     corridor_half_width_m: 0.18
     unknown_cost: 70.0
     lethal_cost: 90

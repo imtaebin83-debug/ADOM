@@ -9,10 +9,10 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
+from sensor_msgs.msg import Imu
 from std_msgs.msg import String
 
-from adom.autonomy import PathControlConfig, control_local_path, gps_speed_mps
+from adom.autonomy import PathControlConfig, control_local_path
 
 
 def message_stamp_ns(message, fallback_ns: int) -> int:
@@ -23,45 +23,38 @@ def message_stamp_ns(message, fallback_ns: int) -> int:
 
 
 class LocalPathControlNode(Node):
-    """Track a robot-frame local path using IMU-aided GPS speed feedback."""
+    """Track a robot-frame local path without using GPS as a control input."""
 
     def __init__(self) -> None:
         super().__init__("local_path_control")
         defaults = {
             "local_path_topic": "/adom/navigation/local_path",
             "imu_topic": "/zed/zed_node/imu/data",
-            "gps_topic": "/fix",
             "cmd_vel_topic": "/cmd_vel",
             "status_topic": "/adom/control/local_path_status",
             "base_frame": "base_link",
             "control_rate_hz": 20.0,
             "path_timeout_sec": 0.25,
             "imu_timeout_sec": 0.25,
-            "gps_timeout_sec": 1.50,
             "wheelbase_m": 0.33,
             "lookahead_m": 0.80,
             "max_steering_deg": 20.0,
             "max_speed_mps": 0.25,
             "min_speed_mps": 0.06,
             "curvature_speed_gain": 1.5,
-            "speed_kp": 0.6,
+            "speed_kp": 0.0,
             "path_stop_distance_m": 0.50,
             "path_slow_distance_m": 2.0,
-            "gps_speed_blend": 0.35,
-            "gps_max_speed_mps": 10.0,
-            "gps_max_position_variance_m2": 4.0,
             "imu_accel_bias_x_mps2": 0.0,
             "imu_max_abs_accel_mps2": 5.0,
             "imu_max_integration_dt_sec": 0.10,
+            "imu_estimated_speed_limit_mps": 1.0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
         self.p = {name: self.get_parameter(name).value for name in defaults}
         if float(self.p["max_speed_mps"]) > 0.30:
             raise ValueError("local path controller max_speed_mps must be <= 0.30")
-        if not 0.0 <= float(self.p["gps_speed_blend"]) <= 1.0:
-            raise ValueError("gps_speed_blend must be in [0,1]")
-
         self._config = PathControlConfig(
             wheelbase_m=float(self.p["wheelbase_m"]),
             lookahead_m=float(self.p["lookahead_m"]),
@@ -78,9 +71,6 @@ class LocalPathControlNode(Node):
         self._last_path_ns: int | None = None
         self._last_imu_ns: int | None = None
         self._last_imu_stamp_ns: int | None = None
-        self._last_gps_ns: int | None = None
-        self._previous_gps: tuple[float, float, int] | None = None
-        self._gps_speed_mps: float | None = None
         self._estimated_speed_mps = 0.0
         self._acceleration_x_mps2 = 0.0
         self._yaw_rate_rps = 0.0
@@ -97,15 +87,9 @@ class LocalPathControlNode(Node):
         self.create_subscription(
             Imu, str(self.p["imu_topic"]), self._on_imu, qos_profile_sensor_data
         )
-        self.create_subscription(
-            NavSatFix,
-            str(self.p["gps_topic"]),
-            self._on_gps,
-            qos_profile_sensor_data,
-        )
         self.create_timer(1.0 / float(self.p["control_rate_hz"]), self._update)
         self.get_logger().warning(
-            "Local path control starts fail-safe at zero until path, IMU and two GPS fixes arrive."
+            "Local path control starts fail-safe at zero until path and IMU arrive; GPS is logging-only."
         )
 
     def _on_path(self, message: Path) -> None:
@@ -137,7 +121,7 @@ class LocalPathControlNode(Node):
                 self._estimated_speed_mps = max(
                     0.0,
                     min(
-                        float(self.p["gps_max_speed_mps"]),
+                        float(self.p["imu_estimated_speed_limit_mps"]),
                         self._estimated_speed_mps + acceleration * dt,
                     ),
                 )
@@ -145,38 +129,6 @@ class LocalPathControlNode(Node):
         self._yaw_rate_rps = float(message.angular_velocity.z)
         self._last_imu_stamp_ns = stamp_ns
         self._last_imu_ns = now_ns
-
-    def _on_gps(self, message: NavSatFix) -> None:
-        now_ns = self.get_clock().now().nanoseconds
-        if message.status.status < NavSatStatus.STATUS_FIX:
-            return
-        if not math.isfinite(message.latitude) or not math.isfinite(message.longitude):
-            return
-        variance = max(
-            0.0,
-            float(message.position_covariance[0]) + float(message.position_covariance[4]),
-        )
-        if variance > float(self.p["gps_max_position_variance_m2"]):
-            return
-        current = (
-            float(message.latitude),
-            float(message.longitude),
-            message_stamp_ns(message, now_ns),
-        )
-        if self._previous_gps is not None:
-            speed = gps_speed_mps(
-                self._previous_gps,
-                current,
-                maximum_speed_mps=float(self.p["gps_max_speed_mps"]),
-            )
-            if speed is not None:
-                blend = float(self.p["gps_speed_blend"])
-                self._gps_speed_mps = speed
-                self._estimated_speed_mps = (
-                    (1.0 - blend) * self._estimated_speed_mps + blend * speed
-                )
-                self._last_gps_ns = now_ns
-        self._previous_gps = current
 
     @staticmethod
     def _age(now_ns: int, stamp_ns: int | None) -> float:
@@ -207,11 +159,9 @@ class LocalPathControlNode(Node):
         now_ns = self.get_clock().now().nanoseconds
         path_age = self._age(now_ns, self._last_path_ns)
         imu_age = self._age(now_ns, self._last_imu_ns)
-        gps_age = self._age(now_ns, self._last_gps_ns)
         common = {
             "path_age_sec": None if not math.isfinite(path_age) else round(path_age, 3),
             "imu_age_sec": None if not math.isfinite(imu_age) else round(imu_age, 3),
-            "gps_age_sec": None if not math.isfinite(gps_age) else round(gps_age, 3),
         }
         if self._path_xy is None or path_age > float(self.p["path_timeout_sec"]):
             self._stop("path_watchdog", **common)
@@ -221,9 +171,6 @@ class LocalPathControlNode(Node):
             return
         if imu_age > float(self.p["imu_timeout_sec"]):
             self._stop("imu_watchdog", **common)
-            return
-        if gps_age > float(self.p["gps_timeout_sec"]) or self._gps_speed_mps is None:
-            self._stop("gps_speed_unavailable", **common)
             return
         try:
             command = control_local_path(
@@ -244,7 +191,6 @@ class LocalPathControlNode(Node):
             **common,
             speed_command_mps=round(command.speed_mps, 3),
             estimated_speed_mps=round(self._estimated_speed_mps, 3),
-            gps_speed_mps=round(self._gps_speed_mps, 3),
             acceleration_x_mps2=round(self._acceleration_x_mps2, 3),
             yaw_rate_rps=round(self._yaw_rate_rps, 3),
             steering_deg=round(math.degrees(command.steering_rad), 2),

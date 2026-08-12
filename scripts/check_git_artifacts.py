@@ -30,6 +30,7 @@ FORBIDDEN_PATH_PREFIXES = tuple(
         "data/processed",
         "data/external",
         "data/captures",
+        "data/autonomy_bags",
         "models/checkpoints",
         "models/exports",
         "logs",

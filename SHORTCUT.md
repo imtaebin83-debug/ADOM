@@ -20,18 +20,46 @@ source ~/.bashrc
 | `pwm` | 없음 | PWM 관련 토픽과 `/adom/control/pwm_us` | `Ctrl-C` |
 | `zed` | 없음 | `/adom/recording/status` | `Ctrl-C` |
 | `zedgui` | 없음 | ZED Explorer GUI | 창 닫기 |
-| `gps` | 없음 | GPS 입력, 주기 및 localization 출력 | 자동 종료 |
+| `gps` | 없음 | GPS 입력, 주기 및 기록용 trail 출력 | 자동 종료 |
 | `up` | 없음 | 로컬 변경 삭제 후 `origin/jetson` 갱신 | 실행 전 주의 |
 | `t0` | `adom_sensors` | ZED 2i 및 GNSS 센서 | `Ctrl-C` |
 | `t1` | `adom_description` | 차량 URDF와 TF | `Ctrl-C` |
-| `t2` | `adom_localization` | local/global EKF와 NavSat 변환 | `Ctrl-C` |
-| `t3` | `adom_control` | 게임패드와 PCA9685 실출력 제어 | `Ctrl-C` |
+| `t2` | `adom_logging` 및 의존 패키지 | GPS trail과 autonomy rosbag 자동 기록 | `Ctrl-C` |
+| `t3` | `adom_control` | 게임패드, safety mux와 PCA9685 실출력 제어 | `Ctrl-C` |
 | `t4` | `adom_perception_ros` | Semantic20 CUDA perception | `Ctrl-C` |
-| `t5` | `adom_costmap_ros`, `adom_planning` | Semantic20 costmap, local planner, controller | `Ctrl-C` |
+| `t5` | `adom_costmap_ros`, `adom_planning`, `adom_control` | Semantic20 costmap, direction-tree planner, controller | `Ctrl-C` |
 
 각 빌드 함수는 같은 `~/ADOM/ros2_ws/build`, `install`, `log`를 공유한다. 두 터미널에서
 `colcon build`를 동시에 실행하지 않는다. 최초 전체 실행은 `t0`부터 `t5`까지 순서대로
-빌드하고 실행한다.
+빌드하고 실행한다. 새 구조에서는 `t2`가 localization을 실행하지 않으며 GPS는 주행
+판단이 아닌 이동경로 기록에만 사용된다.
+
+현재 권장 터미널 구성은 다음과 같다.
+
+```text
+t0  ZED RGB/depth/IMU + GNSS /fix
+t1  vehicle description + camera/base_link TF
+t2  GPS trail + autonomy rosbag recorder
+t3  gamepad safety mux + PCA9685
+t4  Semantic20 perception
+t5  semantic costmap + 3-depth direction tree + local controller
+```
+
+전체 stack이 올라와도 `t3`는 STOPPED로 시작한다. `t0`~`t5`의 health check와 wheels-off
+검증이 끝난 뒤에만 게임패드 A 버튼으로 autonomous mode를 승인한다.
+
+`low_level_autonomy.launch.py`는 `t2`~`t5` 역할을 한 프로세스 그룹으로 묶은 대체
+실행법이다. 기존 다중 터미널 방식에서는 이 launch를 추가로 실행하지 않는다. 함께
+실행하면 perception, planner, controller, gamepad와 recorder가 중복된다. 통합 방식이
+필요한 경우에만 `t0`, `t1`을 실행한 뒤 별도 터미널에서 다음을 사용한다.
+
+```bash
+export ADOM_REPO_ROOT="$HOME/ADOM"
+ros2 launch adom_bringup low_level_autonomy.launch.py \
+  model_config:="$ADOM_MODEL_CONFIG" \
+  checkpoint:="$ADOM_CHECKPOINT" \
+  start_pca9685:=true
+```
 
 ## `car` — 차량 제어
 
@@ -142,7 +170,7 @@ zedgui
 SSH에서 사용하려면 Jetson의 활성 디스플레이 세션 또는 X11 forwarding 설정이 필요할 수
 있다.
 
-## `gps` — GPS와 localization 상태 점검
+## `gps` — GPS와 기록용 이동경로 점검
 
 ```bash
 gps
@@ -153,9 +181,8 @@ ROS 2 Jazzy와 ADOM workspace overlay를 source한 뒤 다음 항목을 순서�
 1. `/fix` publisher/subscriber와 QoS 상세 정보
 2. `/fix` 메시지 1개(최대 5초 대기)
 3. `/fix` 수신 주기(6초 측정)
-4. `/odometry/gps` 메시지 1개
-5. `/odometry/global` 메시지 1개
-6. `/gps/filtered` 메시지 1개
+4. logging-only `/adom/logging/gps_path` 메시지 1개
+5. `/adom/logging/gps_status` 메시지 1개
 
 내부에서 실행하는 핵심 명령은 다음과 같다.
 
@@ -163,10 +190,13 @@ ROS 2 Jazzy와 ADOM workspace overlay를 source한 뒤 다음 항목을 순서�
 ros2 topic info /fix --verbose
 timeout 5s ros2 topic echo /fix --once
 timeout 6s ros2 topic hz /fix
-timeout 5s ros2 topic echo /odometry/gps --once
-timeout 5s ros2 topic echo /odometry/global --once
-timeout 5s ros2 topic echo /gps/filtered --once
+timeout 5s ros2 topic echo /adom/logging/gps_path --once
+timeout 5s ros2 topic echo /adom/logging/gps_status --once
 ```
+
+기존 `gps` 함수가 `/odometry/gps`, `/odometry/global`, `/gps/filtered`를 확인한다면 위
+명령으로 교체한다. `/adom/logging/gps_path`는 최초 valid fix를 원점으로 만든 기록용
+local metric trail이며 TF localization이나 planning/control 입력이 아니다.
 
 표준 `sensor_msgs/NavSatFix`만으로는 GNSS 수신기의 RTK `FIX`와 `FLOAT`를 완전히 구분할
 수 없다. 해당 판정에는 실제 수신기가 발행하는 전용 status 토픽 확인이 추가로 필요하다.
@@ -227,21 +257,37 @@ ros2 launch adom_description description.launch.py
 
 차량 URDF를 읽고 `robot_state_publisher`를 실행한다.
 
-## `t2` — localization
+## `t2` — GPS trail과 autonomy rosbag
 
 ```bash
 t2
 ```
 
-빌드와 실행 명령:
+기존 `t2`의 `adom_localization localization.launch.py` 실행은 제거한다. `~/.bashrc`의
+`t2` 함수를 다음 역할로 바꾼다.
 
 ```bash
-colcon build --symlink-install --packages-select adom_localization
-ros2 launch adom_localization localization.launch.py
+t2() {
+    cd "$HOME/ADOM/ros2_ws" || return
+    source /opt/ros/jazzy/setup.bash
+    colcon build --symlink-install --packages-up-to adom_logging || return
+    source install/setup.bash
+    export ADOM_REPO_ROOT="$HOME/ADOM"
+    ros2 launch adom_logging autonomy_logging.launch.py \
+      capture_root:=data/autonomy_bags
+}
 ```
 
-local EKF, global EKF와 `navsat_transform_node`를 실행한다. 주요 출력은
-`/odometry/local`, `/odometry/global`, `/odometry/gps`, `/gps/filtered`다.
+launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 닫고 종료한다. 기본
+결과 위치는 다음과 같다.
+
+```text
+~/ADOM/data/autonomy_bags/autonomy_<timestamp>/rosbag/
+```
+
+기록 대상은 perception mask/confidence/status, semantic costmap, local path와 선택 tree,
+`/cmd_vel`, `/drive`, control/PWM/E-stop, IMU, raw `/fix`, GPS trail과 TF다. 이 bag은
+기존 RGB 학습 데이터용 `data/captures`와 분리된다.
 
 ## `t3` — 게임패드와 PCA9685 제어
 
@@ -253,8 +299,12 @@ t3
 
 ```bash
 colcon build --symlink-install --packages-select adom_control
-ros2 launch adom_control gamepad_control.launch.py start_pca9685:=true
+ros2 launch adom_control gamepad_control.launch.py \
+  start_pca9685:=true start_data_recorder:=false
 ```
+
+새 autonomy logging은 `t2`가 담당하므로 `start_data_recorder:=false`를 반드시 유지한다.
+이를 빼면 RGB-only recorder와 autonomy recorder가 동시에 실행된다.
 
 이 함수는 PCA9685 실출력을 명시적으로 활성화한다. 항상 STOPPED 상태에서 시작하고,
 바퀴를 띄운 상태에서 neutral과 watchdog을 검증한 뒤에만 자율 모드를 승인한다.
@@ -325,17 +375,24 @@ t5
 ```bash
 colcon build --symlink-install \
   --packages-select adom_costmap_ros adom_planning
+source install/setup.bash
 ros2 launch adom_planning semantic20_local_planning.launch.py
 ```
+
+`t3`가 먼저 최신 `adom_control`을 빌드하므로 `t5`에서 같은 package를 다시 빌드하지
+않는다. 코드 변경 후에는 `t3`를 먼저 재실행하고 그 다음 `t5`를 재실행한다.
 
 이 launch는 다음 세 요소를 함께 실행한다.
 
 - `adom_costmap_ros`: Semantic20 mask, registered depth, camera info와 TF를 이용한 costmap
-- `adom_planning`: Ackermann corridor local planner
-- `adom_control`: local path controller와 `/cmd_vel` 출력
+- `adom_planning`: 5방향을 3단계로 전개하는 Ackermann direction-tree planner
+- `adom_control`: GPS를 사용하지 않는 local path controller와 `/cmd_vel` 출력
 
-`adom_control` 코드를 수정한 경우 `t3`에서 해당 패키지를 다시 빌드하고 `t3`와 `t5`를
-모두 재시작한다.
+planner는 기본적으로 `[-20, -10, 0, 10, 20]°` 방향을 3단계 전개한 125개 path를
+평가한다. `/adom/navigation/rule_status`의 `steering_sequence_deg`에서 선택한 방향열을
+확인할 수 있으며, 매 cycle 첫 방향만 실행하고 최신 costmap에서 다시 계획한다.
+
+`adom_control` 코드를 수정한 경우 `t3`와 `t5`를 모두 종료한 뒤 순서대로 다시 실행한다.
 
 ## 문제 발생 시 재빌드 원칙
 
@@ -345,12 +402,13 @@ ros2 launch adom_planning semantic20_local_planning.launch.py
 | --- | --- |
 | `ros2_ws/src/adom_sensors` | `t0` |
 | `ros2_ws/src/adom_description` | `t1` |
-| `ros2_ws/src/adom_localization` | `t2` |
+| `ros2_ws/src/adom_localization` | 현재 low-level autonomy stack에서는 사용하지 않음 |
+| `ros2_ws/src/adom_logging` | `t2` |
 | `ros2_ws/src/adom_control` | `t3`; local path controller 사용 시 `t5`도 재시작 |
 | `ros2_ws/src/adom_perception_ros` | `t4` |
 | `ros2_ws/src/adom_costmap_ros` | `t5` |
 | `ros2_ws/src/adom_planning` | `t5` |
-| `ros2_ws/src/adom_bringup` | `rec` |
+| `ros2_ws/src/adom_bringup` | `rec`; 통합 launch 사용 시 재빌드 |
 
 ## 자주 발생하는 문제
 

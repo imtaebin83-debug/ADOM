@@ -7,6 +7,7 @@ from .path_control import (
     control_local_path,
     gps_speed_mps,
     haversine_distance_m,
+    local_gps_xy_m,
     select_lookahead_point,
 )
 from .rule_planner import PlannerConfig, RulePlan, plan_corridor
@@ -21,6 +22,7 @@ __all__ = [
     "control_local_path",
     "gps_speed_mps",
     "haversine_distance_m",
+    "local_gps_xy_m",
     "plan_corridor",
     "select_lookahead_point",
 ]

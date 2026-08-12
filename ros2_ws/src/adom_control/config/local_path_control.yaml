@@ -2,7 +2,6 @@ local_path_control:
   ros__parameters:
     local_path_topic: /adom/navigation/local_path
     imu_topic: /zed/zed_node/imu/data
-    gps_topic: /fix
     cmd_vel_topic: /cmd_vel
     status_topic: /adom/control/local_path_status
     base_frame: base_link
@@ -10,7 +9,6 @@ local_path_control:
     control_rate_hz: 20.0
     path_timeout_sec: 0.25
     imu_timeout_sec: 0.25
-    gps_timeout_sec: 1.50
 
     wheelbase_m: 0.33
     lookahead_m: 0.80
@@ -18,13 +16,13 @@ local_path_control:
     max_speed_mps: 0.25
     min_speed_mps: 0.06
     curvature_speed_gain: 1.5
-    speed_kp: 0.6
+    # No wheel-speed sensor is available. Keep speed requests open-loop;
+    # IMU acceleration is recorded and monitored but not treated as absolute speed.
+    speed_kp: 0.0
     path_stop_distance_m: 0.50
     path_slow_distance_m: 2.0
 
-    gps_speed_blend: 0.35
-    gps_max_speed_mps: 10.0
-    gps_max_position_variance_m2: 4.0
     imu_accel_bias_x_mps2: 0.0
     imu_max_abs_accel_mps2: 5.0
     imu_max_integration_dt_sec: 0.10
+    imu_estimated_speed_limit_mps: 1.0

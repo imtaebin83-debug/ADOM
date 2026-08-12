@@ -1,0 +1,20 @@
+gps_track_logger:
+  ros__parameters:
+    fix_topic: /fix
+    path_topic: /adom/logging/gps_path
+    status_topic: /adom/logging/gps_status
+    frame_id: gps_recording_origin
+    minimum_step_m: 0.05
+    maximum_covariance_m2: 25.0
+    maximum_points: 20000
+
+autonomy_data_recorder:
+  ros__parameters:
+    capture_root: data/autonomy_bags
+    auto_start: true
+    session_prefix: autonomy
+    max_size_gb: 20.0
+    size_check_period_sec: 0.5
+    bag_split_size_mb: 1024
+    status_topic: /adom/recording/status
+    topic_regex: "^/(adom/perception/(semantic20_mask|confidence|overlay|status)|adom/navigation/(semantic_costmap|costmap_status|local_path|rule_path|rule_status|action_latency)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/(gps_path|gps_status)|cmd_vel|drive|emergency_stop|fix|tf|tf_static|zed/zed_node/imu/data)$"

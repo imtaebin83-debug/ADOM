@@ -9,6 +9,23 @@ import numpy as np
 EARTH_RADIUS_M = 6_371_008.8
 
 
+def local_gps_xy_m(
+    origin_latitude: float,
+    origin_longitude: float,
+    latitude: float,
+    longitude: float,
+) -> tuple[float, float]:
+    """Approximate a short GPS trail in a local east/north metric frame."""
+    origin_latitude_rad = math.radians(origin_latitude)
+    east = (
+        EARTH_RADIUS_M
+        * math.cos(origin_latitude_rad)
+        * math.radians(longitude - origin_longitude)
+    )
+    north = EARTH_RADIUS_M * math.radians(latitude - origin_latitude)
+    return east, north
+
+
 @dataclass(frozen=True)
 class PathControlConfig:
     wheelbase_m: float = 0.33

@@ -3,18 +3,18 @@
 ## Local path control
 
 `local_path_control`은 `/adom/navigation/local_path`를 pure-pursuit 방식으로 추종하고
-`/cmd_vel`을 발행한다. `/fix`의 연속 위치 차이로 지상속도를 구하고 ZED IMU의 종방향
-가속도를 짧게 적분한 뒤 GPS 속도로 보정한다. IMU·GPS·path 중 하나라도 timeout이거나
-path가 비어 있으면 zero command를 발행한다.
+`/cmd_vel`을 발행한다. GPS는 제어 입력으로 사용하지 않는다. 휠 속도 센서가 없으므로
+기본 속도 명령은 open-loop이고, ZED IMU는 freshness watchdog과 가속도/속도 추정 로그에만
+사용한다. IMU 또는 path가 timeout이거나 path가 비어 있으면 zero command를 발행한다.
 
 ```bash
 ros2 launch adom_control local_path_control.launch.py
 ros2 topic echo /adom/control/local_path_status
 ```
 
-기본 입력 topic은 `/zed/zed_node/imu/data`와 `/fix`이며 실제 장치 topic이 다르면
-`local_path_control.yaml`에서 변경한다. IMU x축 bias와 GPS covariance 기준은 target
-차량에서 정지·직진 로그로 보정하기 전 검증값이 아니다.
+기본 feedback topic은 `/zed/zed_node/imu/data`이다. GPS `/fix`는 `adom_logging`이
+이동 궤적 기록에만 사용한다. IMU x축 bias는 target 차량의 정지·직진 로그로 보정하기
+전까지 검증값이 아니다.
 
 F1TENTH 호환 `/drive` (`AckermannDriveStamped`)를 PCA9685 CH0/CH1 PWM으로
 출력한다. 8BitDo Ultimate C 2.4G 게임패드의 매뉴얼/자율 모드 전환을 지원한다.

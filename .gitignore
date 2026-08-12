@@ -64,6 +64,7 @@ data/interim/
 data/processed/
 data/external/
 data/captures/
+data/autonomy_bags/
 /datasets/
 *.tar
 models/checkpoints/

@@ -33,9 +33,11 @@ class RulePlannerNode(Node):
             "max_source_age_sec": 0.40,
             "wheelbase_m": 0.33,
             "max_steering_deg": 20.0,
-            "steering_step_deg": 4.0,
             "lookahead_m": 3.0,
             "path_step_m": 0.10,
+            "tree_depth": 3,
+            "tree_branch_steering_deg": 10.0,
+            "steering_change_penalty": 4.0,
             "corridor_half_width_m": 0.18,
             "unknown_cost": 70.0,
             "lethal_cost": 90,
@@ -57,9 +59,11 @@ class RulePlannerNode(Node):
         self._planner = PlannerConfig(
             wheelbase_m=float(self.p["wheelbase_m"]),
             max_steering_deg=float(self.p["max_steering_deg"]),
-            steering_step_deg=float(self.p["steering_step_deg"]),
             lookahead_m=float(self.p["lookahead_m"]),
             path_step_m=float(self.p["path_step_m"]),
+            tree_depth=int(self.p["tree_depth"]),
+            tree_branch_steering_deg=float(self.p["tree_branch_steering_deg"]),
+            steering_change_penalty=float(self.p["steering_change_penalty"]),
             corridor_half_width_m=float(self.p["corridor_half_width_m"]),
             unknown_cost=float(self.p["unknown_cost"]),
             lethal_cost=int(self.p["lethal_cost"]),
@@ -256,6 +260,11 @@ class RulePlannerNode(Node):
                 "state": "blocked" if plan.blocked else "driving",
                 "speed_mps": round(plan.speed_mps, 3),
                 "steering_deg": round(math.degrees(plan.steering_rad), 2),
+                "steering_sequence_deg": [
+                    round(math.degrees(value), 2)
+                    for value in plan.steering_sequence_rad
+                ],
+                "tree_depth": int(self.p["tree_depth"]),
                 "score": round(plan.score, 2),
                 "costmap_age_sec": round(age, 3),
                 "local_path_points": int(len(plan.path_xy)),

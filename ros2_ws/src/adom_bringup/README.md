@@ -1,5 +1,21 @@
 # adom_bringup
 
+## Low-level autonomy console
+
+ZED와 `/fix` sensor driver가 실행된 상태에서 perception, Semantic20 costmap, 3-depth
+direction tree planner, local controller, gamepad safety mux와 autonomy rosbag을 한 번에
+시작한다. 실제 PWM은 기본적으로 꺼져 있다.
+
+```bash
+export ADOM_REPO_ROOT="$(git rev-parse --show-toplevel)"
+ros2 launch adom_bringup low_level_autonomy.launch.py \
+  model_config:="$ADOM_MODEL_CONFIG" checkpoint:="$ADOM_CHECKPOINT"
+```
+
+shadow/wheels-off 검증 뒤에만 `start_pca9685:=true`를 추가한다. 프로세스가 올라와도
+차량은 STOPPED로 시작하며 게임패드 A 버튼을 눌러야 autonomous command가 `/drive`로
+전달된다. rosbag은 `data/autonomy_bags/`에서 자동 시작되고 Ctrl-C 시 닫힌다.
+
 기본 실행은 planning을 의도적으로 비활성화하고 control을 dry-run으로 시작한다.
 
 ```bash

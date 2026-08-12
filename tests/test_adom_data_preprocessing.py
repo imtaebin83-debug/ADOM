@@ -163,7 +163,7 @@ class AdomDataPreprocessingTests(unittest.TestCase):
             for relative, values in expected.items():
                 with Image.open(output / "masks" / relative) as mask:
                     self.assertEqual(mask.mode, "L")
-                    self.assertEqual(set(mask.get_flattened_data()), values)
+                    self.assertEqual(set(mask.getdata()), values)
 
             manifest_text = (output / "manifest.csv").read_text(encoding="utf-8")
             self.assertNotIn(str(root), manifest_text)

@@ -7,11 +7,13 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import shutil
 import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import unquote
 
 import numpy as np
 from PIL import Image, UnidentifiedImageError
@@ -27,6 +29,7 @@ class Sample:
     source_date: str
     source_sequence: str
     relative_path: Path
+    source_relative_path: Path
     image_path: Path
     mask_path: Path
 
@@ -141,9 +144,18 @@ def load_split_assignments(path: Path) -> dict[str, str]:
             date, session = sequence.split("/", 1)
             if not date or not session or Path(sequence).is_absolute():
                 raise ValueError(f"Invalid sequence key: {sequence}")
-            if sequence in assignments:
-                raise ValueError(f"Sequence appears in multiple splits: {sequence}")
-            assignments[sequence] = split
+            logical_session = _logical_relative_path(
+                Path(session), f"split sequence {sequence}"
+            )
+            if len(logical_session.parts) != 1:
+                raise ValueError(f"Invalid sequence key: {sequence}")
+            logical_sequence = f"{date}/{logical_session.as_posix()}"
+            if logical_sequence in assignments:
+                raise ValueError(
+                    "Sequence appears in multiple splits after path normalization: "
+                    f"{logical_sequence}"
+                )
+            assignments[logical_sequence] = split
     return assignments
 
 
@@ -176,6 +188,30 @@ def _portable_relative_path(value: object, context: str) -> Path:
     if path.is_absolute() or ".." in path.parts:
         raise ValueError(f"Non-portable upload manifest path: {value}")
     return path
+
+
+def _logical_relative_path(path: Path, context: str) -> Path:
+    """Decode URL-encoded transport components into a safe logical path."""
+    logical_parts: list[str] = []
+    for component in path.parts:
+        if re.search(r"%(?![0-9A-Fa-f]{2})", component):
+            raise ValueError(
+                f"Malformed percent encoding in {context}: {path.as_posix()}"
+            )
+        decoded = unquote(component, encoding="utf-8", errors="strict")
+        if (
+            decoded in ("", ".", "..")
+            or "/" in decoded
+            or "\\" in decoded
+            or "\x00" in decoded
+        ):
+            raise ValueError(
+                f"Unsafe decoded path component in {context}: {component}"
+            )
+        logical_parts.append(decoded)
+    if not logical_parts:
+        raise ValueError(f"Empty logical path in {context}")
+    return Path(*logical_parts)
 
 
 def verify_upload_manifest(input_root: Path, samples: list[Sample]) -> str:
@@ -212,11 +248,15 @@ def verify_upload_manifest(input_root: Path, samples: list[Sample]) -> str:
             relative_path = _portable_relative_path(
                 record.get("relative_path"), f"{date}/{index}"
             )
-            if relative_path in records:
+            logical_relative_path = _logical_relative_path(
+                relative_path, f"upload manifest {date}/{index}"
+            )
+            if logical_relative_path in records:
                 raise ValueError(
-                    f"Duplicate upload manifest path: {date}/{relative_path.as_posix()}"
+                    "Duplicate upload manifest path after path normalization: "
+                    f"{date}/{logical_relative_path.as_posix()}"
                 )
-            records[relative_path] = record
+            records[logical_relative_path] = record
         if set(records) != set(date_samples):
             raise ValueError(
                 f"Upload manifest files differ from discovered pairs: {date}"
@@ -251,6 +291,7 @@ def discover_samples(input_root: Path, assignments: dict[str, str]) -> list[Samp
     for date_root in date_roots:
         raw = collect_pngs(date_root / "raw")
         masks = collect_pngs(date_root / "masks")
+        logical_to_physical: dict[Path, Path] = {}
         if set(raw) != set(masks):
             raw_only = sorted(set(raw) - set(masks), key=lambda item: item.as_posix())
             mask_only = sorted(set(masks) - set(raw), key=lambda item: item.as_posix())
@@ -265,19 +306,35 @@ def discover_samples(input_root: Path, assignments: dict[str, str]) -> list[Samp
                     f"Expected SESSION/frame.png below {date_root.name}: "
                     f"{relative_path.as_posix()}"
                 )
-            session = relative_path.parts[0]
+            logical_relative_path = _logical_relative_path(
+                relative_path,
+                f"source path {date_root.name}/{relative_path.as_posix()}",
+            )
+            previous = logical_to_physical.get(logical_relative_path)
+            if previous is not None:
+                raise ValueError(
+                    "Source paths collide after path normalization: "
+                    f"{date_root.name}/{previous.as_posix()} and "
+                    f"{date_root.name}/{relative_path.as_posix()}"
+                )
+            logical_to_physical[logical_relative_path] = relative_path
+            session = logical_relative_path.parts[0]
             sequence_key = f"{date_root.name}/{session}"
             discovered_sequences.add(sequence_key)
             if sequence_key not in assignments:
                 raise ValueError(f"Sequence is not assigned to a split: {sequence_key}")
-            sample_key = f"{date_root.name}/{relative_path.with_suffix('').as_posix()}"
+            sample_key = (
+                f"{date_root.name}/"
+                f"{logical_relative_path.with_suffix('').as_posix()}"
+            )
             samples.append(
                 Sample(
                     sample_key=sample_key,
                     split=assignments[sequence_key],
                     source_date=date_root.name,
                     source_sequence=session,
-                    relative_path=relative_path,
+                    relative_path=logical_relative_path,
+                    source_relative_path=relative_path,
                     image_path=raw[relative_path],
                     mask_path=masks[relative_path],
                 )
@@ -547,6 +604,22 @@ def write_package(
             split: preflight_result.all_ignore_by_split[split] for split in SPLITS
         },
         "upload_manifest_sha256": upload_manifest_sha256,
+        "source_path_normalization": {
+            "scheme": "percent-decoded-components-v1",
+            "normalized_paths": sum(
+                sample.source_relative_path != sample.relative_path
+                for sample in samples
+            ),
+            "physical_to_logical": [
+                {
+                    "source_date": sample.source_date,
+                    "physical_path": sample.source_relative_path.as_posix(),
+                    "logical_path": sample.relative_path.as_posix(),
+                }
+                for sample in samples
+                if sample.source_relative_path != sample.relative_path
+            ],
+        },
         "path_policy": "All manifest paths are relative to the package root.",
     }
     (metadata_root / "conversion_summary.json").write_text(

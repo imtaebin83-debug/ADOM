@@ -59,11 +59,13 @@ autonomy bag에서 제외한다. 대신 semantic costmap grid와 inference frame
 count/ratio를 보존한다. 기본 `t2`는 raster mask를 제외하고, 공간 evidence가 필요한
 진단 세션의 `t2 mask`는 2 Hz Semantic20 evidence mask를 추가한다. Manual perception
 trial의 `t2 evidence`는 t4의 full-rate 원본 RGB stream과 2 Hz mask를 함께 추가한다.
+빠른 현장 검토용 `t2 preview`는 full-rate RGB 대신 같은 2 Hz 추론 frame의 mask와
+45% alpha Semantic20 overlay를 함께 기록한다.
 Mask header로 실제 추론 frame을 RGB stream에서 결합한다. GPS 경로는 raw fix 시계열로
 재구성한다.
 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
 분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020,
-0025, 0026과 이를 일부 대체하는 0027을 따른다.
+0025, 0026과 이를 일부 대체하는 0027, 0030을 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -628,6 +630,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: live와 rosbag replay의 ID `0..18`/ignore `255` mask를 모델 재추론 없이 동일한
   canonical palette로 모니터링해야 한다. 진단 출력과 legend topic만 추가하며 perception,
   planning, control 입력에는 연결하지 않는다. 상세 근거는 decision record 0028을 따른다.
+- **[2026-08-14] 2 Hz Semantic20 합성 영상을 기록하는 t2 preview를 추가**
+  이유: full-rate RGB를 기록하지 않는 짧은 현장 확인에서도 mask가 가리키는 장면을 즉시
+  재생할 수 있어야 한다. t4는 evidence mask와 같은 추론 frame에서 canonical palette를
+  원본 RGB에 45% alpha로 합성하고 동일 header의 sampled overlay를 발행한다. `t2 preview`는
+  이 overlay와 2 Hz mask를 함께 기록하며 기존 `t2 evidence` 계약은 유지한다. 상세 근거는
+  decision record 0030을 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

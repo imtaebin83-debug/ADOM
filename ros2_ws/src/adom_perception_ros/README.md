@@ -10,6 +10,7 @@
 ```text
 /adom/perception/semantic20_mask  sensor_msgs/Image (mono8, IDs 0..18/255)
 /adom/perception/semantic20_mask_evidence sensor_msgs/Image (mono8, 2 Hz default)
+/adom/perception/semantic20_overlay_evidence sensor_msgs/Image (bgr8, 2 Hz on demand)
 /adom/perception/confidence       sensor_msgs/Image (mono8, 0..255)
 /adom/perception/overlay          sensor_msgs/Image (bgr8)
 /adom/perception/status           std_msgs/String (JSON latency/counters)
@@ -65,7 +66,10 @@ Live autonomy bag은 costmap이 사용하는 full-rate mask를 직접 구독하�
 같은 header와 `mono8` payload를 갖는 `semantic20_mask_evidence`를 기록한다. `t2 evidence`는
 별도 복제 image publisher 대신 t4의 full-rate source RGB topic을 직접 기록한다. Mask는
 추론 입력 message의 header를 보존하므로 source RGB와 timestamp로 결합할 수 있다.
-`evidence_mask_fps:=0.0`이면 mask sample 발행을 끌 수 있다. 클래스 통계는 sample 주기와
+`t2 preview`는 evidence mask와 같은 추론 frame에서 원본 RGB에 canonical palette를 45%
+alpha로 합성한 `semantic20_overlay_evidence`를 기록한다. 이 sampled overlay는 subscriber가
+있을 때만 만들어지며 full-rate `/adom/perception/overlay`를 활성화하지 않는다.
+`evidence_mask_fps:=0.0`이면 mask와 overlay sample 발행을 끌 수 있다. 클래스 통계는 sample 주기와
 무관하게 inference frame마다 status에 남는다.
 
 카메라 clock과 ROS clock이 같은 time domain이고 header stamp가 0이 아닐 때만

@@ -54,6 +54,7 @@ class AdomPerceptionNode(Node):
             "image_topic": "/zed/zed_node/rgb/color/rect/image",
             "mask_topic": "/adom/perception/semantic20_mask",
             "evidence_mask_topic": "/adom/perception/semantic20_mask_evidence",
+            "evidence_overlay_topic": "/adom/perception/semantic20_overlay_evidence",
             "evidence_mask_fps": 2.0,
             "confidence_topic": "/adom/perception/confidence",
             "overlay_topic": "/adom/perception/overlay",
@@ -98,6 +99,9 @@ class AdomPerceptionNode(Node):
         self._mask_pub = self.create_publisher(Image, str(self.p["mask_topic"]), 1)
         self._evidence_mask_pub = self.create_publisher(
             Image, str(self.p["evidence_mask_topic"]), 1
+        )
+        self._evidence_overlay_pub = self.create_publisher(
+            Image, str(self.p["evidence_overlay_topic"]), 1
         )
         self._confidence_pub = self.create_publisher(
             Image, str(self.p["confidence_topic"]), 1
@@ -169,6 +173,12 @@ class AdomPerceptionNode(Node):
             image = self._bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
             publish_confidence = self._confidence_pub.get_subscription_count() > 0
             publish_overlay = self._overlay_pub.get_subscription_count() > 0
+            evidence_mask_subscribers = (
+                self._evidence_mask_pub.get_subscription_count()
+            )
+            evidence_overlay_subscribers = (
+                self._evidence_overlay_pub.get_subscription_count()
+            )
             inference_started = time.monotonic()
             mask, confidence = self._backend.infer(
                 image, include_confidence=publish_confidence
@@ -180,17 +190,23 @@ class AdomPerceptionNode(Node):
             mask_message.header = message.header
             self._mask_pub.publish(mask_message)
             evidence_mask_published = False
+            evidence_overlay_published = False
             evidence_now = time.monotonic()
-            if (
+            publish_evidence = (
                 self._evidence_mask_period is not None
-                and self._evidence_mask_pub.get_subscription_count() > 0
+                and (
+                    evidence_mask_subscribers > 0
+                    or evidence_overlay_subscribers > 0
+                )
                 and evidence_now >= self._next_evidence_mask_publish
-            ):
-                self._evidence_mask_pub.publish(mask_message)
+            )
+            if publish_evidence:
                 self._next_evidence_mask_publish = (
                     evidence_now + self._evidence_mask_period
                 )
-                evidence_mask_published = True
+                if evidence_mask_subscribers > 0:
+                    self._evidence_mask_pub.publish(mask_message)
+                    evidence_mask_published = True
             if publish_confidence:
                 if confidence is None:
                     raise RuntimeError("backend did not return requested confidence")
@@ -199,7 +215,9 @@ class AdomPerceptionNode(Node):
                 )
                 confidence_message.header = message.header
                 self._confidence_pub.publish(confidence_message)
-            if publish_overlay:
+            if publish_overlay or (
+                publish_evidence and evidence_overlay_subscribers > 0
+            ):
                 colors = colorize_semantic20_mask(mask, self._ontology)
                 alpha = min(1.0, max(0.0, float(self.p["overlay_alpha"])))
                 overlay = cv2.addWeighted(image, 1.0 - alpha, colors, alpha, 0.0)
@@ -207,7 +225,11 @@ class AdomPerceptionNode(Node):
                     overlay, encoding="bgr8"
                 )
                 overlay_message.header = message.header
-                self._overlay_pub.publish(overlay_message)
+                if publish_overlay:
+                    self._overlay_pub.publish(overlay_message)
+                if publish_evidence and evidence_overlay_subscribers > 0:
+                    self._evidence_overlay_pub.publish(overlay_message)
+                    evidence_overlay_published = True
 
             output_ros_ns = self.get_clock().now().nanoseconds
             finished = time.monotonic()
@@ -237,10 +259,12 @@ class AdomPerceptionNode(Node):
                 confidence_subscribers=self._confidence_pub.get_subscription_count(),
                 overlay_subscribers=self._overlay_pub.get_subscription_count(),
                 evidence_mask_subscribers=(
-                    self._evidence_mask_pub.get_subscription_count()
+                    evidence_mask_subscribers
                 ),
+                evidence_overlay_subscribers=evidence_overlay_subscribers,
                 evidence_mask_fps=float(self.p["evidence_mask_fps"]),
                 evidence_mask_published=evidence_mask_published,
+                evidence_overlay_published=evidence_overlay_published,
                 **pixel_statistics,
             )
         except Exception as error:

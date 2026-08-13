@@ -2,7 +2,8 @@
 
 자율주행 세션의 perception/planning/control 상태, 속도·조향 명령, PWM과 GPS fix를
 하나의 bounded rosbag으로 기록한다. 기본 모드는 raster를 제외하고, `record_mask`는 2 Hz
-mask를, `record_evidence`는 t4 source RGB의 full-rate 원본 stream까지 추가한다. 작은
+mask를, `record_evidence`는 t4 source RGB의 full-rate 원본 stream까지 추가한다.
+`record_preview`는 2 Hz mask와 같은 frame의 45% Semantic20 overlay를 추가한다. 작은
 semantic costmap grid와 perception status의 클래스별 픽셀 통계는 모든 모드의 기록
 대상이다.
 카메라, full-rate mask, confidence/overlay, path, IMU와 TF는 실시간 처리에 recorder 부하를
@@ -22,6 +23,10 @@ ros2 launch adom_logging autonomy_logging.launch.py \
 # full-rate source RGB와 2 Hz Semantic20 mask (manual perception 전용)
 ros2 launch adom_logging autonomy_logging.launch.py \
   capture_root:=data/autonomy_bags record_mask:=true record_evidence:=true
+
+# 2 Hz mask와 동일-frame 45% overlay (빠른 현장 확인용)
+ros2 launch adom_logging autonomy_logging.launch.py \
+  capture_root:=data/autonomy_bags record_mask:=true record_preview:=true
 ```
 
 recorder는 launch와 함께 자동 시작하고 종료 시 SIGINT로 rosbag metadata를 정상적으로
@@ -34,4 +39,6 @@ recorder는 launch와 함께 자동 시작하고 종료 시 SIGINT로 rosbag met
 82.9 MB/s(5.0 GB/min)다. 여기에 2 Hz mono8 mask가 각각 약 0.46 MB/s와 1.84 MB/s
 추가된다. `t2 evidence`는 짧은 manual perception trial 전용이며 target Jetson에서
 perception p95, overwritten frame, 실제 camera FPS, disk throughput과 온도를 확인해야 한다.
+640x360 2 Hz BGR preview의 raw payload 추정치는 약 1.38 MB/s(83 MB/min)다. `t2 preview`도
+target Jetson에서 같은 부하 지표와 mask-overlay timestamp 일치를 확인해야 한다.
 t5를 실행하지 않으면 costmap/planner topic은 publisher가 없어서 bag에 생성되지 않는다.

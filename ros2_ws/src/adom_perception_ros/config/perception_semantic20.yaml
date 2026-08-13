@@ -5,6 +5,7 @@ adom_perception:
     # Recorder-only sample of the same mono8 mask. The full-rate mask remains
     # available to the costmap without forcing rosbag to serialize every frame.
     evidence_mask_topic: /adom/perception/semantic20_mask_evidence
+    evidence_overlay_topic: /adom/perception/semantic20_overlay_evidence
     evidence_mask_fps: 2.0
     confidence_topic: /adom/perception/confidence
     overlay_topic: /adom/perception/overlay

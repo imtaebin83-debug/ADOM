@@ -263,6 +263,7 @@ ros2 launch adom_description description.launch.py
 t2       # raster mask 제외; class pixel 통계는 유지
 t2 mask  # 위 기록에 2 Hz Semantic20 evidence mask 추가
 t2 evidence  # full-rate 원본 RGB + 2 Hz Semantic20 mask 추가
+t2 preview  # 2 Hz Semantic20 mask + 동일-frame 45% RGB overlay 추가
 ```
 
 기존 `t2`의 `adom_localization localization.launch.py` 실행은 제거한다. `~/.bashrc`의
@@ -274,11 +275,13 @@ t2() {
 }
 ```
 
-Bash 함수 인자는 괄호가 아니라 공백으로 전달한다. 인자가 없으면 raster를 제외하고,
+Bash 함수 인자는 괄호가 아니라 공백으로 전달한다. 인자가 없으면 raster를 제외한다.
 `mask`는 `/adom/perception/semantic20_mask_evidence`, `evidence`는 t4 입력인 full-rate
-`/zed/zed_node/rgb/color/rect/image`와 2 Hz mask를 추가한다. Mask header는 추론에 사용한
-원본 RGB timestamp를 보존하므로 사후 exact join이 가능하다. 모든 모드가 inference-frame별
-class pixel count/ratio를 유지한다. Full-rate mask, confidence와 overlay는 기록하지 않는다.
+`/zed/zed_node/rgb/color/rect/image`와 2 Hz mask를 추가한다. `preview`는 2 Hz mask와 같은
+추론 frame에서 만든 `/adom/perception/semantic20_overlay_evidence`를 추가하고 full-rate
+RGB는 제외한다. Mask와 sampled overlay header는 추론에 사용한 원본 RGB timestamp를
+보존한다. 모든 모드가 inference-frame별 class pixel count/ratio를 유지한다. Full-rate
+mask, confidence와 `/adom/perception/overlay`는 기록하지 않는다.
 
 로컬에서 rosbag의 `mono8` mask를 색으로 보려면 workspace를 빌드·source한 뒤 경량
 colorizer와 viewer를 실행한다. 모델 재추론 없이 canonical Semantic20 palette만 적용한다.
@@ -295,7 +298,7 @@ ros2 launch adom_perception_ros semantic20_colorizer.launch.py
 # 다른 터미널1
 source /opt/ros/jazzy/setup.zsh
 ros2 bag play \
-  /home/myungsub/Videos/autonomy_20260813_142137_+0900/rosbag \
+  "$HOME/Videos/autonomy_20260813_142137_+0900/rosbag" \
   --loop \
   --topics \
   /zed/zed_node/rgb/color/rect/image \
@@ -323,8 +326,9 @@ controller의 명령/추정 속도와 watchdog 상태, control mode, `/cmd_vel`,
 
 카메라, full-rate Semantic20 mask, confidence/overlay, local/rule path, 고주기 IMU, TF 및
 누적 `/adom/logging/gps_path`는 기록하지 않는다. 기본 `t2`는 raster mask도 제외하고,
-`t2 mask`는 2 Hz evidence mask를, `t2 evidence`는 full-rate 원본 RGB와 2 Hz mask를
-추가한다. 작은 semantic costmap과 inference-frame별 class pixel 통계는 모든 모드에서
+`t2 mask`는 2 Hz evidence mask를, `t2 evidence`는 full-rate 원본 RGB와 2 Hz mask를,
+`t2 preview`는 2 Hz mask와 동일-frame 45% overlay를 추가한다. 작은 semantic costmap과
+inference-frame별 class pixel 통계는 모든 모드에서
 기록 대상으로 유지하되, t5를 실행하지 않으면 costmap publisher가 없으므로 실제 bag에는
 costmap 메시지가 생기지 않는다. GPS 이동경로는 작은 raw `/fix` 시계열로 보존하고 사후
 재구성한다.

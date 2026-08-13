@@ -5,7 +5,7 @@
 
 adom_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 adom_repo="${ADOM_REPO:-$(cd "$adom_script_dir/.." && pwd)}"
-adom_model_config="$adom_repo/configs/adom/export/segformer_b0_640x384_rellis3d.py"
+adom_model_config="$adom_repo/configs/adom/runtime/segformer_b0_640x384_rellis3d.py"
 adom_checkpoint_root="${ADOM_CHECKPOINT_ROOT:-$adom_repo/models/checkpoints/b0-e0}"
 
 fail() {

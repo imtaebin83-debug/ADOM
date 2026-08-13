@@ -29,7 +29,7 @@ Cost4 PyTorch 인지, semantic costmap, rule planner와 RViz는 별도 안전 la
 
 ```bash
 export ADOM_REPO="$(git rev-parse --show-toplevel)"
-export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/export/segformer_b0_640x384_rellis3d.py"
+export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/runtime/segformer_b0_640x384_rellis3d.py"
 export ADOM_CHECKPOINT="<CHECKPOINT_PATH>"
 ros2 launch adom_bringup rule_autonomy.launch.py \
   model_config:="$ADOM_MODEL_CONFIG" \

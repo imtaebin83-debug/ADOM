@@ -392,12 +392,13 @@ source ~/.bashrc
 wrapper는 다음 B0-E0 config를 고정해 사용한다.
 
 ```text
-configs/adom/export/segformer_b0_640x384_rellis3d.py
+configs/adom/runtime/segformer_b0_640x384_rellis3d.py
 ```
 
 이 config는 `segformer_b0_stage2_e0_rellis.py`를 기반으로 하며 Semantic20 ID `0..18`,
-ignore `255`, 640x384 resize/padding 계약을 사용한다. E1, B2 또는 Cost4 checkpoint를
-같은 디렉터리에 넣지 않는다.
+ignore `255`, 640x384 resize/padding 계약을 사용한다. ROS 추론에서는 data
+preprocessor가 padding metadata를 기록해 mask 복원 전에 하단 padding을 제거한다.
+E1, B2 또는 Cost4 checkpoint를 같은 디렉터리에 넣지 않는다.
 
 기본 디렉터리 밖의 파일을 사용하려면 실행 전에 정확한 B0-E0 파일을 지정한다.
 

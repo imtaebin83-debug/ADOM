@@ -81,7 +81,7 @@ Semantic20 config와 그 config로 학습한 checkpoint를 함께 사용해야 �
 
 ```bash
 export ADOM_REPO="$(git rev-parse --show-toplevel)"
-export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/export/segformer_b0_640x384_rellis3d.py"
+export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/runtime/segformer_b0_640x384_rellis3d.py"
 export ADOM_CHECKPOINT="$ADOM_REPO/models/checkpoints/b0-e0/best_mIoU_iter_6000.pth"
 python3 -m pip install -e "$ADOM_REPO"
 ros2 launch adom_perception_ros perception.launch.py \
@@ -93,6 +93,11 @@ ros2 launch adom_perception_ros perception.launch.py \
 checkpoint는 Git에 포함되지 않으므로 perception 담당자에게 전달받아 위 경로에 둔다.
 E1, B2 또는 Cost4 checkpoint를 이 config와 혼용하지 않는다. Jetson `t4` 실행은
 저장소 루트의 `scripts/run_jetson_t4.sh`를 사용한다.
+
+ROS runtime config는 640x360 입력을 파이프라인에서 직접 640x384로 `Pad`하지 않는다.
+대신 `SegDataPreProcessor.test_cfg`가 하단 24행을 패딩하고 `img_padding_size`를 기록한다.
+이 metadata를 이용해 MMSeg가 예측 후 패딩을 제거하므로 mask가 세로로 압축되지 않는다.
+정적 ONNX export에는 별도의 `configs/adom/export/` config를 사용한다.
 
 다른 mapping 파일을 실험할 때만 `bridge_mapping:=<PATH>`를 넘긴다. 이 경우에도
 노드는 19개 train ID와 ignore 255 계약을 검증한다. 실제 ZED topic, publisher QoS,

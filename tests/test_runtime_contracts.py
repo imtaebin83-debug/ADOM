@@ -107,6 +107,30 @@ class RuntimeContractTests(unittest.TestCase):
         )
         self.assertIn('/ "cost4"', cycle_text)
 
+    def test_semantic20_ros_runtime_config_delegates_padding(self) -> None:
+        path = (
+            REPO_ROOT
+            / "configs"
+            / "adom"
+            / "runtime"
+            / "segformer_b0_640x384_rellis3d.py"
+        )
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("segformer_b0_stage2_e0_rellis.py", text)
+        self.assertIn("test_cfg=dict(size=runtime_size)", text)
+        self.assertIn('dict(type="Resize"', text)
+        self.assertIn("keep_ratio=True", text)
+        self.assertNotIn('dict(type="Pad"', text)
+        self.assertIn('dict(type="PackSegInputs")', text)
+
+        launcher = (REPO_ROOT / "scripts" / "run_jetson_t4.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "configs/adom/runtime/segformer_b0_640x384_rellis3d.py",
+            launcher,
+        )
+
     def test_parity_defaults_and_roi_polygon_contract(self) -> None:
         self.assertEqual(DEFAULT_MINIMUM_IMAGES, 10)
         self.assertEqual(DEFAULT_EXPECTED_NUM_CLASSES, 19)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections import Counter
 import shutil
 from pathlib import Path
 from typing import Any
@@ -307,6 +308,69 @@ class FiniteLossHook(Hook):
             raise FloatingPointError(
                 f"Non-finite loss detected at iteration {runner.iter}"
             )
+
+
+@HOOKS.register_module()
+class SourceExposureAuditHook(Hook):
+    """Record the source identity of every batch actually consumed by training."""
+
+    priority = "LOWEST"
+
+    def __init__(self, interval: int = 100) -> None:
+        if interval < 1:
+            raise ValueError("Source exposure audit interval must be positive")
+        self.interval = int(interval)
+        self.counts: Counter[str] = Counter()
+
+    def before_train(self, runner: Any) -> None:
+        path = Path(runner.work_dir) / "source_exposure.json"
+        if path.is_file():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            self.counts.update(
+                {key: int(value) for key, value in payload.get("sample_counts", {}).items()}
+            )
+
+    def after_train_iter(
+        self,
+        runner: Any,
+        batch_idx: int,
+        data_batch: Any = None,
+        outputs: dict[str, Any] | None = None,
+    ) -> None:
+        if not isinstance(data_batch, dict):
+            raise RuntimeError("Source exposure audit requires a dict data batch")
+        samples = data_batch.get("data_samples")
+        if not samples:
+            raise RuntimeError("Source exposure audit found no data_samples")
+        for sample in samples:
+            sample_id = str(sample.metainfo.get("sample_id", ""))
+            if "/" not in sample_id:
+                raise RuntimeError(f"Source exposure audit found invalid sample_id: {sample_id}")
+            self.counts[sample_id.split("/", 1)[0]] += 1
+        if getattr(runner, "rank", 0) == 0 and (runner.iter + 1) % self.interval == 0:
+            _write_audit(runner, "source_exposure.json", self._payload(runner))
+
+    def after_train(self, runner: Any) -> None:
+        if getattr(runner, "rank", 0) != 0:
+            return
+        _write_audit(runner, "source_exposure.json", self._payload(runner))
+
+    def _payload(self, runner: Any) -> dict[str, Any]:
+        sampler = runner.train_dataloader.sampler
+        total = sum(self.counts.values())
+        return {
+            "schema_version": "adom-source-exposure-v1",
+            "sampler": type(sampler).__name__,
+            "requested_weights": getattr(sampler, "source_weights", None),
+            "seed": getattr(sampler, "seed", None),
+            "start_index": getattr(sampler, "start_index", None),
+            "sample_counts": dict(sorted(self.counts.items())),
+            "sample_shares": {
+                source: count / total if total else 0.0
+                for source, count in sorted(self.counts.items())
+            },
+            "total_samples": total,
+        }
 
 
 @HOOKS.register_module()

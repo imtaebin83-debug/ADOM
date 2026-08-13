@@ -114,7 +114,6 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         matcher = re.compile(topic_regex)
         for required_topic in (
             "/adom/perception/status",
-            "/adom/perception/semantic20_mask_evidence",
             "/adom/navigation/semantic_costmap",
             "/adom/navigation/rule_status",
             "/adom/navigation/planned_speed",
@@ -128,6 +127,16 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
             "/fix",
         ):
             self.assertIsNotNone(matcher.fullmatch(required_topic))
+        self.assertIsNone(
+            matcher.fullmatch("/adom/perception/semantic20_mask_evidence")
+        )
+        self.assertFalse(
+            config["autonomy_data_recorder"]["ros__parameters"]["record_mask"]
+        )
+        self.assertEqual(
+            config["autonomy_data_recorder"]["ros__parameters"]["mask_topic"],
+            "/adom/perception/semantic20_mask_evidence",
+        )
         for high_load_topic in (
             "/adom/perception/semantic20_mask",
             "/adom/perception/confidence",

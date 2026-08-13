@@ -18,9 +18,12 @@ autonomy_data_recorder:
     bag_split_size_mb: 1024
     status_topic: /adom/recording/status
     # Keep full-rate camera/confidence/overlay/path/IMU/TF out of the live bag.
-    # The evidence mask is a 2 Hz sample configured by adom_perception; the
-    # semantic costmap is a small 80x60 grid. Per-class pixel counts/ratios are
-    # embedded in /adom/perception/status at the inference rate.
+    # Per-class pixel counts/ratios remain in /adom/perception/status at the
+    # inference rate. Set record_mask=true to additionally record the 2 Hz
+    # evidence mask configured by adom_perception. The full-rate mask is never
+    # recorded by this profile.
     # Raw /fix samples preserve the driven GPS route without repeatedly writing
     # the growing nav_msgs/Path published on /adom/logging/gps_path.
-    topic_regex: "^/(adom/perception/(status|semantic20_mask_evidence)|adom/navigation/(semantic_costmap|costmap_status|planned_speed|rule_status|action_latency)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/gps_status|cmd_vel|drive(/autonomous)?|emergency_stop|fix)$"
+    topic_regex: "^/(adom/perception/status|adom/navigation/(semantic_costmap|costmap_status|planned_speed|rule_status|action_latency)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/gps_status|cmd_vel|drive(/autonomous)?|emergency_stop|fix)$"
+    record_mask: false
+    mask_topic: /adom/perception/semantic20_mask_evidence

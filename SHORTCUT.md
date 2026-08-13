@@ -24,7 +24,7 @@ source ~/.bashrc
 | `up` | 없음 | 로컬 변경 삭제 후 `origin/jetson` 갱신 | 실행 전 주의 |
 | `t0` | `adom_sensors` | ZED 2i 및 GNSS 센서 | `Ctrl-C` |
 | `t1` | `adom_description` | 차량 URDF와 TF | `Ctrl-C` |
-| `t2` | `adom_logging` 및 의존 패키지 | GPS·모드·회피·속도 경량 rosbag 자동 기록 | `Ctrl-C` |
+| `t2 [mask]` | `adom_logging` 및 의존 패키지 | 기본 경량 rosbag; `mask` 인자면 2 Hz Semantic20 evidence mask 추가 | `Ctrl-C` |
 | `t3` | `adom_control` | 게임패드, safety mux와 PCA9685 실출력 제어 | `Ctrl-C` |
 | `t4` | `adom_perception_ros` | Semantic20 CUDA perception | `Ctrl-C` |
 | `t5` | `adom_costmap_ros`, `adom_planning`, `adom_control` | Semantic20 costmap, direction-tree planner, controller | `Ctrl-C` |
@@ -260,7 +260,8 @@ ros2 launch adom_description description.launch.py
 ## `t2` — GPS와 경량 autonomy rosbag
 
 ```bash
-t2
+t2       # raster mask 제외; class pixel 통계는 유지
+t2 mask  # 위 기록에 2 Hz Semantic20 evidence mask 추가
 ```
 
 기존 `t2`의 `adom_localization localization.launch.py` 실행은 제거한다. `~/.bashrc`의
@@ -268,15 +269,16 @@ t2
 
 ```bash
 t2() {
-    cd "$HOME/ADOM/ros2_ws" || return
-    source /opt/ros/jazzy/setup.bash
-    colcon build --symlink-install --packages-up-to adom_logging || return
-    source install/setup.bash
-    export ADOM_REPO_ROOT="$HOME/ADOM"
-    ros2 launch adom_logging autonomy_logging.launch.py \
-      capture_root:=data/autonomy_bags
+    "$HOME/ADOM/scripts/run_jetson_t2.sh" "$@"
 }
 ```
+
+Bash 함수 인자는 괄호가 아니라 공백으로 전달하므로 `t2(mask)`가 아닌 `t2 mask`를
+사용한다. 인자가 없으면 2 Hz raster mask를 제외하고, `mask`를 넘기면 기존 topic에
+`/adom/perception/semantic20_mask_evidence`를 추가한다. 두 모드 모두
+`/adom/perception/status`의 inference-frame별 class pixel count/ratio와 작은 semantic
+costmap은 유지한다. Full-rate mask, RGB, confidence와 overlay는 어느 모드에서도 기록하지
+않는다.
 
 launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 닫고 종료한다. 기본
 결과 위치는 다음과 같다.
@@ -289,10 +291,11 @@ launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 �
 controller의 명령/추정 속도와 watchdog 상태, control mode, `/cmd_vel`,
 `/drive/autonomous`, 최종 `/drive`, PWM, E-stop, raw `/fix`와 GPS 품질 상태다.
 
-카메라와 Semantic20 mask/confidence/overlay, semantic costmap grid, local/rule path,
-고주기 IMU, TF 및 누적 `/adom/logging/gps_path`는 기록하지 않는다. 특히 mask, costmap,
-path를 rosbag이 추가 구독하지 않으므로 t5의 대용량 메시지 직렬화·복사·disk I/O를
-늘리지 않는다. GPS 이동경로는 작은 raw `/fix` 시계열로 보존하고 사후 재구성한다.
+카메라, full-rate Semantic20 mask, confidence/overlay, local/rule path, 고주기 IMU, TF 및
+누적 `/adom/logging/gps_path`는 기록하지 않는다. 기본 `t2`는 raster mask도 제외하고,
+`t2 mask`만 2 Hz evidence mask를 추가한다. 작은 semantic costmap과 inference-frame별
+class pixel 통계는 두 모드 모두 기록한다. GPS 이동경로는 작은 raw `/fix` 시계열로
+보존하고 사후 재구성한다.
 이 bag은 기존 RGB 학습 데이터용 `rec`의 `data/captures`와 분리되며, `rec`의 동작과
 토픽 구성은 바뀌지 않는다.
 

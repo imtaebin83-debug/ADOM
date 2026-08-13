@@ -55,12 +55,13 @@ GPS는 localization, planning, control 입력으로 사용하지 않고 이동�
 자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
 `/drive`, PWM, E-stop과 raw GPS fix를 bounded rosbag으로 기록한다. 카메라, full-rate
 Semantic20 mask, confidence/overlay, path, 고주기 IMU, TF와 누적 GPS trail은 live
-autonomy bag에서 제외한다. 대신 2 Hz Semantic20 evidence mask, semantic costmap grid와
-inference frame별 class pixel count/ratio를 보존한다. GPS 경로는 raw fix 시계열로
-재구성한다.
+autonomy bag에서 제외한다. 대신 semantic costmap grid와 inference frame별 class pixel
+count/ratio를 보존한다. 기본 `t2`는 raster mask를 제외하고, 공간 evidence가 필요한
+진단 세션의 `t2 mask`만 2 Hz Semantic20 evidence mask를 추가한다. GPS 경로는 raw fix
+시계열로 재구성한다.
 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
-분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020을
-따른다.
+분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020,
+0025를 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -606,6 +607,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   semantic costmap grid와 inference-rate class pixel 통계를 기록해 예상 추가 payload를
   약 0.54 MB/s로 제한한다. Jetson latency 영향은 A/B 실측 전까지 미검증이며 문제가
   있으면 mask sample부터 비활성화한다. 상세 근거는 decision record 0020을 따른다.
+- **[2026-08-13] t2의 sampled mask 기록을 명시적 선택 모드로 전환**
+  이유: 장시간 기본 주행은 class 통계와 작은 costmap으로 recorder 부하를 낮추고, 공간
+  mask가 필요한 발표·진단 trial에서만 2 Hz raster를 추가해야 한다. `t2`는 mask 없이,
+  `t2 mask`는 evidence mask를 포함하며 full-rate mask와 RGB는 계속 제외한다. 상세 근거는
+  decision record 0025를 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

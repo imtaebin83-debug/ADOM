@@ -49,7 +49,8 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0022](0022-straight-avoid-blocked-modes.md) | Straight/avoid/blocked modes | Accepted | 직진 장애물 거리로 mode 전환 |
 | [0023](0023-avoid-trigger-distance-tuning.md) | Avoid trigger distance tuning | Accepted | AVOID 진입 거리 3.50 m → 1.50 m |
 | [0024](0024-costmap-clock-domain-boundary.md) | Costmap clock-domain boundary | Accepted | 센서 stamp는 sync까지 유지, costmap 출력은 ROS clock |
-| [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Accepted | 2 Hz mask sample + costmap grid + per-class status |
+| [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Superseded in part | status/costmap 유지; sampled mask 기본 활성화는 0025가 대체 |
+| [0025](0025-optional-sampled-mask-recording.md) | Optional sampled mask recording | Accepted | `t2`는 mask 제외, `t2 mask`만 2 Hz evidence mask 추가 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

@@ -16,9 +16,9 @@ local_path_control:
     wheelbase_m: 0.33
     lookahead_m: 0.80
     max_steering_deg: 24.0
-    # Match the planner and hard-cap the final autonomous command at 1.00 m/s.
-    max_speed_mps: 1.00
-    min_speed_mps: 0.25
+    # Match the planner and hard-cap the final autonomous command at 6.00 m/s.
+    max_speed_mps: 6.00
+    min_speed_mps: 0.5
     downstream_max_speed_mps: 12.0
     curvature_speed_gain: 1.5
     # Bounded IMU feedback correction. IMU-only velocity remains a short-horizon

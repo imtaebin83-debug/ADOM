@@ -53,6 +53,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0025](0025-optional-sampled-mask-recording.md) | Optional sampled mask recording | Accepted | `t2`는 mask 제외, `t2 mask`만 2 Hz evidence mask 추가 |
 | [0026](0026-paired-manual-perception-evidence.md) | Paired manual perception evidence | Superseded in part | sampled RGB 설계는 0027이 full-rate source RGB로 대체 |
 | [0027](0027-full-rate-manual-perception-evidence.md) | Full-rate manual perception evidence | Accepted | `t2 evidence`는 full-rate source RGB + 2 Hz mask 기록 |
+| [0028](0028-semantic20-mask-color-monitor.md) | Semantic20 mask color monitor | Accepted | mono8 ID mask를 canonical BGR image와 JSON legend로 변환 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

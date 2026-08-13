@@ -15,6 +15,29 @@
 /adom/perception/status           std_msgs/String (JSON latency/counters)
 ```
 
+## Semantic20 mask 컬러 모니터링
+
+`mono8` mask의 ID를 canonical Semantic20 palette로 바꾸는 진단 노드다. 모델을 다시
+추론하지 않으며 ignore `255`는 검정으로 표시한다.
+
+```bash
+ros2 launch adom_perception_ros semantic20_colorizer.launch.py
+```
+
+기본 입력은 `/adom/perception/semantic20_mask_evidence`, 출력은 다음과 같다.
+
+```text
+/adom/perception/semantic20_mask_color  sensor_msgs/Image (bgr8)
+/adom/perception/semantic20_legend      std_msgs/String (ID/name/RGB JSON)
+```
+
+Full-rate live mask를 보려면 다음처럼 입력만 바꾼다.
+
+```bash
+ros2 launch adom_perception_ros semantic20_colorizer.launch.py \
+  mask_topic:=/adom/perception/semantic20_mask
+```
+
 ## Latest-frame 처리
 
 이미지 subscription은 Best Effort, Keep Last 1이다. callback은 추론하지 않고 한 칸짜리

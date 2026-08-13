@@ -624,6 +624,10 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   결합해야 한다. 별도 2 Hz RGB 복제 publisher를 제거하고 t4 source RGB topic을 직접
   기록한다. Raw RGB 대역폭이 크므로 manual perception의 짧은 trial로 제한하고 full
   autonomy 기본 모드로 사용하지 않는다. 상세 근거는 decision record 0027을 따른다.
+- **[2026-08-13] Semantic20 mono8 mask용 경량 ROS colorizer를 추가**
+  이유: live와 rosbag replay의 ID `0..18`/ignore `255` mask를 모델 재추론 없이 동일한
+  canonical palette로 모니터링해야 한다. 진단 출력과 legend topic만 추가하며 perception,
+  planning, control 입력에는 연결하지 않는다. 상세 근거는 decision record 0028을 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

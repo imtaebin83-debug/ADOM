@@ -8,6 +8,7 @@ import yaml
 from adom.perception import (
     LatestItemMailbox,
     SEMANTIC20_PALETTE_BGR,
+    SEMANTIC20_PALETTE_RGB,
     colorize_semantic20_mask,
     load_semantic20_ontology,
     semantic20_pixel_statistics,
@@ -56,6 +57,7 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         np.testing.assert_array_equal(output[0, 0], SEMANTIC20_PALETTE_BGR[0])
         np.testing.assert_array_equal(output[0, 1], SEMANTIC20_PALETTE_BGR[18])
         np.testing.assert_array_equal(output[0, 2], [0, 0, 0])
+        self.assertEqual(SEMANTIC20_PALETTE_RGB.shape, (19, 3))
 
     def test_unknown_id_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid IDs"):

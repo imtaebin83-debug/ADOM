@@ -4,6 +4,7 @@ from .mmseg_backend import COST4_PALETTE_BGR, MmsegBackend, colorize_mask
 from .latest_frame import LatestItem, LatestItemMailbox
 from .semantic20 import (
     SEMANTIC20_PALETTE_BGR,
+    SEMANTIC20_PALETTE_RGB,
     Semantic20Ontology,
     colorize_semantic20_mask,
     default_bridge_mapping_path,
@@ -17,6 +18,7 @@ __all__ = [
     "LatestItemMailbox",
     "MmsegBackend",
     "SEMANTIC20_PALETTE_BGR",
+    "SEMANTIC20_PALETTE_RGB",
     "Semantic20Ontology",
     "colorize_mask",
     "colorize_semantic20_mask",

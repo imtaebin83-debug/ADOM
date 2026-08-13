@@ -280,6 +280,36 @@ Bash 함수 인자는 괄호가 아니라 공백으로 전달한다. 인자가 �
 원본 RGB timestamp를 보존하므로 사후 exact join이 가능하다. 모든 모드가 inference-frame별
 class pixel count/ratio를 유지한다. Full-rate mask, confidence와 overlay는 기록하지 않는다.
 
+로컬에서 rosbag의 `mono8` mask를 색으로 보려면 workspace를 빌드·source한 뒤 경량
+colorizer와 viewer를 실행한다. 모델 재추론 없이 canonical Semantic20 palette만 적용한다.
+
+```zsh
+#semantic20 시각화
+cd "$HOME/ADOM/ros2_ws"
+source /opt/ros/jazzy/setup.zsh
+colcon build --symlink-install --packages-select adom_perception_ros
+source install/setup.zsh
+export PYTHONPATH="$HOME/ADOM/src${PYTHONPATH:+:$PYTHONPATH}"
+ros2 launch adom_perception_ros semantic20_colorizer.launch.py
+
+# 다른 터미널1
+source /opt/ros/jazzy/setup.zsh
+ros2 bag play \
+  /home/myungsub/Videos/autonomy_20260813_142137_+0900/rosbag \
+  --loop \
+  --topics \
+  /zed/zed_node/rgb/color/rect/image \
+  /adom/perception/semantic20_mask_evidence \
+  /adom/perception/status
+# 다른 터미널2
+source /opt/ros/jazzy/setup.szh
+source "$HOME/ADOM/ros2_ws/install/setup.zsh"
+ros2 run rqt_image_view rqt_image_view
+```
+
+viewer에서는 `/adom/perception/semantic20_mask_color`을 선택한다. ID/name/RGB 대응표는
+`ros2 topic echo /adom/perception/semantic20_legend --once`로 확인한다.
+
 launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 닫고 종료한다. 기본
 결과 위치는 다음과 같다.
 

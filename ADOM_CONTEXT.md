@@ -580,6 +580,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   train split만 RELLIS 4,435 + ADOM 133으로 바꾼다. 단일-seed 결과는 긴급 배포 후보이며
   0010의 장기 recipe discovery 및 3-seed 결론을 대체하지 않는다. 상세 계약은 decision
   record 0011을 따른다.
+- **[2026-08-13] E-ADOM 긴급 실행 GPU를 RTX 4090으로 허용**
+  이유: A100 재고 소진으로 E-ADOM 시작이 차단됐으며, CUDA 12.2/PyTorch 2.1 image와
+  호환되는 Ada GPU가 필요하다. E-ADOM wrapper만 RTX 4090 22GiB doctor 계약을 사용하고
+  다른 cycle의 A100 75GiB 기본값 및 E-ADOM의 effective batch 16/44k update는 유지한다.
+  상세 계약은 decision record 0012를 따른다.
 
 ## 17. Primary References
 

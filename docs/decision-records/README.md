@@ -35,6 +35,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0009](0009-target-adaptation-comparison.md) | B0-E0 target-adaptation comparison | Accepted | TA0/TA1/TA2 병렬 비교 계약 |
 | [0010](0010-ta0-common-recipe-selection.md) | TA0 common fine-tuning recipe selection | Accepted | 장기 공통 recipe discovery 계약 |
 | [0011](0011-emergency-eadom-e0-recipe.md) | Emergency E-ADOM using the E0 recipe | Accepted | 내일 Jetson 배포용 data-only 단일-seed 경로 |
+| [0012](0012-emergency-eadom-rtx4090-runtime.md) | Emergency E-ADOM on RTX 4090 | Accepted | A100 재고 소진 시 Ada-compatible 긴급 runtime 계약 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

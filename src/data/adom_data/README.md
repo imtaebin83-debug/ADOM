@@ -101,6 +101,9 @@ On RunPod, the discovered source package is
 `_SUCCESS` only after all checks pass. Training must consume only packages with
 that marker.
 
+The verified 2026-08-12 Network Volume layout and the 2026-08-13 standalone
+materialization result, ownership, release-marker status, and lookup commands are recorded in
+[`docs/status/runpod-dataset-inventory-2026-08-12.md`](../../../docs/status/runpod-dataset-inventory-2026-08-12.md).
 Upload transports may percent-encode directory names (for example, store a
 logical `+0900` session as `%2B0900` on disk). The converter compares raw/mask
 pairs through their exact physical paths, safely normalizes each path component

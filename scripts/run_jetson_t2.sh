@@ -10,7 +10,7 @@ if [[ $# -gt 1 || ( -n "$adom_mode" && "$adom_mode" != "mask" && "$adom_mode" !=
     echo "Usage: t2 [mask|evidence]" >&2
     echo "  t2       class statistics/status without raster mask" >&2
     echo "  t2 mask  additionally records the 2 Hz Semantic20 evidence mask" >&2
-    echo "  t2 evidence  records paired 2 Hz BGR image and Semantic20 mask" >&2
+    echo "  t2 evidence  records full-rate source RGB and the 2 Hz Semantic20 mask" >&2
     exit 2
 fi
 

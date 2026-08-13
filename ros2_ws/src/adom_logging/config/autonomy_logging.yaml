@@ -28,4 +28,6 @@ autonomy_data_recorder:
     record_mask: false
     mask_topic: /adom/perception/semantic20_mask_evidence
     record_evidence: false
-    evidence_image_topic: /adom/perception/image_evidence
+    # Full-rate source RGB used by t4. Evidence masks retain the matching source
+    # header stamp so analysis can join each mask to its exact camera frame.
+    evidence_image_topic: /zed/zed_node/rgb/color/rect/image

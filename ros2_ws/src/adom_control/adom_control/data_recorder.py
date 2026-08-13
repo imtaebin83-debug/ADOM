@@ -46,7 +46,7 @@ class DataRecorder(Node):
             "record_mask": False,
             "mask_topic": "/adom/perception/semantic20_mask_evidence",
             "record_evidence": False,
-            "evidence_image_topic": "/adom/perception/image_evidence",
+            "evidence_image_topic": "/zed/zed_node/rgb/color/rect/image",
             "max_size_gb": 10.0,
             "size_check_period_sec": 0.5,
             "bag_split_size_mb": 1024,
@@ -112,9 +112,7 @@ class DataRecorder(Node):
             if not bool(self.p["record_mask"]):
                 raise ValueError("record_evidence requires record_mask=true")
             if not str(self.p["evidence_image_topic"]).strip():
-                raise ValueError(
-                    "evidence_image_topic must not be empty when record_evidence is true"
-                )
+                raise ValueError("evidence_image_topic must not be empty")
 
     def _effective_topic_regex(self):
         base_regex = str(self.p["topic_regex"]).strip()

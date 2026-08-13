@@ -2,7 +2,7 @@
 
 자율주행 세션의 perception/planning/control 상태, 속도·조향 명령, PWM과 GPS fix를
 하나의 bounded rosbag으로 기록한다. 기본 모드는 raster를 제외하고, `record_mask`는 2 Hz
-mask를, `record_evidence`는 같은 inference frame의 paired BGR image까지 추가한다. 작은
+mask를, `record_evidence`는 t4 source RGB의 full-rate 원본 stream까지 추가한다. 작은
 semantic costmap grid와 perception status의 클래스별 픽셀 통계는 모든 모드의 기록
 대상이다.
 카메라, full-rate mask, confidence/overlay, path, IMU와 TF는 실시간 처리에 recorder 부하를
@@ -19,7 +19,7 @@ ros2 launch adom_logging autonomy_logging.launch.py \
 ros2 launch adom_logging autonomy_logging.launch.py \
   capture_root:=data/autonomy_bags record_mask:=true
 
-# paired 2 Hz BGR image와 Semantic20 mask
+# full-rate source RGB와 2 Hz Semantic20 mask (manual perception 전용)
 ros2 launch adom_logging autonomy_logging.launch.py \
   capture_root:=data/autonomy_bags record_mask:=true record_evidence:=true
 ```
@@ -30,8 +30,8 @@ recorder는 launch와 함께 자동 시작하고 종료 시 SIGINT로 rosbag met
 분석할 수 있다. 결과 디렉터리는 Git에서 제외되며 기본 20 GB 제한과 1 GB split을
 사용한다.
 
-현장 bag에서 확인된 640x360 기준으로 mask 2 Hz는 약 0.46 MB/s, paired BGR image는 약
-1.38 MB/s의 raw payload다. evidence 모드는 DDS/MCAP overhead와 압축을 제외해도 두 image
-합계가 약 110 MB/min이므로 target Jetson에서 기본/mask/evidence 모드의 perception p95,
-overwritten frame과 watchdog을 A/B 비교해야 한다. t5를 실행하지 않으면 costmap/planner
-topic은 publisher가 없어서 bag에 생성되지 않는다.
+640x360 raw BGR 30 FPS는 RGB만 약 20.7 MB/s(1.24 GB/min), HD720 30 FPS는 약
+82.9 MB/s(5.0 GB/min)다. 여기에 2 Hz mono8 mask가 각각 약 0.46 MB/s와 1.84 MB/s
+추가된다. `t2 evidence`는 짧은 manual perception trial 전용이며 target Jetson에서
+perception p95, overwritten frame, 실제 camera FPS, disk throughput과 온도를 확인해야 한다.
+t5를 실행하지 않으면 costmap/planner topic은 publisher가 없어서 bag에 생성되지 않는다.

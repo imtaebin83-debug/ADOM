@@ -58,11 +58,12 @@ Semantic20 mask, confidence/overlay, path, 고주기 IMU, TF와 누적 GPS trail
 autonomy bag에서 제외한다. 대신 semantic costmap grid와 inference frame별 class pixel
 count/ratio를 보존한다. 기본 `t2`는 raster mask를 제외하고, 공간 evidence가 필요한
 진단 세션의 `t2 mask`는 2 Hz Semantic20 evidence mask를 추가한다. Manual perception
-trial의 `t2 evidence`는 t4가 실제 추론한 동일 frame의 2 Hz BGR image와 mask를 함께
-추가한다. GPS 경로는 raw fix 시계열로 재구성한다.
+trial의 `t2 evidence`는 t4의 full-rate 원본 RGB stream과 2 Hz mask를 함께 추가한다.
+Mask header로 실제 추론 frame을 RGB stream에서 결합한다. GPS 경로는 raw fix 시계열로
+재구성한다.
 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
 분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020,
-0025, 0026을 따른다.
+0025, 0026과 이를 일부 대체하는 0027을 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
@@ -618,6 +619,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   mask를 동일 timestamp로 보존해야 GT 작성과 시각 A/B가 가능하다. Full-rate camera 대신
   subscriber가 있을 때만 2 Hz BGR image를 mask와 함께 발행하며, t5가 없으면 costmap과
   planner topic은 기록되지 않는다. 상세 근거는 decision record 0026을 따른다.
+- **[2026-08-13] manual evidence RGB를 full-rate source stream으로 확장**
+  이유: 이동 중 전체 장면 영상을 보존하면서 2 Hz mask를 정확한 추론 RGB timestamp에
+  결합해야 한다. 별도 2 Hz RGB 복제 publisher를 제거하고 t4 source RGB topic을 직접
+  기록한다. Raw RGB 대역폭이 크므로 manual perception의 짧은 trial로 제한하고 full
+  autonomy 기본 모드로 사용하지 않는다. 상세 근거는 decision record 0027을 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

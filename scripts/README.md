@@ -24,7 +24,7 @@ checkpoint를 검증한 뒤 `adom_perception_ros`를 빌드·실행한다. 기�
 ```bash
 scripts/run_jetson_t2.sh       # raster mask 제외
 scripts/run_jetson_t2.sh mask  # 2 Hz Semantic20 evidence mask 추가
-scripts/run_jetson_t2.sh evidence  # paired 2 Hz BGR image + mask 추가
+scripts/run_jetson_t2.sh evidence  # full-rate source RGB + 2 Hz mask 추가
 ```
 
 모든 모드가 inference-frame별 class pixel 통계를 기록한다. Jetson의

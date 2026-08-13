@@ -18,6 +18,7 @@ dependencies = [
 adom-semantic20-preprocess = "adom.data.semantic20:main"
 adom-semantic20-aggregate = "adom.runtime.semantic20_aggregate:main"
 adom-semantic20-ta-package = "adom.data.target_adaptation:main"
+adom-ta0-transform-audit = "adom.data.transform_audit:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

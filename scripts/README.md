@@ -16,6 +16,13 @@ Semantic20 B0 E0 배포는 다음 재사용 entry point를 사용한다.
 반복 가능한 운영 진입점만 둔다. 데이터 로직은 `src/adom/data`, MMSeg 확장은
 `src/adom/mmseg`, 실행 상태 관리는 `src/adom/runtime`에 있다.
 
+TA0 method-recipe discovery는 두 read-only/validation entry point를 추가로 사용한다.
+
+- `adom-ta0-transform-audit`: I0 512 crop, I1 640x384 no-crop, I2 640x480
+  no-crop의 mask retention을 20회 이상 offline 감사한다.
+- `python scripts/check_ta0_config_imports.py`: training image 안에서 모든 독립
+  ablation config를 import하고 E0/RELLIS/seed/effective-batch/update 계약을 확인한다.
+
 ## RunPod 학습 1-cycle
 
 ```bash

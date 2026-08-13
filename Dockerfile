@@ -136,7 +136,9 @@ RUN python -m pip install --no-cache-dir --no-deps . \
     && python -c "import adom.mmseg; print('ADOM MMSeg extensions imported successfully.')" \
     && python -m adom.data.semantic20 --help > /dev/null \
     && python -m adom.data.target_adaptation --help > /dev/null \
+    && python -m adom.data.transform_audit --help > /dev/null \
     && python -m adom.runtime.semantic20_contract --help > /dev/null \
+    && python scripts/check_ta0_config_imports.py \
     && python -c "from adom.data.semantic20 import resource_path; expected={'train':4435,'val':900,'test':899}; actual={s:len([v for v in resource_path('rellis','splits',s+'.txt').read_text(encoding='utf-8-sig').splitlines() if v.strip()]) for s in expected}; assert actual==expected,(actual,expected); assert resource_path('rugd','config','label_mapping.json').is_file(); assert resource_path('semantic_20','config','bridge_mapping.yaml').is_file(); print('Semantic20 preprocessing assets verified:', actual)"
 
 CMD ["sleep", "infinity"]

@@ -50,6 +50,14 @@ the TA0 method-selection gate is complete. The selected recipe must use equal to
 optimizer-update budgets across its controls. After the recipe is frozen, condition
 branches may change only their train split, fixed source weights and identity.
 
+TA0 discovery uses `ADOM_TA_TOTAL_OPTIMIZER_UPDATES` as the single budget input.
+LP-FT compares 500- and 1,000-update head phases via
+`ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES`, with the full phase receiving the exact remainder;
+direct-FT and discriminative-LR consume the same total in one phase. The contract hook rejects an inconsistent phase,
+effective batch other than 16, a changed E0 file/SHA, or a split other than
+`splits/ta0_train.txt`. A phase above 500 updates additionally requires the literal
+`ADOM_TA0_FULL_TRAINING_APPROVED=user-approved`, which must not be set before user review.
+
 ## 3. Parallel gates
 
 After the three condition commits are integrated, build one SHA-tagged image. Launch
@@ -80,6 +88,12 @@ Run the same command with `ta1` and `ta2` and their own output roots. Required o
    unlock canonical test during tuning.
 5. If a recipe is accepted, retrain one `TA-final` independently from the same E0
    checkpoint and evaluate canonical RELLIS test and ADOM held-out diagnostics once.
+
+The smoke and mini totals are 50 and 500 optimizer updates respectively, not 50/500 per
+LP-FT phase. The runner splits the shared total and executes both LP-FT phases. Canonical
+test remains locked for every discovery run. `source_exposure.json` schema v2 records
+both exact source draws and class presence after the spatial transform, allowing RCS
+requested exposure to be compared with what the optimizer actually consumed.
 
 TA0 requests RELLIS 1.0. TA1 requests RELLIS 0.75 / ADOM 0.25. TA2 requests RELLIS
 0.4375 / RUGD 0.25 / YCOR 0.0625 / ADOM 0.25. The deterministic sampler writes actual

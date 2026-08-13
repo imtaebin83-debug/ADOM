@@ -108,6 +108,71 @@ seed 42, 500-update mini는 명백한 실패 제거용이며 최종 선택 근�
 checkpoint를 병합하는 것이 아니라 선택 recipe로 동일 E0에서 TA-final 하나를 새로
 학습한다.
 
+## Implemented discovery controls
+
+Offline input audit는 학습을 실행하지 않고 아래 명령으로 만든다. `--draws`는 20보다
+작으면 실패하며, TA package의 `ta0_train`과 manifest를 사용하므로 canonical test를
+읽지 않는다.
+
+```bash
+adom-ta0-transform-audit \
+  --dataset "$TA_ROOT" \
+  --split splits/ta0_train.txt \
+  --manifest manifest.csv \
+  --draws 20 \
+  --seed 42 \
+  --output /workspace/adom/runs/ta0/input-audit-seed42.json
+```
+
+Artifact에는 candidate/source/class별 presence retention, resized-mask 대비 retained
+pixel 비율, connected-component count와 largest-component 비율, non-ignore/pad 비율,
+crop miss와 실제 resize/crop/pad 좌표 빈도가 들어간다. mask는 nearest, RGB config는
+bilinear이며 no-crop padding은 right/bottom, mask pad value는 255다.
+
+독립 config matrix는 다음과 같다. 각 행은 다른 축을 동시에 바꾸지 않는다.
+
+| Axis | Control | Candidate config |
+| --- | --- | --- |
+| continued training | TA0-C0 | `segformer_b0_ta0_c0_stage{1,2}.py` |
+| input | I0 | `segformer_b0_ta0_i0_stage{1,2}.py` |
+| input | I1 | `segformer_b0_ta0_i1_stage{1,2}.py` |
+| input | I2 | `segformer_b0_ta0_i2_stage{1,2}.py` |
+| optimization | O0 direct-FT | `segformer_b0_ta0_o0_direct_ft.py` |
+| optimization | O1 LP-FT | `segformer_b0_ta0_o1_lp_ft_stage{1,2}.py` |
+| optimization | O2 discriminative-LR | `segformer_b0_ta0_o2_discriminative_lr.py` |
+| imbalance | B0 source-uniform | `segformer_b0_ta0_b0_uniform_stage{1,2}.py` |
+| imbalance | B1 source-quota RCS | `segformer_b0_ta0_b1_rcs_stage{1,2}.py` |
+| loss | L0 CE-only | `segformer_b0_ta0_l0_ce_stage{1,2}.py` |
+| loss | L1 CE+Lovasz | `segformer_b0_ta0_l1_ce_lovasz_stage{1,2}.py` |
+
+LP-FT의 Stage 1/2는 `ADOM_TA_TOTAL_OPTIMIZER_UPDATES` 합을 항상 보존한다. Full에서는
+`ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES=500`과 `1000`을 각각 500+5,500과
+1,000+5,000으로 독립 비교하고 smoke/mini는 같은 비율로 축소한다. O0/O2는 같은
+total을 한 phase에서 쓴다. C0/I/B/L은
+I0+LP-FT+source-uniform+CE-only 공통 anchor에서 정확히 한 축만 바꾼다. B1 sampler는
+source slot을 먼저 선택한 뒤 그 source 안에서만 rare-risk image를 재표집하므로 source
+quota를 바꾸지 않는다. `source_exposure.json`은 source draw와 post-transform class-image
+exposure를 함께 기록한다.
+
+`segformer_b0_ta0_r_combined.py`는 개별 ablation과 분리된 provisional interaction-check
+candidate다. 독립 결과가 검토되지 않으면 일반 import가 실패하고 Docker syntax check의
+`ADOM_TA0_COMBINED_CONFIG_IMPORT_ONLY=true`만 허용된다. contract hook은 provisional
+상태의 학습을 항상 거부한다. 실제 winner가 현재
+provisional I1/O2/B1/L1과 다르면 이 파일을 실행하는 것이 아니라 선택 결과와 이유를
+기록한 새 commit에서 명시적으로 갱신한다.
+
+모든 TA0 config는 `TA0AblationContractHook`으로 실제 E0 file SHA, `ta0_train`, RELLIS
+1.0 source quota, seed, effective batch 16, phase/total optimizer update를 검사한다. 500
+update를 넘는 phase는 사용자 승인 후에만
+`ADOM_TA0_FULL_TRAINING_APPROVED=user-approved`를 설정할 수 있다. canonical test lock은
+그와 별도로 유지된다.
+
+실행 우선순위는 I0/I1/I2 offline audit와 input mini, O0 direct-FT, O1 LP-FT
+(500/1,000 head 후보), O2 discriminative-LR, B0/B1, L0/L1 순서다. 단순한 O0가 gate를
+통과하면 O1/O2의 복잡성을 유지할 필요가 있는지 먼저 판단한다. I3 rare-class-aware
+crop은 현재 config에 넣지 않는다. I0의 crop miss/retention evidence가 no-crop 후보의
+단점을 감수할 만큼 심각할 때만 별도 decision과 독립 ablation으로 연다.
+
 ## Primary literature
 
 - SegFormer, NeurIPS 2021: <https://proceedings.neurips.cc/paper_files/paper/2021/hash/64f1f27bf1b4ec22924fd0acb550c235-Abstract.html>

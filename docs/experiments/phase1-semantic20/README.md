@@ -12,6 +12,7 @@ RELLIS target domain의 전체 성능을 보존하고 희소 위험 class를 개
 | E0 | RELLIS | RELLIS | RELLIS | 원본 baseline |
 | E1 | RELLIS + RUGD + YCOR | RELLIS | RELLIS | 기존 3-source 증강 |
 | E2 | E1 + GOOSE Semantic20 direct mapping | RELLIS | RELLIS | GOOSE의 추가 효과 분리 |
+| E-ADOM | RELLIS + ADOM ZED2i, E0 recipe from ImageNet MiT-B0 | RELLIS | locked | 긴급 Jetson 배포용 data-only 후보 |
 | TA0 | RELLIS, B0-E0 warm start | RELLIS | RELLIS | 공통 개선 recipe의 method control |
 | TA1 | RELLIS + ADOM ZED2i | RELLIS | RELLIS | TA0 recipe에서 신규 target-domain data 순효과 |
 | TA2 | RELLIS + RUGD + YCOR + ADOM ZED2i | RELLIS | RELLIS | TA0 recipe에서 multi-source 상보 효과 |
@@ -57,3 +58,5 @@ RareRisk-4에 남겨 비열화 여부를 감시하지만, 현재 source mapping�
 - [Clean Baseline v1 protocol](protocols/clean-baseline-v1.md)
 - [TA0/TA1/TA2 parallel RunPod runbook](target-adaptation-runbook.md)
 - [TA method-recipe selection plan](ta-method-recipe-selection.md)
+- [Emergency E-ADOM decision](../../decision-records/0011-emergency-eadom-e0-recipe.md)
+- [Emergency E-ADOM RunPod runbook](emergency-eadom-runbook.md)

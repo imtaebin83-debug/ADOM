@@ -18,6 +18,9 @@ Semantic20 B0 E0 배포는 다음 재사용 entry point를 사용한다.
 
 TA0 method-recipe discovery는 두 read-only/validation entry point를 추가로 사용한다.
 
+긴급 E-ADOM data-only 모델은 `run_emergency_eadom.sh`로 실행한다. 이 entry point는
+B0-E0의 4k/40k recipe를 유지하고 validated superset의 `ta1_train`만 선택한다.
+
 - `adom-ta0-transform-audit`: I0 512 crop, I1 640x384 no-crop, I2 640x480
   no-crop의 mask retention을 20회 이상 offline 감사한다.
 - `python scripts/check_ta0_config_imports.py`: training image 안에서 모든 독립

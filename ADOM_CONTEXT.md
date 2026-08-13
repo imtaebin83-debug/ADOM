@@ -573,6 +573,13 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   ablation에서 먼저 선택하고 동일 recipe를 TA1/TA2가 상속해야 방법 효과와 데이터
   효과를 분리할 수 있다. 구체 방법은 ablation 전에는 제안이며, recipe selection 후
   commit SHA로 동결한다. 상세 계약은 decision record 0010을 따른다.
+- **[2026-08-13] 내일 Jetson 배포를 위한 E-ADOM data-only 긴급 경로 추가**
+  이유: TA0 전체 method ablation 완료를 기다리지 않고 자체 수집 데이터 반영 모델을
+  배포해야 한다. E-ADOM은 ImageNet MiT-B0에서 시작해 B0-E0의 512 crop, CE-only,
+  uniform sampling, 4k head-only + 40k full-model recipe와 seed/effective batch를 유지하고
+  train split만 RELLIS 4,435 + ADOM 133으로 바꾼다. 단일-seed 결과는 긴급 배포 후보이며
+  0010의 장기 recipe discovery 및 3-seed 결론을 대체하지 않는다. 상세 계약은 decision
+  record 0011을 따른다.
 
 ## 17. Primary References
 

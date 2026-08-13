@@ -51,3 +51,7 @@
     gnss_fusion:
       # ADOM initially uses robot_localization. Do not enable both fusion paths.
       gnss_fusion_enabled: false
+    debug:
+      # Publish ROS-system timestamps so downstream freshness watchdogs use
+      # the same clock domain as rclpy nodes.
+      use_pub_timestamps: true

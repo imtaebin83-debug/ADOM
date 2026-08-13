@@ -104,6 +104,13 @@ that marker.
 The verified 2026-08-12 Network Volume layout, ownership, release-marker status,
 and lookup commands are recorded in
 [`docs/status/runpod-dataset-inventory-2026-08-12.md`](../../../docs/status/runpod-dataset-inventory-2026-08-12.md).
+Upload transports may percent-encode directory names (for example, store a
+logical `+0900` session as `%2B0900` on disk). The converter compares raw/mask
+pairs through their exact physical paths, safely normalizes each path component
+for split and upload-manifest matching, and writes canonical logical paths to
+the output package. It rejects malformed encodings, decoded separators, and
+physical paths that collide after normalization. The conversion summary records
+every physical-to-logical path change for provenance.
 
 The result is compatible with `AdomSemantic20Dataset` through its manifest
 contract and is shared by SegFormer-B0 and SegFormer-B2:

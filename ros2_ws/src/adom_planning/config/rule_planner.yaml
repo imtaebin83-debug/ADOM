@@ -30,9 +30,9 @@ rule_planner:
     lethal_cost: 90
     stop_distance_m: 0.30
 
-    # Current autonomous planner command profile: 0.10..1.00 m/s.
-    max_speed_mps: 6.00
-    min_speed_mps: 0.5
+    # Current autonomous planner command profile: 0.30..3.00 m/s.
+    max_speed_mps: 3.00
+    min_speed_mps: 0.30
     # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
     downstream_max_speed_mps: 12.0
     steering_penalty: 8.0

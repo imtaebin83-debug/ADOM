@@ -38,11 +38,11 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Superseded in part | 0016이 live bag topic 범위를 더 축소 |
 | [0012](0012-planner-source-age-tolerance.md) | Planner source-age tolerance | Superseded in part | 0024 이후 costmap output age 기준 |
 | [0013](0013-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
-| [0014](0014-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; 6 m/s mapping은 0015가 대체 |
+| [0014](0014-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; profile은 0029가 대체 |
 | [0015](0015-imu-aided-12mps-pwm-calibration.md) | IMU-aided nominal 12 m/s PWM calibration | Accepted | 1500..2000 us = 0..12 m/s, IMU bias/ZUPT/P-feedback |
 | [0016](0016-lightweight-autonomy-evidence-bag.md) | Lightweight autonomy evidence bag | Accepted | t2는 수치·상태·raw GPS만 기록; rec는 RGB 전용 유지 |
 | [0017](0017-zed-depth-ground-filter.md) | ZED depth and ground-frame filtering | Accepted | NEURAL 0.30--8.0 m, verified 0.21 m mount height |
-| [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Accepted | planner/control hard ceiling 0.75 m/s |
+| [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Superseded | 0029가 autonomous profile을 대체; latency evidence는 유효 |
 | [0019](0019-gap-guided-direction-tree.md) | Gap-guided direction tree | Superseded | 0021이 gap 폭/거리와 no-gap BLOCKED를 제거 |
 | [0020](0020-blocked-release-debounce.md) | BLOCKED release debounce | Superseded in part | release 유지; no-gap trigger는 0021이 제거 |
 | [0021](0021-side-cost-assisted-tree.md) | Side-cost-assisted direction tree | Superseded in part | 좌우 cost 선택 유지; activation은 0022 우선 |
@@ -54,6 +54,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0026](0026-paired-manual-perception-evidence.md) | Paired manual perception evidence | Superseded in part | sampled RGB 설계는 0027이 full-rate source RGB로 대체 |
 | [0027](0027-full-rate-manual-perception-evidence.md) | Full-rate manual perception evidence | Accepted | `t2 evidence`는 full-rate source RGB + 2 Hz mask 기록 |
 | [0028](0028-semantic20-mask-color-monitor.md) | Semantic20 mask color monitor | Accepted | mono8 ID mask를 canonical BGR image와 JSON legend로 변환 |
+| [0029](0029-autonomous-speed-profile.md) | Autonomous 0.30..3.00 m/s speed profile | Accepted | planner/local controller 범위 통일 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

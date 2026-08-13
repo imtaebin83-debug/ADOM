@@ -12,7 +12,7 @@ planner의 `/adom/navigation/planned_speed`를 보존해 `/cmd_vel`을 발행한
 속도 명령은 아래 순서로 흐른다.
 
 ```text
-rule_planner plan.speed_mps (0.25..3.0 m/s, blocked이면 0)
+rule_planner plan.speed_mps (0.30..3.0 m/s, blocked이면 0)
   -> /adom/navigation/planned_speed
   -> local_path_control -> /cmd_vel.linear.x
   -> gamepad_control (A/autonomous mode + 0.25 s watchdog)
@@ -28,9 +28,10 @@ esc_pwm_us = esc_neutral_us
                * (esc_forward_max_us - esc_neutral_us)
 ```
 
-현재 nominal calibration은 `max_speed_mps=12.0`, neutral `1500 us`, forward max
-`2000 us`다. 따라서 planner 최소 0.25 m/s는 약 1510.4 us, 최대 3.0 m/s는 1625 us가
-된다. 50 Hz PWM carrier frequency는 고정이며 속도는 pulse width로 정한다.
+현재 nominal calibration은 `max_speed_mps=12.0`, neutral `1500 us`, positive-command
+start `1570 us`, forward max `2000 us`다. 따라서 planner 최소 0.30 m/s는 약
+1580.75 us, 최대 3.0 m/s는 1677.5 us가 된다. 50 Hz PWM carrier frequency는 고정이며
+속도는 pulse width로 정한다.
 
 | ESC pulse | Nominal speed |
 | ---: | ---: |

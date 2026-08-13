@@ -70,7 +70,7 @@ tree path를 평가한다. 좌우 cost가 같으면 왼쪽으로 고정해 항�
 가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.80초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
-Planner의 현재 속도 profile은 0.25..3.0 m/s이며
+Planner의 현재 속도 profile은 0.30..3.0 m/s이며
 `/adom/navigation/planned_speed`로 local controller에 전달된다. Controller는 이를
 `/cmd_vel`에 보존하고, gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로
 전달한다. PCA9685에 직접 연결하지 않는다. Downstream gamepad/PCA9685 nominal ceiling은

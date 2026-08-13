@@ -455,9 +455,9 @@ ros2 topic echo /drive
 ros2 topic echo /adom/control/pwm_us
 ```
 
-현재 planner의 `0.25..3.0 m/s`를 local controller가 받고 IMU 추정 오차로 제한 보정한다.
-Control의 nominal `12.0 m/s -> 2000 us`, neutral `1500 us` 선형 변환에 따라 planner
-범위는 약 `1510.4..1625 us`가 된다. `/planned_speed`는 양수인데 `/cmd_vel`이 0이면
+현재 planner의 `0.30..3.0 m/s`를 local controller가 받고 IMU 추정 오차로 제한 보정한다.
+Control의 nominal `12.0 m/s -> 2000 us`, positive-command start `1570 us` 변환에 따라
+planner 범위는 약 `1580.75..1677.5 us`가 된다. `/planned_speed`는 양수인데 `/cmd_vel`이 0이면
 `local_path_status.reason`의
 path/IMU/speed watchdog을 확인하고, `/cmd_vel`은 양수인데 `/drive`가 0이면 A 버튼으로
 autonomous mode가 승인됐는지 확인한다.

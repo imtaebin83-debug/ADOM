@@ -204,7 +204,8 @@ class RulePlannerTests(unittest.TestCase):
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertFalse(plan.blocked)
         self.assertAlmostEqual(plan.steering_rad, 0.0)
-        self.assertLessEqual(plan.speed_mps, 0.25)
+        self.assertGreaterEqual(plan.speed_mps, 0.30)
+        self.assertLessEqual(plan.speed_mps, 3.0)
 
     def test_near_full_width_obstacle_stops(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
@@ -347,8 +348,9 @@ class LocalPathControlTests(unittest.TestCase):
         pca = vehicle["pca9685_control"]["ros__parameters"]
         gamepad = vehicle["gamepad_control"]["ros__parameters"]
 
-        self.assertEqual(planner["min_speed_mps"], 0.10)
-        self.assertEqual(planner["max_speed_mps"], 1.0)
+        self.assertEqual(planner["min_speed_mps"], 0.30)
+        self.assertEqual(planner["max_speed_mps"], 3.0)
+        self.assertEqual(local["min_speed_mps"], planner["min_speed_mps"])
         self.assertEqual(local["max_speed_mps"], planner["max_speed_mps"])
         self.assertEqual(planner["max_steering_deg"], 24.0)
         self.assertEqual(local["max_steering_deg"], planner["max_steering_deg"])
@@ -378,7 +380,7 @@ class LocalPathControlTests(unittest.TestCase):
             )
 
         self.assertEqual(pulse(0.0), 1500.0)
-        self.assertAlmostEqual(pulse(0.25), 1578.9583333)
+        self.assertAlmostEqual(pulse(0.30), 1580.75)
         self.assertEqual(pulse(3.0), 1677.5)
         self.assertEqual(pulse(12.0), 2000.0)
 
@@ -386,16 +388,25 @@ class LocalPathControlTests(unittest.TestCase):
         command = control_local_path(
             np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
             0.0,
-            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.25, speed_kp=0.0),
+            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.30, speed_kp=0.0),
             planned_speed_mps=2.4,
         )
         self.assertAlmostEqual(command.speed_mps, 2.4)
+
+    def test_positive_planner_speed_is_clamped_to_autonomous_minimum(self):
+        command = control_local_path(
+            np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
+            0.0,
+            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.30, speed_kp=0.0),
+            planned_speed_mps=0.1,
+        )
+        self.assertEqual(command.speed_mps, 0.30)
 
     def test_planner_stop_overrides_nonempty_path(self):
         command = control_local_path(
             np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
             0.0,
-            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.25, speed_kp=0.0),
+            PathControlConfig(max_speed_mps=3.0, min_speed_mps=0.30, speed_kp=0.0),
             planned_speed_mps=0.0,
         )
         self.assertEqual(command.speed_mps, 0.0)
@@ -461,7 +472,8 @@ class LocalPathControlTests(unittest.TestCase):
         )
         self.assertGreater(left.steering_rad, 0.0)
         self.assertLess(left.speed_mps, straight.speed_mps)
-        self.assertLessEqual(left.speed_mps, 0.25)
+        self.assertGreaterEqual(left.speed_mps, 0.30)
+        self.assertLessEqual(left.speed_mps, 3.0)
 
     def test_gps_speed_uses_position_and_timestamp_delta(self):
         # About 0.22 m east at the equator over one second.

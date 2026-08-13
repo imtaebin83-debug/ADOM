@@ -31,8 +31,8 @@ class PathControlConfig:
     wheelbase_m: float = 0.33
     lookahead_m: float = 0.80
     max_steering_deg: float = 20.0
-    max_speed_mps: float = 0.25
-    min_speed_mps: float = 0.06
+    max_speed_mps: float = 3.0
+    min_speed_mps: float = 0.30
     curvature_speed_gain: float = 1.5
     speed_kp: float = 0.6
     path_stop_distance_m: float = 0.50
@@ -119,7 +119,13 @@ def control_local_path(
     elif planned_speed_mps is not None:
         if not math.isfinite(planned_speed_mps):
             raise ValueError("planned_speed_mps must be finite")
-        target_speed = max(0.0, min(config.max_speed_mps, planned_speed_mps))
+        if planned_speed_mps <= 0.0:
+            target_speed = 0.0
+        else:
+            target_speed = max(
+                config.min_speed_mps,
+                min(config.max_speed_mps, planned_speed_mps),
+            )
     else:
         target_speed = config.max_speed_mps / (
             1.0 + config.curvature_speed_gain * abs(curvature)
@@ -135,7 +141,13 @@ def control_local_path(
         )
     speed_error = target_speed - max(0.0, measured_speed_mps)
     command_speed = target_speed + config.speed_kp * speed_error
-    command_speed = max(0.0, min(config.max_speed_mps, command_speed))
+    if target_speed <= 0.0:
+        command_speed = 0.0
+    else:
+        command_speed = max(
+            config.min_speed_mps,
+            min(config.max_speed_mps, command_speed),
+        )
     return PathControlCommand(
         speed_mps=command_speed,
         steering_rad=steering,

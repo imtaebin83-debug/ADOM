@@ -22,8 +22,8 @@ class PlannerConfig:
     unknown_cost: float = 70.0
     lethal_cost: int = 90
     stop_distance_m: float = 0.30
-    max_speed_mps: float = 0.25
-    min_speed_mps: float = 0.08
+    max_speed_mps: float = 3.0
+    min_speed_mps: float = 0.30
     steering_penalty: float = 8.0
     distance_decay_m: float = 1.25
     clearance_penalty: float = 35.0

@@ -147,7 +147,7 @@ held-out test를 이 문서와 새 decision record에 함께 기록한다. 그 �
 
 | 항목 | 초기값 | 규칙 |
 | --- | ---: | --- |
-| planner command profile | 0.10..0.75 m/s | 2026-08-12 bag latency에 맞춘 autonomous ceiling; 실제 속도는 지상 주행 전 실측 필요 |
+| planner command profile | 0.30..3.00 m/s | 승인된 autonomous command 범위; 실제 속도는 지상 주행 전 실측 필요 |
 | target | 미동결 | Semantic20 IDs 0..18 전체를 먼저 검토 |
 | ROI | 하단 중앙 trapezoid 후보 | padding 제외 source-image 좌표로 카메라 장착 후 고정 |
 | target area ratio | 미동결 | 선택 class validation에서 조정 |
@@ -661,6 +661,11 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   지연 중앙값이 약 0.33초, 95 percentile이 약 0.43초였고 perception 출력은 약
   10.2 Hz였다. 현장 설정 1.0 m/s의 75%인 0.75 m/s를 planner와 local controller의
   hard ceiling으로 적용한다. 상세 근거는 decision record 0018을 따른다.
+- **[2026-08-14] autonomous command profile을 0.30..3.00 m/s로 변경**
+  이유: 운영자 요청에 따라 planner와 local controller의 주행 중 최소·최대 명령을
+  각각 0.30 m/s와 3.00 m/s로 통일한다. STOP, watchdog, manual/PWM ceiling은 유지한다.
+  0018에서 측정한 지연은 해소되지 않았으므로 실차 적용 전 wheels-off와 폐쇄 공간
+  저속 검증이 필요하다. 상세 근거는 decision record 0029를 따른다.
 - **[2026-08-12] 중앙 장애물 회피에 gap-guided 25-candidate tree를 채택**
   이유: 전체 125개 tree의 순간 최저 비용만 선택하면 더 넓게 열린 반대편 대신 국소적으로
   막힌 방향에 진입할 수 있다. 중앙 장애물 기준 좌·우 gap 폭·깊이를 먼저 비교하고

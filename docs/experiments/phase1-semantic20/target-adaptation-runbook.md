@@ -8,14 +8,16 @@ TA checkpoint를 서로 이어 학습하거나 평균·ensemble하지 않는다.
 ## 1. Immutable package
 
 원본 확인 결과 `/workspace/adom/datasets/raw/adomdata`에는 9개 capture group, 총
-215 pair가 있다. 저장 공간은 충분하지만 raw package는 학습 입력이 아니다. 먼저
-standalone converter/validator가 133 train, 21 val, 61 test와 `_SUCCESS`를 만든 뒤
-공통 superset을 한 번만 생성한다.
+215 pair가 있다. raw package는 학습 입력이 아니다. 2026-08-13에 standalone
+converter/validator가 133 train, 21 val, 61 test와 `_SUCCESS`를 생성했고 validator
+`PASS`를 확인했다. 같은 날 released E1과 released standalone으로 공통 superset을
+생성하고 validator `PASS`를 확인했다.
 
 2026-08-12 실제 Network Volume snapshot과 lookup 명령은
 [RunPod dataset inventory](../../status/runpod-dataset-inventory-2026-08-12.md)에
-기록돼 있다. 당시 E1은 release 완료, ADOM standalone과 TA superset은 미생성 상태였고,
-marker 없는 18 GB E1 staging tree는 학습 입력에서 제외됐다.
+기록돼 있다. 최초 snapshot에서는 E1만 release 상태였고, 2026-08-13 후속 snapshot에서
+ADOM standalone과 TA superset release를 확인했다. marker 없는 18 GB E1 staging
+tree는 계속 학습 입력에서 제외한다.
 
 ```bash
 export E1_ROOT=/workspace/adom/datasets/processed/adom_semantic20_rellis_rugd_ycor_v1
@@ -36,6 +38,19 @@ Expected split counts are TA0 4,435, TA1 4,568, TA2 10,001, canonical val 900,
 canonical test 899, ADOM diagnostic val 21 and diagnostic test 61. `build` refuses
 non-empty output; failed or changed inputs require a new package version, not in-place
 mutation. Training Pods treat `TA_ROOT` read-only.
+
+Verified package digests are manifest `183dda705e76b451dc383a81f517d36df3d6032f00002ab225421b9ae316b9dd`,
+images `f07e1ed3a463ade04834f6de8e5c80c531d2b67be2ca1df78f3de4d0fe57ef87`, and
+masks `975209f763326e5c86d9d54e55474997a76489ea6dcbf1ed51fe61f830c1bc69`.
+All 14,636 image and mask entries are hardlinks, so source and target release roots are
+immutable after validation.
+
+TA0의 source exposure는 RELLIS 100%이지만 현재 config는 공통 package의
+`splits/ta0_train.txt`와 `manifest.csv`를 요구하고 hook이 이를 강제한다. 따라서 TA0도
+superset build/validate 이후 시작한다. 이 구조는 standalone sample을 TA0에 노출하지
+않으며, 세 condition이 동일 package digest와 canonical RELLIS val/test를 공유하게 한다.
+TA1/TA2 full run은 TA0에서 선택한 recipe commit을 상속하고 검증된 동일 `TA_ROOT`를
+사용해야 한다.
 
 ## 2. E0 warm-start lock
 

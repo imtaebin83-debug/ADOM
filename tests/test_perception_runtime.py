@@ -96,6 +96,10 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
             semantic20_params["evidence_mask_topic"],
             "/adom/perception/semantic20_mask_evidence",
         )
+        self.assertEqual(
+            semantic20_params["evidence_image_topic"],
+            "/adom/perception/image_evidence",
+        )
 
     def test_live_autonomy_bag_includes_bounded_semantic_evidence(self):
         config = yaml.safe_load(
@@ -137,8 +141,18 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
             config["autonomy_data_recorder"]["ros__parameters"]["mask_topic"],
             "/adom/perception/semantic20_mask_evidence",
         )
+        self.assertFalse(
+            config["autonomy_data_recorder"]["ros__parameters"]["record_evidence"]
+        )
+        self.assertEqual(
+            config["autonomy_data_recorder"]["ros__parameters"][
+                "evidence_image_topic"
+            ],
+            "/adom/perception/image_evidence",
+        )
         for high_load_topic in (
             "/adom/perception/semantic20_mask",
+            "/adom/perception/image_evidence",
             "/adom/perception/confidence",
             "/adom/perception/overlay",
             "/adom/navigation/local_path",

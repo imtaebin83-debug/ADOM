@@ -45,6 +45,8 @@ class DataRecorder(Node):
             "topic_regex": DEFAULT_TOPIC_REGEX,
             "record_mask": False,
             "mask_topic": "/adom/perception/semantic20_mask_evidence",
+            "record_evidence": False,
+            "evidence_image_topic": "/adom/perception/image_evidence",
             "max_size_gb": 10.0,
             "size_check_period_sec": 0.5,
             "bag_split_size_mb": 1024,
@@ -87,7 +89,8 @@ class DataRecorder(Node):
         self.get_logger().info(
             f"Data recorder ready: Y/button {self.p['record_button']} toggles recording; "
             f"limit={self.p['max_size_gb']} GB, root={self._capture_root}, "
-            f"record_mask={bool(self.p['record_mask'])}"
+            f"record_mask={bool(self.p['record_mask'])}, "
+            f"record_evidence={bool(self.p['record_evidence'])}"
         )
         if bool(self.p["auto_start"]):
             self.start_recording()
@@ -105,13 +108,25 @@ class DataRecorder(Node):
             raise ValueError("topic_regex must not be empty")
         if bool(self.p["record_mask"]) and not str(self.p["mask_topic"]).strip():
             raise ValueError("mask_topic must not be empty when record_mask is true")
+        if bool(self.p["record_evidence"]):
+            if not bool(self.p["record_mask"]):
+                raise ValueError("record_evidence requires record_mask=true")
+            if not str(self.p["evidence_image_topic"]).strip():
+                raise ValueError(
+                    "evidence_image_topic must not be empty when record_evidence is true"
+                )
 
     def _effective_topic_regex(self):
         base_regex = str(self.p["topic_regex"]).strip()
-        if not bool(self.p["record_mask"]):
-            return base_regex
-        mask_topic = str(self.p["mask_topic"]).strip()
-        return rf"(?:{base_regex})|(?:^{re.escape(mask_topic)}$)"
+        extra_topics = []
+        if bool(self.p["record_mask"]):
+            extra_topics.append(str(self.p["mask_topic"]).strip())
+        if bool(self.p["record_evidence"]):
+            extra_topics.append(str(self.p["evidence_image_topic"]).strip())
+        regex = base_regex
+        for topic in extra_topics:
+            regex = rf"(?:{regex})|(?:^{re.escape(topic)}$)"
+        return regex
 
     @staticmethod
     def _rising(buttons, previous, index):
@@ -271,8 +286,14 @@ class DataRecorder(Node):
             "stop_reason": None if state == "recording" else reason,
             "topic_regex": self._topic_regex,
             "record_mask": bool(self.p["record_mask"]),
+            "record_evidence": bool(self.p["record_evidence"]),
             "mask_topic": (
                 str(self.p["mask_topic"]) if bool(self.p["record_mask"]) else None
+            ),
+            "evidence_image_topic": (
+                str(self.p["evidence_image_topic"])
+                if bool(self.p["record_evidence"])
+                else None
             ),
             "max_size_bytes": self._max_bytes,
             "size_bytes": directory_size(session_dir),
@@ -299,6 +320,7 @@ class DataRecorder(Node):
                 "max_size_bytes": self._max_bytes,
                 "reason": reason,
                 "record_mask": bool(self.p["record_mask"]),
+                "record_evidence": bool(self.p["record_evidence"]),
             },
             separators=(",", ":"),
         )

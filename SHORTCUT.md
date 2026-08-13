@@ -24,7 +24,7 @@ source ~/.bashrc
 | `up` | 없음 | 로컬 변경 삭제 후 `origin/jetson` 갱신 | 실행 전 주의 |
 | `t0` | `adom_sensors` | ZED 2i 및 GNSS 센서 | `Ctrl-C` |
 | `t1` | `adom_description` | 차량 URDF와 TF | `Ctrl-C` |
-| `t2 [mask]` | `adom_logging` 및 의존 패키지 | 기본 경량 rosbag; `mask` 인자면 2 Hz Semantic20 evidence mask 추가 | `Ctrl-C` |
+| `t2 [mask\|evidence]` | `adom_logging` 및 의존 패키지 | 기본 경량 bag; 선택적으로 2 Hz mask 또는 paired RGB+mask 추가 | `Ctrl-C` |
 | `t3` | `adom_control` | 게임패드, safety mux와 PCA9685 실출력 제어 | `Ctrl-C` |
 | `t4` | `adom_perception_ros` | Semantic20 CUDA perception | `Ctrl-C` |
 | `t5` | `adom_costmap_ros`, `adom_planning`, `adom_control` | Semantic20 costmap, direction-tree planner, controller | `Ctrl-C` |
@@ -262,6 +262,7 @@ ros2 launch adom_description description.launch.py
 ```bash
 t2       # raster mask 제외; class pixel 통계는 유지
 t2 mask  # 위 기록에 2 Hz Semantic20 evidence mask 추가
+t2 evidence  # t4가 추론한 동일 frame의 2 Hz BGR image + mask 추가
 ```
 
 기존 `t2`의 `adom_localization localization.launch.py` 실행은 제거한다. `~/.bashrc`의
@@ -273,12 +274,11 @@ t2() {
 }
 ```
 
-Bash 함수 인자는 괄호가 아니라 공백으로 전달하므로 `t2(mask)`가 아닌 `t2 mask`를
-사용한다. 인자가 없으면 2 Hz raster mask를 제외하고, `mask`를 넘기면 기존 topic에
-`/adom/perception/semantic20_mask_evidence`를 추가한다. 두 모드 모두
-`/adom/perception/status`의 inference-frame별 class pixel count/ratio와 작은 semantic
-costmap은 유지한다. Full-rate mask, RGB, confidence와 overlay는 어느 모드에서도 기록하지
-않는다.
+Bash 함수 인자는 괄호가 아니라 공백으로 전달한다. 인자가 없으면 raster를 제외하고,
+`mask`는 `/adom/perception/semantic20_mask_evidence`, `evidence`는 그 mask와 같은
+inference frame/header의 `/adom/perception/image_evidence` BGR image까지 추가한다. 모든
+모드가 inference-frame별 class pixel count/ratio를 유지한다. Full-rate mask, full-rate
+camera, confidence와 overlay는 어느 모드에서도 기록하지 않는다.
 
 launch와 함께 rosbag이 자동으로 시작되며 `Ctrl-C` 시 metadata를 닫고 종료한다. 기본
 결과 위치는 다음과 같다.
@@ -293,9 +293,11 @@ controller의 명령/추정 속도와 watchdog 상태, control mode, `/cmd_vel`,
 
 카메라, full-rate Semantic20 mask, confidence/overlay, local/rule path, 고주기 IMU, TF 및
 누적 `/adom/logging/gps_path`는 기록하지 않는다. 기본 `t2`는 raster mask도 제외하고,
-`t2 mask`만 2 Hz evidence mask를 추가한다. 작은 semantic costmap과 inference-frame별
-class pixel 통계는 두 모드 모두 기록한다. GPS 이동경로는 작은 raw `/fix` 시계열로
-보존하고 사후 재구성한다.
+`t2 mask`는 2 Hz evidence mask를, `t2 evidence`는 paired 2 Hz BGR image와 mask를
+추가한다. 작은 semantic costmap과 inference-frame별 class pixel 통계는 모든 모드에서
+기록 대상으로 유지하되, t5를 실행하지 않으면 costmap publisher가 없으므로 실제 bag에는
+costmap 메시지가 생기지 않는다. GPS 이동경로는 작은 raw `/fix` 시계열로 보존하고 사후
+재구성한다.
 이 bag은 기존 RGB 학습 데이터용 `rec`의 `data/captures`와 분리되며, `rec`의 동작과
 토픽 구성은 바뀌지 않는다.
 

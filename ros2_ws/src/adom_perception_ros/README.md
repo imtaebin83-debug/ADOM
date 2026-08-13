@@ -10,6 +10,7 @@
 ```text
 /adom/perception/semantic20_mask  sensor_msgs/Image (mono8, IDs 0..18/255)
 /adom/perception/semantic20_mask_evidence sensor_msgs/Image (mono8, 2 Hz default)
+/adom/perception/image_evidence   sensor_msgs/Image (bgr8, paired 2 Hz default)
 /adom/perception/confidence       sensor_msgs/Image (mono8, 0..255)
 /adom/perception/overlay          sensor_msgs/Image (bgr8)
 /adom/perception/status           std_msgs/String (JSON latency/counters)
@@ -38,9 +39,11 @@ mailbox의 pending frame을 교체한다. 별도 worker가 현재 추론을 마�
   신뢰도 threshold 통과를 뜻하지 않는다.
 - `ignore_pixel_count` / `ignore_pixel_ratio`: ID `255` 영역 통계
 
-Live autonomy bag은 costmap이 사용하는 full-rate mask를 직접 구독하지 않는다. 대신 같은
-header와 `mono8` payload를 갖는 `semantic20_mask_evidence`를 기본 2 Hz로 발행해 기록한다.
-`evidence_mask_fps:=0.0`이면 이 sample 발행을 끌 수 있다. 클래스 통계는 sample 주기와
+Live autonomy bag은 costmap이 사용하는 full-rate mask를 직접 구독하지 않는다. `t2 mask`는
+같은 header와 `mono8` payload를 갖는 `semantic20_mask_evidence`를 기록하고,
+`t2 evidence`는 추론 입력과 같은 frame/header의 `bgr8` `image_evidence`도 함께 기록한다.
+두 raster는 기본 2 Hz schedule을 공유하며 subscriber가 있을 때만 만들어진다.
+`evidence_mask_fps:=0.0`이면 sample 발행을 끌 수 있다. 클래스 통계는 sample 주기와
 무관하게 inference frame마다 status에 남는다.
 
 카메라 clock과 ROS clock이 같은 time domain이고 header stamp가 0이 아닐 때만

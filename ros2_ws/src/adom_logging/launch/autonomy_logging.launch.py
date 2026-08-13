@@ -15,6 +15,7 @@ def generate_launch_description():
             DeclareLaunchArgument("params_file", default_value=default_config),
             DeclareLaunchArgument("capture_root", default_value="data/autonomy_bags"),
             DeclareLaunchArgument("record_mask", default_value="false"),
+            DeclareLaunchArgument("record_evidence", default_value="false"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             Node(
                 package="adom_logging",
@@ -36,6 +37,9 @@ def generate_launch_description():
                         "capture_root": LaunchConfiguration("capture_root"),
                         "record_mask": ParameterValue(
                             LaunchConfiguration("record_mask"), value_type=bool
+                        ),
+                        "record_evidence": ParameterValue(
+                            LaunchConfiguration("record_evidence"), value_type=bool
                         ),
                         "use_sim_time": LaunchConfiguration("use_sim_time"),
                     },

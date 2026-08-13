@@ -27,3 +27,5 @@ autonomy_data_recorder:
     topic_regex: "^/(adom/perception/status|adom/navigation/(semantic_costmap|costmap_status|planned_speed|rule_status|action_latency)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/gps_status|cmd_vel|drive(/autonomous)?|emergency_stop|fix)$"
     record_mask: false
     mask_topic: /adom/perception/semantic20_mask_evidence
+    record_evidence: false
+    evidence_image_topic: /adom/perception/image_evidence

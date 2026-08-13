@@ -54,6 +54,7 @@ class AdomPerceptionNode(Node):
             "image_topic": "/zed/zed_node/rgb/color/rect/image",
             "mask_topic": "/adom/perception/semantic20_mask",
             "evidence_mask_topic": "/adom/perception/semantic20_mask_evidence",
+            "evidence_image_topic": "/adom/perception/image_evidence",
             "evidence_mask_fps": 2.0,
             "confidence_topic": "/adom/perception/confidence",
             "overlay_topic": "/adom/perception/overlay",
@@ -98,6 +99,9 @@ class AdomPerceptionNode(Node):
         self._mask_pub = self.create_publisher(Image, str(self.p["mask_topic"]), 1)
         self._evidence_mask_pub = self.create_publisher(
             Image, str(self.p["evidence_mask_topic"]), 1
+        )
+        self._evidence_image_pub = self.create_publisher(
+            Image, str(self.p["evidence_image_topic"]), 1
         )
         self._confidence_pub = self.create_publisher(
             Image, str(self.p["confidence_topic"]), 1
@@ -180,17 +184,29 @@ class AdomPerceptionNode(Node):
             mask_message.header = message.header
             self._mask_pub.publish(mask_message)
             evidence_mask_published = False
+            evidence_image_published = False
             evidence_now = time.monotonic()
             if (
                 self._evidence_mask_period is not None
-                and self._evidence_mask_pub.get_subscription_count() > 0
+                and (
+                    self._evidence_mask_pub.get_subscription_count() > 0
+                    or self._evidence_image_pub.get_subscription_count() > 0
+                )
                 and evidence_now >= self._next_evidence_mask_publish
             ):
-                self._evidence_mask_pub.publish(mask_message)
+                if self._evidence_mask_pub.get_subscription_count() > 0:
+                    self._evidence_mask_pub.publish(mask_message)
+                    evidence_mask_published = True
+                if self._evidence_image_pub.get_subscription_count() > 0:
+                    evidence_image_message = self._bridge.cv2_to_imgmsg(
+                        image, encoding="bgr8"
+                    )
+                    evidence_image_message.header = message.header
+                    self._evidence_image_pub.publish(evidence_image_message)
+                    evidence_image_published = True
                 self._next_evidence_mask_publish = (
                     evidence_now + self._evidence_mask_period
                 )
-                evidence_mask_published = True
             if publish_confidence:
                 if confidence is None:
                     raise RuntimeError("backend did not return requested confidence")
@@ -241,6 +257,10 @@ class AdomPerceptionNode(Node):
                 ),
                 evidence_mask_fps=float(self.p["evidence_mask_fps"]),
                 evidence_mask_published=evidence_mask_published,
+                evidence_image_subscribers=(
+                    self._evidence_image_pub.get_subscription_count()
+                ),
+                evidence_image_published=evidence_image_published,
                 **pixel_statistics,
             )
         except Exception as error:

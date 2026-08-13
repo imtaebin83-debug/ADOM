@@ -27,6 +27,7 @@ def generate_launch_description():
             DeclareLaunchArgument("start_recording", default_value="true"),
             DeclareLaunchArgument("capture_root", default_value="data/autonomy_bags"),
             DeclareLaunchArgument("record_mask", default_value="false"),
+            DeclareLaunchArgument("record_evidence", default_value="false"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             package_launch(
                 "adom_perception_ros",
@@ -58,6 +59,7 @@ def generate_launch_description():
                 {
                     "capture_root": LaunchConfiguration("capture_root"),
                     "record_mask": LaunchConfiguration("record_mask"),
+                    "record_evidence": LaunchConfiguration("record_evidence"),
                     "use_sim_time": LaunchConfiguration("use_sim_time"),
                 },
                 condition=IfCondition(LaunchConfiguration("start_recording")),

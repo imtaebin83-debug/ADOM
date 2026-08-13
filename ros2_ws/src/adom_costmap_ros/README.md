@@ -13,6 +13,13 @@ inflation 활성화만으로 hard-stop cost 100으로 승격되지는 않는다.
 /adom/navigation/costmap_status    std_msgs/String (JSON)
 ```
 
+RGB mask와 registered depth의 원본 camera timestamp는 depth matching과 TF lookup까지
+그대로 사용한다. 완성된 `OccupancyGrid.header.stamp`는 costmap 노드의 ROS 현재 시각으로
+새로 기록한다. ZED가 device/monotonic timestamp를 발행해도 planner가 system ROS clock과
+직접 비교하지 않게 하며, downstream age는 costmap 생성 이후 software freshness를
+뜻한다. Camera clock과 ROS clock이 같은 domain일 때만 status의
+`source_to_costmap_output_ms`를 camera-to-costmap 지연으로 해석한다.
+
 이번 구현은 rule planner와 RViz 검증을 위한 별도 grid다. 장기적으로 Nav2가 이 비용을 직접
 합성해야 할 때는 동일한 투영/비용 계약을 `nav2_costmap_2d::Layer` C++ plugin으로 옮긴다.
 

@@ -665,6 +665,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: 평상시 직진을 더 오래 유지하고 가까운 직진 장애물에만 회피 tree를 활성화하도록
   `avoid_trigger_distance_m`을 초기 3.50 m에서 1.50 m로 조정한다. 모드 구조와 0.30 m
   BLOCKED 기준은 유지한다. 상세 근거는 decision record 0023을 따른다.
+- **[2026-08-13] semantic costmap 출력에서 ROS clock domain으로 전환**
+  이유: Jetson ZED의 device/monotonic timestamp를 planner의 system ROS clock과 직접
+  비교해 모든 costmap을 stale로 폐기했다. RGB mask와 depth의 원본 timestamp는 동기화와
+  TF lookup까지 유지하고, 완성된 `OccupancyGrid.header.stamp`만 costmap 노드의 ROS 현재
+  시각으로 기록한다. ZED timestamp 설정은 변경하지 않으며 downstream watchdog age는
+  costmap 생성 이후 freshness를 뜻한다. 상세 근거는 decision record 0024를 따른다.
 
 ## 17. Primary References
 

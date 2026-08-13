@@ -36,7 +36,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0009](0009-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Superseded in part | 방향 선택/control은 0010 우선 |
 | [0010](0010-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Superseded in part | tree 방향 선택은 0019 우선; logging 계약 유지 |
 | [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Superseded in part | 0016이 live bag topic 범위를 더 축소 |
-| [0012](0012-planner-source-age-tolerance.md) | Planner source-age tolerance | Accepted | camera source age 폐기 기준 0.80초 |
+| [0012](0012-planner-source-age-tolerance.md) | Planner source-age tolerance | Superseded in part | 0024 이후 costmap output age 기준 |
 | [0013](0013-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
 | [0014](0014-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; 6 m/s mapping은 0015가 대체 |
 | [0015](0015-imu-aided-12mps-pwm-calibration.md) | IMU-aided nominal 12 m/s PWM calibration | Accepted | 1500..2000 us = 0..12 m/s, IMU bias/ZUPT/P-feedback |
@@ -48,6 +48,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0021](0021-side-cost-assisted-tree.md) | Side-cost-assisted direction tree | Superseded in part | 좌우 cost 선택 유지; activation은 0022 우선 |
 | [0022](0022-straight-avoid-blocked-modes.md) | Straight/avoid/blocked modes | Accepted | 직진 장애물 거리로 mode 전환 |
 | [0023](0023-avoid-trigger-distance-tuning.md) | Avoid trigger distance tuning | Accepted | AVOID 진입 거리 3.50 m → 1.50 m |
+| [0024](0024-costmap-clock-domain-boundary.md) | Costmap clock-domain boundary | Accepted | 센서 stamp는 sync까지 유지, costmap 출력은 ROS clock |
 | [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Accepted | 2 Hz mask sample + costmap grid + per-class status |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별

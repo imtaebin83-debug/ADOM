@@ -177,6 +177,22 @@ class SemanticCostmapTests(unittest.TestCase):
         self.assertEqual(zed["depth_texture_conf"], 50)
         self.assertIn('name="zed_z" default="0.21"', urdf)
 
+    def test_costmap_restamps_output_without_changing_sensor_inputs(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (
+            root
+            / "ros2_ws/src/adom_costmap_ros/scripts/semantic_costmap_node.py"
+        ).read_text()
+
+        self.assertIn("Time.from_msg(depth_message.header.stamp)", source)
+        self.assertIn("output_stamp = self.get_clock().now()", source)
+        self.assertIn("output.header.stamp = output_stamp.to_msg()", source)
+        self.assertIn(
+            "source_to_costmap_output_ms=elapsed_ms_if_compatible(", source
+        )
+        self.assertIn("output_ns, source_ns", source)
+        self.assertNotIn("output.header = mask_message.header", source)
+
 
 class RulePlannerTests(unittest.TestCase):
     def setUp(self):

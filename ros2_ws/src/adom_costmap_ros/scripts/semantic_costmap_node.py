@@ -33,6 +33,17 @@ def stamp_ns(message) -> int:
     )
 
 
+def elapsed_ms_if_compatible(later_ns: int, earlier_ns: int) -> float | None:
+    if earlier_ns <= 0:
+        return None
+    elapsed_ns = later_ns - earlier_ns
+    # A live costmap cannot legitimately take a minute. Treat a larger delta
+    # as evidence that the sensor and ROS clocks have different epochs.
+    if elapsed_ns < 0 or elapsed_ns > 60_000_000_000:
+        return None
+    return round(elapsed_ns / 1e6, 2)
+
+
 class SemanticCostmapNode(Node):
     def __init__(self) -> None:
         super().__init__("semantic_costmap")
@@ -210,8 +221,11 @@ class SemanticCostmapNode(Node):
             )
             grid = build_costmap(points, labels, self._config)
 
+            # Preserve camera timestamps through mask/depth synchronization and
+            # TF lookup, then cross into the planner's ROS clock domain here.
+            output_stamp = self.get_clock().now()
             output = OccupancyGrid()
-            output.header = mask_message.header
+            output.header.stamp = output_stamp.to_msg()
             output.header.frame_id = str(self.p["output_frame"])
             output.info.resolution = float(self._config.resolution_m)
             output.info.width = self._config.rows
@@ -221,7 +235,7 @@ class SemanticCostmapNode(Node):
             output.info.origin.orientation.w = 1.0
             output.data = grid.reshape(-1).astype(np.int8).tolist()
             self._costmap_pub.publish(output)
-            output_ns = self.get_clock().now().nanoseconds
+            output_ns = output_stamp.nanoseconds
             source_ns = stamp_ns(mask_message)
             self._publish_status(
                 "ok",
@@ -232,10 +246,8 @@ class SemanticCostmapNode(Node):
                 processing_ms=round(
                     (time.monotonic() - processing_started) * 1000.0, 2
                 ),
-                source_to_costmap_output_ms=(
-                    None
-                    if source_ns <= 0 or output_ns < source_ns
-                    else round((output_ns - source_ns) / 1e6, 2)
+                source_to_costmap_output_ms=elapsed_ms_if_compatible(
+                    output_ns, source_ns
                 ),
             )
         except TransformException as error:

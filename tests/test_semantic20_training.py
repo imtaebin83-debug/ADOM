@@ -368,6 +368,36 @@ class Semantic20ConfigImportTests(unittest.TestCase):
                         self.assertEqual(config.train_cfg.max_iters, expected_updates * 2)
                         self.assertEqual(config.default_hooks.checkpoint.interval, 1000)
 
+    def test_eadom_configs_change_only_the_training_dataset_contract(self) -> None:
+        from mmengine.config import Config
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {
+                "ADOM_DATA_ROOT": Path(directory).as_posix(),
+                "ADOM_ACCUMULATIVE_COUNTS": "1",
+            },
+            clear=False,
+        ):
+            for stage, expected_updates in (("stage1", 4000), ("stage2", 40000)):
+                config = Config.fromfile(
+                    CONFIG_ROOT / f"segformer_b0_{stage}_eadom.py",
+                    import_custom_modules=False,
+                )
+                self.assertEqual(
+                    config.train_dataloader.dataset.split,
+                    "splits/ta1_train.txt",
+                )
+                self.assertEqual(config.train_dataloader.sampler.type, "InfiniteSampler")
+                self.assertEqual(config.model.decode_head.loss_decode.type, "CrossEntropyLoss")
+                self.assertEqual(config.model.data_preprocessor.size, (512, 512))
+                self.assertEqual(config.train_cfg.max_iters, expected_updates)
+                self.assertEqual(
+                    [metric.type for metric in config.val_evaluator],
+                    ["AdomSemantic20Metric"],
+                )
+                self.assertTrue(config.randomness.deterministic)
+
 
 if __name__ == "__main__":
     unittest.main()

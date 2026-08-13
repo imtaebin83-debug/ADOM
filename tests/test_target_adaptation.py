@@ -143,6 +143,7 @@ class TargetAdaptationPackageTests(unittest.TestCase):
             ), patch.dict(
                 semantic20_cycle.EXPECTED_SPLIT_COUNTS,
                 {
+                    "eadom": {"train": 2, "val": 1, "test": 1},
                     "ta0": {"train": 1, "val": 1, "test": 1},
                     "ta1": {"train": 2, "val": 1, "test": 1},
                     "ta2": {"train": 4, "val": 1, "test": 1},
@@ -168,6 +169,31 @@ class TargetAdaptationPackageTests(unittest.TestCase):
                 )
             self.assertEqual(runtime_report["split_counts"]["train"], 4)
             self.assertEqual(runtime_report["verified_pairs"], 8)
+            with patch.object(
+                semantic20_cycle, "REFERENCE_SPLITS", reference
+            ), patch.dict(
+                semantic20_cycle.EXPECTED_SPLIT_COUNTS,
+                {"eadom": {"train": 2, "val": 1, "test": 1}},
+                clear=False,
+            ), patch.object(
+                semantic20_cycle,
+                "EXPECTED_TA_MANIFEST_SOURCE_COUNTS",
+                Counter({"rellis3d": 3, "rugd": 1, "ycor": 1, "adom_zed2i": 3}),
+            ), patch.object(
+                semantic20_cycle,
+                "EXPECTED_TA_MAIN_SOURCE_COUNTS",
+                {"ta1": Counter({"rellis3d": 3, "adom_zed2i": 1})},
+            ):
+                eadom_report = semantic20_cycle.validate_semantic20_dataset(
+                    output, "eadom"
+                )
+            self.assertEqual(eadom_report["split_counts"]["train"], 2)
+            self.assertEqual(
+                eadom_report["class_support"]["by_source_split"][
+                    "adom_zed2i/train"
+                ]["sample_count"],
+                1,
+            )
 
 
 class SourceWeightedScheduleTests(unittest.TestCase):

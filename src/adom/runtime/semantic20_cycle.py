@@ -43,6 +43,7 @@ GATE_UPDATES = {"smoke": 50, "mini": 500}
 EXPECTED_SPLIT_COUNTS = {
     "e0": {"train": 4435, "val": 900, "test": 899},
     "e1": {"train": 9868, "val": 900, "test": 899},
+    "eadom": {"train": 4568, "val": 900, "test": 899},
     "ta0": {"train": 4435, "val": 900, "test": 899},
     "ta1": {"train": 4568, "val": 900, "test": 899},
     "ta2": {"train": 10001, "val": 900, "test": 899},
@@ -50,7 +51,8 @@ EXPECTED_SPLIT_COUNTS = {
 PRODUCTION_CANONICAL_EVAL_COUNTS = {"val": 900, "test": 899}
 CANONICAL_EVAL_COUNTS = PRODUCTION_CANONICAL_EVAL_COUNTS.copy()
 TA_EXPERIMENTS = {"ta0", "ta1", "ta2"}
-COMBINED_EXPERIMENTS = {"e1", "e2"} | TA_EXPERIMENTS
+EADOM_EXPERIMENT = "eadom"
+COMBINED_EXPERIMENTS = {"e1", "e2", EADOM_EXPERIMENT} | TA_EXPERIMENTS
 EXPECTED_E1_MANIFEST_COUNT = 14421
 EXPECTED_E1_MAIN_SOURCE_COUNTS = Counter(
     {"rellis3d": 6234, "rugd": 4779, "ycor": 654}
@@ -73,6 +75,7 @@ EXPECTED_TA_TRAIN_SOURCES = {
     "ta1": {"rellis3d", "adom_zed2i"},
     "ta2": {"rellis3d", "rugd", "ycor", "adom_zed2i"},
 }
+EXPECTED_EADOM_TRAIN_SOURCES = {"rellis3d", "adom_zed2i"}
 ALLOWED_TARGET_IDS = set(range(19)) | {255}
 
 
@@ -282,7 +285,13 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         split: _read_split(REFERENCE_SPLITS / f"{split}.txt")
         for split in ("train", "val", "test")
     }
-    train_filename = f"{experiment}_train.txt" if experiment in TA_EXPERIMENTS else "train.txt"
+    train_filename = (
+        "ta1_train.txt"
+        if experiment == EADOM_EXPERIMENT
+        else f"{experiment}_train.txt"
+        if experiment in TA_EXPERIMENTS
+        else "train.txt"
+    )
     actual = {
         "train": _read_split(dataset_root / "splits" / train_filename),
         "val": _read_split(dataset_root / "splits" / "val.txt"),
@@ -337,6 +346,8 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
         required_sources = (
             EXPECTED_TA_TRAIN_SOURCES[experiment]
             if experiment in TA_EXPERIMENTS
+            else EXPECTED_EADOM_TRAIN_SOURCES
+            if experiment == EADOM_EXPERIMENT
             else {"rellis3d", "rugd", "ycor"}
         )
         if experiment == "e2":
@@ -389,7 +400,7 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
                 f"{len(manifest_rows)} != {EXPECTED_E1_MANIFEST_COUNT}"
             )
         manifest_sources = Counter(key.split("/", 1)[0] for key in manifest_rows)
-        if experiment in TA_EXPERIMENTS and (
+        if experiment in TA_EXPERIMENTS | {EADOM_EXPERIMENT} and (
             manifest_sources != EXPECTED_TA_MANIFEST_SOURCE_COUNTS
         ):
             raise RuntimeError(
@@ -472,6 +483,13 @@ def validate_semantic20_dataset(dataset_root: Path, experiment: str) -> dict[str
             f"{experiment.upper()} main split source counts differ from contract: "
             f"{dict(main_source_counts)}"
         )
+    if experiment == EADOM_EXPERIMENT and (
+        main_source_counts != EXPECTED_TA_MAIN_SOURCE_COUNTS["ta1"]
+    ):
+        raise RuntimeError(
+            "EADOM main split source counts differ from the TA1 data-only contract: "
+            f"{dict(main_source_counts)}"
+        )
 
     digest = hashlib.sha256()
     for split in ("train", "val", "test"):
@@ -534,6 +552,7 @@ def _config(model: str, stage: str, experiment: str) -> Path:
         "e0": "e0_rellis",
         "e1": "e1_combined",
         "e2": "e2_combined_goose",
+        "eadom": "eadom",
         "ta0": "ta0",
         "ta1": "ta1",
         "ta2": "ta2",
@@ -571,6 +590,7 @@ def _probe_batch(
                 "ADOM_ACCUMULATIVE_COUNTS": "1",
                 "ADOM_TA_CONFIG_PROBE": "true",
                 "WANDB_MODE": "disabled",
+                "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
             }
         )
         command = [
@@ -583,6 +603,9 @@ def _probe_batch(
             "train_cfg.max_iters=2",
             "train_cfg.val_interval=3",
             "default_hooks.checkpoint.interval=3",
+            "val_cfg=None",
+            "val_dataloader=None",
+            "val_evaluator=None",
         ]
         if load_from is not None:
             command.append(f"load_from={load_from}")
@@ -877,6 +900,7 @@ def run_cycle(args: argparse.Namespace) -> None:
     env["ADOM_DATA_ROOT"] = dataset_root.as_posix()
     env["ADOM_SEED"] = str(args.seed)
     env["ADOM_DETERMINISTIC"] = "true"
+    env["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     if initial_checkpoint_contract is not None:
         env["ADOM_EXPECTED_INITIAL_CHECKPOINT_SHA256"] = initial_checkpoint_contract[
             "sha256"
@@ -901,6 +925,8 @@ def run_cycle(args: argparse.Namespace) -> None:
         raise RuntimeError("--models contains duplicates")
     if args.experiment in TA_EXPERIMENTS and models != ["b0"]:
         raise RuntimeError("TA0/TA1/TA2 are locked to --models b0")
+    if args.experiment == EADOM_EXPERIMENT and models != ["b0"]:
+        raise RuntimeError("Emergency E-ADOM is locked to --models b0")
 
     doctor_path = output_root / "doctor.json"
     doctor_command = [
@@ -1086,12 +1112,14 @@ def run_cycle(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Run Clean v1 E0/E1/E2/TA0/TA1/TA2 Semantic20 SegFormer gates"
+        description=(
+            "Run Clean v1 E0/E1/E2/E-ADOM/TA0/TA1/TA2 Semantic20 SegFormer gates"
+        )
     )
     parser.add_argument("--dataset", type=Path)
     parser.add_argument(
         "--experiment",
-        choices=("e0", "e1", "e2", "ta0", "ta1", "ta2"),
+        choices=("e0", "e1", "e2", "eadom", "ta0", "ta1", "ta2"),
         required=True,
     )
     parser.add_argument("--models", default="b0,b2")

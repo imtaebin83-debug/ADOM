@@ -12,6 +12,9 @@ RELLIS target domain의 전체 성능을 보존하고 희소 위험 class를 개
 | E0 | RELLIS | RELLIS | RELLIS | 원본 baseline |
 | E1 | RELLIS + RUGD + YCOR | RELLIS | RELLIS | 기존 3-source 증강 |
 | E2 | E1 + GOOSE Semantic20 direct mapping | RELLIS | RELLIS | GOOSE의 추가 효과 분리 |
+| TA0 | RELLIS, B0-E0 warm start | RELLIS | RELLIS | 공통 개선 recipe의 method control |
+| TA1 | RELLIS + ADOM ZED2i | RELLIS | RELLIS | TA0 recipe에서 신규 target-domain data 순효과 |
+| TA2 | RELLIS + RUGD + YCOR + ADOM ZED2i | RELLIS | RELLIS | TA0 recipe에서 multi-source 상보 효과 |
 
 기존 `E1`의 의미는 config와 decision record에 이미 고정돼 있으므로 GOOSE를
 추가한 4-source 조건은 `E2`로 관리하는 것을 권장한다. RUGD/YCOR/GOOSE의
@@ -52,3 +55,5 @@ RareRisk-4에 남겨 비열화 여부를 감시하지만, 현재 source mapping�
 - [v0-legacy](versions/v0-legacy/README.md)
 - [v1-clean-baseline](versions/v1-clean-baseline/README.md)
 - [Clean Baseline v1 protocol](protocols/clean-baseline-v1.md)
+- [TA0/TA1/TA2 parallel RunPod runbook](target-adaptation-runbook.md)
+- [TA method-recipe selection plan](ta-method-recipe-selection.md)

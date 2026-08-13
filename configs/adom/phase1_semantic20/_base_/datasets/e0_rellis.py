@@ -2,6 +2,18 @@
 dataset_type = "AdomSemantic20Dataset"
 data_root = "{{$ADOM_DATA_ROOT:ADOM_DATA_ROOT_NOT_SET}}"
 crop_size = (512, 512)
+pack_meta_keys = (
+    "img_path",
+    "seg_map_path",
+    "ori_shape",
+    "img_shape",
+    "pad_shape",
+    "scale_factor",
+    "flip",
+    "flip_direction",
+    "reduce_zero_label",
+    "sample_id",
+)
 
 train_pipeline = [
     dict(type="LoadImageFromFile"),
@@ -15,14 +27,14 @@ train_pipeline = [
     dict(type="RandomCrop", crop_size=crop_size, cat_max_ratio=0.75),
     dict(type="RandomFlip", prob=0.5, direction="horizontal"),
     dict(type="PhotoMetricDistortion"),
-    dict(type="PackSegInputs"),
+    dict(type="PackSegInputs", meta_keys=pack_meta_keys),
 ]
 
 test_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(type="Resize", scale=(1024, 512), keep_ratio=True),
     dict(type="LoadAnnotations", reduce_zero_label=False),
-    dict(type="PackSegInputs"),
+    dict(type="PackSegInputs", meta_keys=pack_meta_keys),
 ]
 
 train_dataset = dict(

@@ -2,7 +2,14 @@ accumulative_counts = int("{{$ADOM_ACCUMULATIVE_COUNTS:1}}")
 if accumulative_counts < 1:
     raise ValueError("ADOM_ACCUMULATIVE_COUNTS must be at least 1")
 
-optimizer_updates = int("{{$ADOM_MAX_OPTIMIZER_UPDATES:5000}}")
+comparison_total_updates = int("{{$ADOM_TA_TOTAL_OPTIMIZER_UPDATES:6000}}")
+if comparison_total_updates < 2:
+    raise ValueError("ADOM_TA_TOTAL_OPTIMIZER_UPDATES must be at least 2")
+lp_head_full_updates = int("{{$ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES:1000}}")
+if lp_head_full_updates not in {500, 1000}:
+    raise ValueError("ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES must be 500 or 1000")
+stage1_updates = max(1, round(comparison_total_updates * lp_head_full_updates / 6000))
+optimizer_updates = comparison_total_updates - stage1_updates
 warmup_updates = min(int("{{$ADOM_WARMUP_OPTIMIZER_UPDATES:100}}"), optimizer_updates)
 val_updates = int("{{$ADOM_VAL_INTERVAL_OPTIMIZER_UPDATES:500}}")
 
@@ -53,6 +60,7 @@ val_cfg = dict(type="ValLoop")
 test_cfg = dict(type="TestLoop")
 custom_hooks = [
     dict(type="CanonicalTestLockHook"),
+    dict(type="TA0AblationContractHook"),
     dict(type="BackboneAuditHook"),
     dict(type="FiniteLossHook"),
     dict(type="MetricArtifactHook"),

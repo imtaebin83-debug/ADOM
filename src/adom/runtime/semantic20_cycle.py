@@ -569,6 +569,7 @@ def _probe_batch(
             {
                 "ADOM_MICRO_BATCH": str(micro_batch),
                 "ADOM_ACCUMULATIVE_COUNTS": "1",
+                "ADOM_TA_CONFIG_PROBE": "true",
                 "WANDB_MODE": "disabled",
             }
         )
@@ -625,8 +626,16 @@ def _stage_env(
     if gate in GATE_UPDATES:
         updates = GATE_UPDATES[gate]
         value["ADOM_MAX_OPTIMIZER_UPDATES"] = str(updates)
+        value["ADOM_TA_TOTAL_OPTIMIZER_UPDATES"] = str(updates)
+        lp_head_updates = int(value.get("ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES", "1000"))
+        if stage == "stage1":
+            phase_updates = max(1, round(updates * lp_head_updates / 6000))
+        elif stage == "stage2":
+            phase_updates = updates - max(1, round(updates * lp_head_updates / 6000))
+        else:
+            phase_updates = updates
         value["ADOM_VAL_INTERVAL_OPTIMIZER_UPDATES"] = str(
-            updates if gate == "mini" else updates + 1
+            phase_updates if gate == "mini" else phase_updates + 1
         )
     else:
         value.pop("ADOM_MAX_OPTIMIZER_UPDATES", None)
@@ -713,7 +722,10 @@ def _train_stage(
         resume=resume,
     )
     if gate == "smoke":
-        return None
+        checkpoint = _resumable_checkpoint(work_dir)
+        if checkpoint is None:
+            raise RuntimeError(f"Smoke phase did not create a checkpoint: {work_dir}")
+        return checkpoint
     best = resolve_single_best_checkpoint(work_dir)
     state.value["phases"][f"{model}_{stage}"]["best_checkpoint"] = str(best)
     state.save()
@@ -743,6 +755,10 @@ def _run_resume_gate(
     config = _config(model, "stage1", experiment)
     first_env = dict(base_env)
     first_env["ADOM_MAX_OPTIMIZER_UPDATES"] = "2"
+    lp_head_updates = int(first_env.get("ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES", "1000"))
+    first_env["ADOM_TA_TOTAL_OPTIMIZER_UPDATES"] = str(
+        round(2 * 6000 / lp_head_updates)
+    )
     _run_phase(
         state,
         name=f"{model}_resume_seed",
@@ -768,6 +784,9 @@ def _run_resume_gate(
 
     second_env = dict(base_env)
     second_env["ADOM_MAX_OPTIMIZER_UPDATES"] = "4"
+    second_env["ADOM_TA_TOTAL_OPTIMIZER_UPDATES"] = str(
+        round(4 * 6000 / lp_head_updates)
+    )
     _run_phase(
         state,
         name=f"{model}_resume_restore",
@@ -858,6 +877,11 @@ def run_cycle(args: argparse.Namespace) -> None:
     env["ADOM_DATA_ROOT"] = dataset_root.as_posix()
     env["ADOM_SEED"] = str(args.seed)
     env["ADOM_DETERMINISTIC"] = "true"
+    if initial_checkpoint_contract is not None:
+        env["ADOM_EXPECTED_INITIAL_CHECKPOINT_SHA256"] = initial_checkpoint_contract[
+            "sha256"
+        ]
+        env["ADOM_INITIAL_CHECKPOINT"] = initial_checkpoint_contract["path"]
     tags = [item for item in env.get("WANDB_TAGS", "").split(",") if item]
     tags.extend(
         (
@@ -979,10 +1003,10 @@ def run_cycle(args: argparse.Namespace) -> None:
             resume=args.resume,
             load_from=initial_checkpoint,
         )
-        if args.gate != "full":
+        if args.gate != "full" and args.experiment not in TA_EXPERIMENTS:
             continue
         if stage1_best is None:
-            raise RuntimeError("Full Stage 2 requires a Stage 1 best checkpoint")
+            raise RuntimeError("TA/full Stage 2 requires a Stage 1 checkpoint")
         stage2_best = _train_stage(
             state=state,
             model=model,
@@ -997,6 +1021,8 @@ def run_cycle(args: argparse.Namespace) -> None:
         )
         if stage2_best is None:
             raise RuntimeError("Full training requires a Stage 2 selected checkpoint")
+        if args.gate != "full":
+            continue
         if not args.run_test or model != args.final_test_model:
             continue
         test_dir = output_root / model / "test"

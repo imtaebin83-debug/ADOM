@@ -86,6 +86,67 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
             hook_types = {hook["type"] for hook in config["custom_hooks"]}
             self.assertIn(audit_hook, hook_types)
             self.assertIn("SourceExposureAuditHook", hook_types)
+            self.assertIn("TA0AblationContractHook", hook_types)
+
+    def test_target_adaptation_gate_budget_is_split_without_extra_updates(self) -> None:
+        for total in (50, 500, 6000):
+            for head_full_updates in (500, 1000):
+                with self.subTest(total=total, head_full_updates=head_full_updates):
+                    self._assert_ta_budget_split(total, head_full_updates)
+
+    def _assert_ta_budget_split(self, total: int, head_full_updates: int) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "ADOM_ACCUMULATIVE_COUNTS": "2",
+                "ADOM_TA_TOTAL_OPTIMIZER_UPDATES": str(total),
+                "ADOM_TA_LP_HEAD_OPTIMIZER_UPDATES": str(head_full_updates),
+            },
+            clear=False,
+        ):
+            stage1 = _execute_env_config(
+                CONFIG_ROOT
+                / "_base_"
+                / "schedules"
+                / "target_adapt_stage1_head.py"
+            )
+            stage2 = _execute_env_config(
+                CONFIG_ROOT
+                / "_base_"
+                / "schedules"
+                / "target_adapt_stage2_full.py"
+            )
+            direct = _execute_env_config(
+                CONFIG_ROOT
+                / "_base_"
+                / "schedules"
+                / "target_adapt_direct_ft.py"
+            )
+        stage1_updates = stage1["train_cfg"]["max_iters"] // 2
+        stage2_updates = stage2["train_cfg"]["max_iters"] // 2
+        direct_updates = direct["train_cfg"]["max_iters"] // 2
+        self.assertEqual(stage1_updates + stage2_updates, total)
+        self.assertEqual(direct_updates, total)
+
+    def test_ta0_direct_and_discriminative_controls_share_total_budget(self) -> None:
+        direct = _execute_env_config(
+            CONFIG_ROOT / "_base_" / "schedules" / "target_adapt_direct_ft.py"
+        )
+        self.assertEqual(direct["train_cfg"]["max_iters"], 6000)
+        hook_types = {hook["type"] for hook in direct["custom_hooks"]}
+        self.assertIn("TA0AblationContractHook", hook_types)
+        discriminative = _execute_env_config(
+            CONFIG_ROOT
+            / "_base_"
+            / "schedules"
+            / "target_adapt_discriminative_lr.py"
+        )
+        self.assertEqual(discriminative["_base_"], ["./target_adapt_direct_ft.py"])
+        keys = discriminative["optim_wrapper"]["paramwise_cfg"]["custom_keys"]
+        self.assertLess(
+            keys["backbone.layers.0"]["lr_mult"],
+            keys["backbone.layers.3"]["lr_mult"],
+        )
 
     def test_target_adaptation_dataset_base_is_fail_closed(self) -> None:
         config = _execute_env_config(

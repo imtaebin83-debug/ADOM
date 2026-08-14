@@ -12,6 +12,7 @@
 | E0 | RELLIS | clean model baseline |
 | E1 | RELLIS + RUGD + YCOR | 기존 bridge data의 효과 |
 | E2 | E1 + GOOSE direct-only | GOOSE의 추가 pole 효과 |
+| E-ADOM | RELLIS anchors + newly labeled standalone data | 긴급 data-only field adaptation |
 
 ## Required improvements from v0
 
@@ -43,6 +44,13 @@
 - paired seed aggregator가 각 조건 내부의 dataset content digest와 B0/B2 존재를
   검사한 뒤 42/43/44의 mean, sample std, paired delta를 만든다.
 - B0/B2는 같은 dataset base, CE, optimizer-update schedule을 상속한다.
+
+E-ADOM은 위 confirmatory E1/E2 matrix와 분리된 단일-seed 긴급 실험이다. Legacy
+B0-E0 recipe를 유지해 데이터 변화만 우선 확인했고, validation으로 선택한 checkpoint의
+canonical test와 export parity까지 완료했다. 전체 test 성능은 B0-E0를 넘지 못했으므로
+B0-E0를 대체하지 않고 별도 Jetson field A/B profile로 유지한다.
+
+- [E-ADOM B0 seed 42 result and export hand-off](eadom-b0-seed42.md)
 
 ## Run order
 

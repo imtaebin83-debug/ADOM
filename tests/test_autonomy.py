@@ -255,7 +255,8 @@ class RulePlannerTests(unittest.TestCase):
     def test_lower_left_half_cost_fixes_first_action_and_reduces_tree_to_25(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         center = self.costmap.columns // 2
-        grid[center - 2 : center + 3, 15:17] = 100
+        # Keep the obstacle inside the accepted 1.5 m AVOID trigger contract.
+        grid[center - 2 : center + 3, 10:12] = 100
         grid[:center, 20:30] = 75
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertTrue(plan.side_cost.active)
@@ -267,7 +268,8 @@ class RulePlannerTests(unittest.TestCase):
     def test_lower_right_half_cost_fixes_first_action_and_reduces_tree_to_25(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         center = self.costmap.columns // 2
-        grid[center - 2 : center + 3, 15:17] = 100
+        # Keep the obstacle inside the accepted 1.5 m AVOID trigger contract.
+        grid[center - 2 : center + 3, 10:12] = 100
         grid[center:, 20:30] = 75
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertTrue(plan.side_cost.active)
@@ -299,7 +301,8 @@ class RulePlannerTests(unittest.TestCase):
     def test_symmetric_avoidance_tie_still_reduces_tree_to_25(self):
         grid = np.zeros((self.costmap.columns, self.costmap.rows), dtype=np.int8)
         center = self.costmap.columns // 2
-        grid[center - 2 : center + 2, 15:17] = 100
+        # Keep the obstacle inside the accepted 1.5 m AVOID trigger contract.
+        grid[center - 2 : center + 2, 10:12] = 100
         plan = plan_corridor(grid, self.costmap, self.planner)
         self.assertEqual(plan.side_cost.mode, "avoid")
         self.assertTrue(plan.side_cost.active)

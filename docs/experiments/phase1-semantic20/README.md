@@ -12,6 +12,7 @@ RELLIS target domain의 전체 성능을 보존하고 희소 위험 class를 개
 | E0 | RELLIS | RELLIS | RELLIS | 원본 baseline |
 | E1 | RELLIS + RUGD + YCOR | RELLIS | RELLIS | 기존 3-source 증강 |
 | E2 | E1 + GOOSE Semantic20 direct mapping | RELLIS | RELLIS | GOOSE의 추가 효과 분리 |
+| E-ADOM | RELLIS anchors + newly labeled standalone data | RELLIS | RELLIS | 긴급 field adaptation; E0 대체 아님 |
 
 기존 `E1`의 의미는 config와 decision record에 이미 고정돼 있으므로 GOOSE를
 추가한 4-source 조건은 `E2`로 관리하는 것을 권장한다. RUGD/YCOR/GOOSE의
@@ -51,4 +52,5 @@ RareRisk-4에 남겨 비열화 여부를 감시하지만, 현재 source mapping�
 
 - [v0-legacy](versions/v0-legacy/README.md)
 - [v1-clean-baseline](versions/v1-clean-baseline/README.md)
+- [E-ADOM B0 seed 42 result](versions/v1-clean-baseline/eadom-b0-seed42.md)
 - [Clean Baseline v1 protocol](protocols/clean-baseline-v1.md)

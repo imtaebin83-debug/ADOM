@@ -422,6 +422,12 @@ t4 b0-e0
 
 script는 profile을 생략하거나 checkpoint가 없거나 여러 개이거나 SHA가 다르면 launch를
 시작하지 않고 원인을 출력한다. B0-E0가 기본/fallback이고 E-ADOM은 현장 A/B 후보다.
+profile config는 외부 `ADOM_MODEL_CONFIG`보다 우선하므로 이전 export config가 남아 있어도
+padding 계약을 우회하지 않는다. canonical SHA가 일치하는 두 MMEngine checkpoint는
+PyTorch 2.6+ loader 호환 설정을 검증 이후 자동 적용하므로 별도 `TORCH_FORCE_*` 설정이
+필요하지 않다. checkpoint의 RunPod→로컬→Jetson 전달, SHA 확인과 live 검증 절차는
+[`docs/setup-guides/jetson-model-checkpoint-handoff.md`](docs/setup-guides/jetson-model-checkpoint-handoff.md)를
+따른다.
 현재 둘 다 PyTorch/MMSeg CUDA backend를 사용하며 TensorRT engine의 ROS 연결은 후속
 작업이다.
 별도 프로세스로 실행되므로 실패해도 현재 SSH shell은 종료되지 않는다. 빌드할 때

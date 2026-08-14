@@ -6,4 +6,5 @@
 
 - [development.md](development.md)
 - [runpod-a100-mlops.md](runpod-a100-mlops.md)
+- [jetson-model-checkpoint-handoff.md](jetson-model-checkpoint-handoff.md)
 - [ros2-humble.md](ros2-humble.md)

@@ -81,6 +81,7 @@ Mask header로 실제 추론 frame을 RGB stream에서 결합한다. GPS 경로�
 - ROS 2 control node, gamepad manual/autonomous/stop mode, command watchdog
 - 640x384 ONNX export 설정과 PyTorch↔ONNX logits parity 검사
 - SHA-locked `t4 b0-e0`/`t4 eadom` PyTorch/MMSeg CUDA profile 전환
+- target Jetson에서 frozen E-ADOM checkpoint load와 live Semantic20 status 확인
 
 ### 아직 구현되지 않은 핵심 구간
 
@@ -309,6 +310,8 @@ B0-E0보다 낮았으므로 자동 대체하지 않는다.
 현재 두 profile의 ROS backend는 PyTorch/MMSeg CUDA다. Export archive가 통과한 것은
 TensorRT ROS 연결 완료를 뜻하지 않는다. Engine은 target Jetson에서 만들고 standalone
 parity를 거친 뒤 별도 backend로 연결한다. 상세 결정은 decision record 0031을 따른다.
+`t4` launcher는 profile-owned runtime config를 강제하고 canonical checkpoint SHA가
+일치한 뒤에만 PyTorch 2.6+ full-MMEngine-checkpoint 호환 모드를 자동 적용한다.
 
 ### 전처리 후보와 동결 조건
 
@@ -657,6 +660,13 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   `b0-e0` 또는 `eadom`을 명시하고 각 checkpoint SHA를 검증한다. TensorRT ROS backend
   연결은 target-side engine/parity 이후 TODO로 분리한다. 상세 근거는 decision record
   0031을 따른다.
+- **[2026-08-14] canonical t4 checkpoint의 PyTorch 2.6+ 호환을 SHA 검증 뒤 자동 적용**
+  이유: target Jetson의 PyTorch 2.12는 MMEngine `HistoryBuffer`가 포함된 full checkpoint를
+  기본 `weights_only=True`로 거부했다. 두 승인된 checkpoint의 고정 SHA가 일치한 뒤에만
+  legacy metadata load를 허용하고, profile-owned runtime config를 강제해 이전 export
+  config가 padding metadata 수정을 우회하지 못하게 한다. 같은 날 frozen E-ADOM과 ZED
+  640x360 live input에서 단일 publisher/subscriber 및 perception status 반환을 확인했다.
+  source/mask dimension evidence와 통제 latency benchmark는 별도 미완료다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

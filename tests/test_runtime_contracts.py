@@ -159,6 +159,13 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertIn("ADOM_MODEL_PROFILE", launcher)
         self.assertIn("ADOM_EXPECTED_CHECKPOINT_SHA256", launcher)
         self.assertIn('sha256sum "$adom_checkpoint"', launcher)
+        self.assertIn("trusted-canonical-mmengine", launcher)
+        self.assertIn("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1", launcher)
+        self.assertIn('adom_model_config="$adom_model_config_default"', launcher)
+        self.assertNotIn(
+            'adom_model_config="${ADOM_MODEL_CONFIG:-',
+            launcher,
+        )
 
     def test_parity_defaults_and_roi_polygon_contract(self) -> None:
         self.assertEqual(DEFAULT_MINIMUM_IMAGES, 10)

@@ -32,7 +32,15 @@ case "$adom_profile" in
         ;;
 esac
 
-adom_model_config="${ADOM_MODEL_CONFIG:-$adom_model_config_default}"
+# A named profile owns its runtime config. In particular, allowing a stale
+# export config through ADOM_MODEL_CONFIG can reintroduce the 640x360 padding
+# distortion that the runtime config fixes. Keep the variable only as output
+# for the ROS launch below; callers may override checkpoint location, not the
+# profile's preprocessing contract.
+if [[ -n "${ADOM_MODEL_CONFIG:-}" && "$ADOM_MODEL_CONFIG" != "$adom_model_config_default" ]]; then
+    echo "WARNING: ignoring ADOM_MODEL_CONFIG for locked profile $adom_profile: $ADOM_MODEL_CONFIG" >&2
+fi
+adom_model_config="$adom_model_config_default"
 adom_checkpoint_root="${ADOM_CHECKPOINT_ROOT:-$adom_checkpoint_root_default}"
 adom_expected_checkpoint_sha="${ADOM_EXPECTED_CHECKPOINT_SHA256:-$adom_checkpoint_sha_default}"
 
@@ -74,6 +82,19 @@ if [[ "$adom_actual_checkpoint_sha" != "$adom_expected_checkpoint_sha" ]]; then
     exit 1
 fi
 
+# MMEngine training checkpoints include trusted metadata such as
+# HistoryBuffer. PyTorch 2.6+ defaults torch.load() to weights_only=True, while
+# the pinned MMEngine call site does not pass the argument. Only the two
+# repository-reviewed canonical hashes receive the compatibility override;
+# custom artifacts remain on PyTorch's safer default unless the operator makes
+# an explicit environment choice.
+adom_checkpoint_load_mode="pytorch-default"
+if [[ "$adom_actual_checkpoint_sha" == "$adom_checkpoint_sha_default" ]]; then
+    unset TORCH_FORCE_WEIGHTS_ONLY_LOAD
+    export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
+    adom_checkpoint_load_mode="trusted-canonical-mmengine"
+fi
+
 export ADOM_REPO="$adom_repo"
 export ADOM_MODEL_PROFILE="$adom_profile"
 export ADOM_MODEL_CONFIG="$adom_model_config"
@@ -99,6 +120,7 @@ echo "Model profile: $ADOM_MODEL_PROFILE"
 echo "Model config: $ADOM_MODEL_CONFIG"
 echo "Checkpoint: $ADOM_CHECKPOINT"
 echo "Checkpoint SHA256: $adom_actual_checkpoint_sha"
+echo "Checkpoint load mode: $adom_checkpoint_load_mode"
 
 exec ros2 launch adom_perception_ros perception.launch.py \
     model_config:="$ADOM_MODEL_CONFIG" \

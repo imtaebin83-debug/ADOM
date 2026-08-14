@@ -34,6 +34,10 @@
 - [x] E-ADOM selected checkpoint를 SHA256으로 동결했다.
 - [x] locked canonical test와 export image/metadata/PyTorch-to-ONNX parity를 통과했다.
 - [x] Jetson `t4 b0-e0`/`t4 eadom` profile을 checkpoint SHA까지 분리했다.
+- [x] frozen E-ADOM `.pth`를 target Jetson으로 전송해 SHA, runtime config, checkpoint
+  load, 단일 ZED publisher/perception subscriber와 live status 반환을 확인했다.
+- [ ] target Jetson에서 source RGB와 Semantic20 mask가 모두 640x360으로 복원되는
+  dimension evidence를 저장한다.
 - [ ] E-ADOM export archive를 target Jetson으로 전송하고 `SHA256SUMS`를 검증한다.
 - [ ] target Jetson의 실제 TensorRT 버전/GPU에서 B0-E0와 E-ADOM FP16 engine을 각각
   생성한다. RunPod에서 생성한 serialized engine은 전달하지 않는다.

@@ -45,16 +45,9 @@ class JetsonModelProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as directory:
             checkpoint = Path(directory) / "checkpoint.pth"
             checkpoint.write_bytes(b"not-an-adom-checkpoint")
-            config = (
-                REPO_ROOT
-                / "configs"
-                / "adom"
-                / "runtime"
-                / "segformer_b0_640x384_eadom.py"
-            ).relative_to(REPO_ROOT).as_posix()
             command = " ".join(
                 (
-                    f"ADOM_MODEL_CONFIG={shlex.quote(config)}",
+                    "ADOM_MODEL_CONFIG=/tmp/stale-export-config.py",
                     "ADOM_CHECKPOINT="
                     + shlex.quote(checkpoint.relative_to(REPO_ROOT).as_posix()),
                     "ADOM_EXPECTED_CHECKPOINT_SHA256=" + "0" * 64,
@@ -71,8 +64,27 @@ class JetsonModelProfileTests(unittest.TestCase):
                 text=True,
             )
         self.assertEqual(result.returncode, 1)
+        self.assertIn("ignoring ADOM_MODEL_CONFIG", result.stderr)
+        self.assertNotIn("model config", result.stderr.splitlines()[-1])
         self.assertIn("checkpoint SHA256 mismatch", result.stderr)
         self.assertNotIn("ros2 launch", result.stdout + result.stderr)
+
+    def test_canonical_hash_enables_trusted_mmengine_compatibility(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+        hash_check = launcher.index(
+            'if [[ "$adom_actual_checkpoint_sha" != "$adom_expected_checkpoint_sha" ]]'
+        )
+        compatibility = launcher.index(
+            'if [[ "$adom_actual_checkpoint_sha" == "$adom_checkpoint_sha_default" ]]'
+        )
+        self.assertLess(hash_check, compatibility)
+        self.assertIn("unset TORCH_FORCE_WEIGHTS_ONLY_LOAD", launcher)
+        self.assertIn("export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1", launcher)
+        self.assertIn('adom_model_config="$adom_model_config_default"', launcher)
+        self.assertNotIn(
+            'adom_model_config="${ADOM_MODEL_CONFIG:-',
+            launcher,
+        )
 
 
 if __name__ == "__main__":

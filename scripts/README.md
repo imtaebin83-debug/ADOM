@@ -20,8 +20,11 @@ scripts/run_jetson_t4.sh eadom
 개의 `.pth`만 허용한다. 다른 위치를 사용할 때는 `ADOM_CHECKPOINT`에 절대 경로를
 지정한다. SHA override가 필요한 의도적 신규 artifact는
 `ADOM_EXPECTED_CHECKPOINT_SHA256`도 함께 명시해야 한다. 자세한 설치와 `t4` wrapper는
-[`SHORTCUT.md`](../SHORTCUT.md)를 따른다. 현재 두 profile 모두 PyTorch/MMSeg CUDA
-backend이며 TensorRT ROS backend 연결은 [`docs/TODO.md`](../docs/TODO.md)에 남긴다.
+[`SHORTCUT.md`](../SHORTCUT.md)를 따른다. RunPod, 로컬 컴퓨터와 Jetson 사이 checkpoint
+전달 및 실기 검증은
+[`jetson-model-checkpoint-handoff.md`](../docs/setup-guides/jetson-model-checkpoint-handoff.md)를
+따른다. 현재 두 profile 모두 PyTorch/MMSeg CUDA backend이며 TensorRT ROS backend
+연결은 [`docs/TODO.md`](../docs/TODO.md)에 남긴다.
 
 ## Jetson autonomy logging
 

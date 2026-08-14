@@ -32,35 +32,44 @@ selection result, so canonical-test output does not justify reselecting a checkp
 
 ## Canonical RELLIS test
 
-The final selected model was evaluated once on the locked canonical test. Values are
-percent. The supported panels use GT support fixed independently of predictions.
+The final selected model was evaluated once on the locked canonical test. The frozen
+B0-E0 and E-ADOM checkpoints were then reproduced with the same config, metric and
+899-image test split in audit `audit-20260814T013811Z`. Values are percent. The
+supported panels use GT support fixed independently of predictions.
 
-| Metric | E-ADOM | B0-E0 | Approx. delta |
+| Metric | E-ADOM | B0-E0 | Delta |
 | --- | ---: | ---: | ---: |
-| aAcc | 89.49 | 89.78 | -0.29 pp |
-| TestSupported11/Core11 mIoU | 58.04 | 59.11 | -1.07 pp |
-| RareRisk4 mIoU | 36.42 | 37.59 | -1.17 pp |
-| AugmentedRisk2 mIoU | 31.56 | 26.67 | +4.89 pp |
-| TerrainHazard mIoU | 53.85 | 57.72 | -3.87 pp |
+| aAcc | 89.4871 | 89.7847 | -0.2976 pp |
+| TestSupported11/Core11 mIoU | 58.0352 | 59.1118 | -1.0766 pp |
+| RareRisk4 mIoU | 36.4164 | 37.5852 | -1.1688 pp |
+| AugmentedRisk2 mIoU | 31.5624 | 26.6671 | +4.8953 pp |
+| TerrainHazard mIoU | 53.8464 | 57.7222 | -3.8758 pp |
 
 ### Supported class metrics
 
-`puddle` IoU is reconstructed from the stored two-class TerrainHazard mean and the
-stored `mud` IoU because the pasted console JSON omitted its individual IoU line.
+The audit directly confirmed the complete class table, including `puddle`.
 
-| Class | IoU | Recall | B0-E0 IoU | Approx. IoU delta |
-| --- | ---: | ---: | ---: | ---: |
-| grass | 83.06 | 97.79 | 83.92 | -0.86 pp |
-| tree | 76.95 | 94.40 | 76.09 | +0.86 pp |
-| pole | 0.00 | 0.00 | 0.00 | 0.00 pp |
-| sky | 95.46 | 97.43 | 95.29 | +0.17 pp |
-| log | 40.57 | 63.37 | 40.33 | +0.24 pp |
-| bush | 69.29 | 74.33 | 69.97 | -0.68 pp |
-| concrete | 60.27 | 62.88 | 59.17 | +1.10 pp |
-| barrier | 41.97 | 42.46 | 56.68 | -14.71 pp |
-| puddle | 69.71 | 90.29 | 70.93 | -1.22 pp |
-| mud | 37.98 | 39.21 | 44.51 | -6.53 pp |
-| rubble | 63.12 | 65.47 | 53.34 | +9.78 pp |
+| ID | Class | B0-E0 IoU | E-ADOM IoU | Delta | GT supported |
+| ---: | --- | ---: | ---: | ---: | --- |
+| 0 | dirt | N/A | N/A | N/A | false |
+| 1 | grass | 83.9225 | 83.0634 | -0.8592 pp | true |
+| 2 | tree | 76.0919 | 76.9464 | +0.8545 pp | true |
+| 3 | pole | 0.0000 | 0.0000 | +0.0000 pp | true |
+| 4 | water | N/A | N/A | N/A | false |
+| 5 | sky | 95.2903 | 95.4594 | +0.1690 pp | true |
+| 6 | vehicle | N/A | N/A | N/A | false |
+| 7 | object | N/A | N/A | N/A | false |
+| 8 | asphalt | N/A | N/A | N/A | false |
+| 9 | building | N/A | N/A | N/A | false |
+| 10 | log | 40.3294 | 40.5692 | +0.2398 pp | true |
+| 11 | person | N/A | N/A | N/A | false |
+| 12 | fence | N/A | N/A | N/A | false |
+| 13 | bush | 69.9722 | 69.2929 | -0.6793 pp | true |
+| 14 | concrete | 59.1676 | 60.2665 | +1.0989 pp | true |
+| 15 | barrier | 56.6771 | 41.9717 | -14.7054 pp | true |
+| 16 | puddle | 70.9335 | 69.7079 | -1.2256 pp | true |
+| 17 | mud | 44.5108 | 37.9848 | -6.5260 pp | true |
+| 18 | rubble | 53.3341 | 63.1248 | +9.7907 pp | true |
 
 Absent-class false positives totaled 1,259 pixels: building 436, fence 772,
 object 42 and person 9; dirt, water, vehicle and asphalt were zero.

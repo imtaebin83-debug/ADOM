@@ -1,6 +1,6 @@
 # 명섭 Jetson ROS 통합 TODO
 
-- 업데이트: 2026-08-07 KST
+- 업데이트: 2026-08-14 KST
 - 점검 대상: Jetson `ztr@192.168.0.201`, ROS 2 Jazzy, `ROS_DOMAIN_ID=11`
 - 범위: `t0`∼`t5` 실행 이후 ROS graph, 토픽 발행, 제어 중립 상태
 - 상위 문서: [ADOM_CONTEXT.md](../ADOM_CONTEXT.md)
@@ -11,8 +11,9 @@
 ### 요약
 
 `t0`∼`t3`의 센서, TF/localization, gamepad, PCA9685 기본 경로는 동작한다.
-`t4` perception과 `t5` local planning은 현재 ROS graph에서 발견되지 않아
-전체 Semantic20 자율주행 경로는 연결되지 않은 상태다.
+`t4`는 B0-E0/E-ADOM profile 분리와 checkpoint SHA 검증까지 코드로 준비됐지만
+Jetson ROS graph 실측은 아직 필요하다. `t5` local planning도 현재 보존된 실측에서는
+발견되지 않아 전체 Semantic20 자율주행 경로는 연결 검증 전이다.
 
 | 구간 | 상태 | 확인 결과 |
 | --- | --- | --- |
@@ -20,7 +21,7 @@
 | `t1` URDF/TF | 정상 | `/robot_state_publisher`, `/tf`, `/tf_static` 확인 |
 | `t2` localization | 동작/경고 | local/global odometry 약 12∼14 Hz, EKF diagnostic error 발생 |
 | `t3` 제어 | 정상/안전 중립 | `/drive`·PWM 약 50 Hz, ESC 1500 µs, steering 1556 µs |
-| `t4` perception | 중단 | checkpoint 자리표시자 경로 오류 후 SSH shell 종료 |
+| `t4` perception | 전달 준비/실측 필요 | `t4 b0-e0`/`t4 eadom` SHA-locked wrapper 준비 |
 | `t5` planning/control | 중단 | costmap, planner, local path controller 노드·토픽 없음 |
 
 ### 센서와 TF
@@ -67,9 +68,11 @@
   SSH shell까지 logout됐다.
 - ROS graph에 `/adom_perception`, `/adom/perception/semantic20_mask`,
   `/adom/perception/status`가 없다.
-- 사용할 checkpoint는 `e49ad80`에 기록된 Semantic20 B0 Stage 2 E0
-  `best_mIoU_iter_6000.pth`이며, config는
-  `configs/adom/export/segformer_b0_640x384_rellis3d.py`다.
+- 이 증상은 2026-08-07 historical observation이다. 현재 wrapper는 profile을
+  명시하고 실패 시 launch 전에 종료한다.
+- B0-E0는 `best_mIoU_iter_6000.pth`와
+  `configs/adom/runtime/segformer_b0_640x384_rellis3d.py`, E-ADOM은 frozen
+  `checkpoint.pth`와 `configs/adom/runtime/segformer_b0_640x384_eadom.py`를 쓴다.
   Cost4/B2/E1/다른 ontology checkpoint를 섞어 사용하지 않는다.
 
 ### `t5` Semantic20 local planning blocker
@@ -85,18 +88,20 @@
 
 ## 앞으로 해야 할 것
 
-### P0 — `t4` perception 복구
+### P0 — `t4` dual-profile perception 전달
 
-- [ ] Jetson에서 Semantic20 B0 Stage 2 E0 checkpoint 위치를 확인한다.
-- [ ] checkpoint가 없으면 RunPod/W&B artifact 또는 학습 담당자의 보관 파일을
-  Jetson으로 전달한다.
-- [ ] legacy B0-E0 run의 `best_mIoU_iter_6000.pth`를 선택한다. 이 run에는 후대의
+- [ ] B0-E0와 E-ADOM archive를 Jetson으로 전달하고 archive/checkpoint SHA256을
+  각각 검증한다.
+- [x] legacy B0-E0 run의 `best_mIoU_iter_6000.pth`를 선택했다. 이 run에는 후대의
   `checkpoint_selection.json`이 없으므로 해당 계약을 소급 적용하지 않는다.
-- [ ] checkpoint를 기본 경로 `~/ADOM/models/checkpoints/b0-e0/`에 복사하거나
-  `ADOM_CHECKPOINT`로 실제 절대 경로를 지정한다.
-- [ ] Jetson `~/.bashrc`의 기존 `t4` 함수를 `scripts/run_jetson_t4.sh` wrapper로
-  교체해 실패 시 SSH shell 종료를 막는다.
-- [ ] `test -r "$ADOM_CHECKPOINT"`로 파일을 검증한 뒤 `t4`를 다시 실행한다.
+- [x] E-ADOM Stage 2 iter 26,000을 validation으로 선택하고 canonical test/export
+  parity를 완료했다. canonical test 전체는 B0-E0보다 낮아 대체 모델이 아닌 A/B
+  후보로 둔다.
+- [ ] checkpoint를 `~/ADOM/models/checkpoints/b0-e0/`와
+  `~/ADOM/models/checkpoints/eadom/`에 각각 정확히 하나씩 둔다.
+- [ ] Jetson `~/.bashrc`의 `t4` 함수가 `"$@"`를 wrapper로 전달하도록 교체한다.
+- [ ] `t4 b0-e0`, `t4 eadom`을 각각 실행하고 출력된 checkpoint SHA가 계약과
+  일치하는지 확인한다.
 - [ ] `/adom_perception`, `/adom/perception/semantic20_mask`,
   `/adom/perception/status`를 확인한다.
 - [ ] status JSON에서 inference error, overwritten frame, queue/model/end-to-end latency를

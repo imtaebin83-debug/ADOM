@@ -1,7 +1,7 @@
 # ADOM Project Context — D-5 PoC Single Source of Truth
 
 > 상태: **ACTIVE / 발표 시연 우선**
-> 기준일: **2026-08-12**
+> 기준일: **2026-08-14**
 > 권위: 이 파일이 ADOM의 유일한 프로젝트 Source of Truth다. 기존 설계 문서나
 > 회의 기록과 충돌하면 이 문서를 우선한다.
 > 변경 규칙: 범위, 인터페이스, 담당자, 성공 기준을 변경할 때는 이 파일의
@@ -75,15 +75,17 @@ Mask header로 실제 추론 frame을 RGB stream에서 결합한다. GPS 경로�
 
 - MMSegmentation 1.2.2 기반 Semantic20 학습·평가 파이프라인
 - RELLIS 기반 SegFormer-B0/B2 E0 checkpoint
+- canonical test와 export parity를 통과한 E-ADOM B0 seed 42 checkpoint
 - RunPod 학습·resume·W&B·고정 split 및 metric contract
 - Jetson Orin Nano 8GB, ZED 2i, PCA9685 PWM, 배터리가 장착된 RC Car
 - ROS 2 control node, gamepad manual/autonomous/stop mode, command watchdog
 - 640x384 ONNX export 설정과 PyTorch↔ONNX logits parity 검사
+- SHA-locked `t4 b0-e0`/`t4 eadom` PyTorch/MMSeg CUDA profile 전환
 
 ### 아직 구현되지 않은 핵심 구간
 
-- TensorRT engine 및 Jetson standalone inference
-- `adom_perception_ros` 실제 inference node
+- target Jetson TensorRT engine 및 standalone ONNX↔TensorRT parity
+- `adom_perception_ros` native TensorRT backend 연결
 - target mask에서 Go/Stop을 결정하는 safety-reflex node
 - perception→`/drive/autonomous`→PCA9685 end-to-end 검증
 - 신규 target-class 촬영·CVAT 라벨·short fine-tuning
@@ -294,6 +296,19 @@ frame은 쌓지 않는 구성을 우선 검토한다. 실제 ZED publisher QoS�
 - Demo precision: TensorRT FP16
 - Shape candidate: static batch 1, `1x3x384x640`; Day 1 parity·latency 후 동결
 - INT8, dynamic shape, batch inference: 금지
+
+### Jetson model profiles
+
+`t4`는 model identity를 생략하지 않고 `t4 b0-e0` 또는 `t4 eadom`으로 실행한다.
+두 profile은 Semantic20 SegFormer-B0와 동일한 640x384 runtime preprocessing을 쓰지만
+config identity, checkpoint 디렉터리와 SHA256을 분리한다. B0-E0가 안전한
+default/fallback 후보이며 E-ADOM은 newly labeled domain의 field A/B 후보다. E-ADOM은
+validation log와 canonical-test rubble을 개선했지만 TestSupported11과 RareRisk4 전체는
+B0-E0보다 낮았으므로 자동 대체하지 않는다.
+
+현재 두 profile의 ROS backend는 PyTorch/MMSeg CUDA다. Export archive가 통과한 것은
+TensorRT ROS 연결 완료를 뜻하지 않는다. Engine은 target Jetson에서 만들고 standalone
+parity를 거친 뒤 별도 backend로 연결한다. 상세 결정은 decision record 0031을 따른다.
 
 ### 전처리 후보와 동결 조건
 
@@ -636,6 +651,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   원본 RGB에 45% alpha로 합성하고 동일 header의 sampled overlay를 발행한다. `t2 preview`는
   이 overlay와 2 Hz mask를 함께 기록하며 기존 `t2 evidence` 계약은 유지한다. 상세 근거는
   decision record 0030을 따른다.
+- **[2026-08-14] Jetson t4의 B0-E0/E-ADOM model profile을 SHA-locked로 분리**
+  이유: E-ADOM export는 통과했지만 canonical test 전체가 B0-E0를 넘지 못했으므로
+  checkpoint를 암묵적으로 교체하지 않고 동일 현장 입력에서 A/B해야 한다. `t4`는
+  `b0-e0` 또는 `eadom`을 명시하고 각 checkpoint SHA를 검증한다. TensorRT ROS backend
+  연결은 target-side engine/parity 이후 TODO로 분리한다. 상세 근거는 decision record
+  0031을 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

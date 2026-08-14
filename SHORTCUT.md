@@ -26,7 +26,7 @@ source ~/.bashrc
 | `t1` | `adom_description` | 차량 URDF와 TF | `Ctrl-C` |
 | `t2 [mask\|evidence]` | `adom_logging` 및 의존 패키지 | 기본 경량 bag; 2 Hz mask 또는 manual 검증용 full-rate RGB+mask 추가 | `Ctrl-C` |
 | `t3` | `adom_control` | 게임패드, safety mux와 PCA9685 실출력 제어 | `Ctrl-C` |
-| `t4` | `adom_perception_ros` | Semantic20 CUDA perception | `Ctrl-C` |
+| `t4 <b0-e0|eadom>` | `adom_perception_ros` | SHA-locked Semantic20 CUDA perception profile | `Ctrl-C` |
 | `t5` | `adom_costmap_ros`, `adom_planning`, `adom_control` | Semantic20 costmap, direction-tree planner, controller | `Ctrl-C` |
 
 각 빌드 함수는 같은 `~/ADOM/ros2_ws/build`, `install`, `log`를 공유한다. 두 터미널에서
@@ -363,55 +363,67 @@ ros2 launch adom_control gamepad_control.launch.py \
 ## `t4` — Semantic20 perception
 
 ```bash
-t4
+t4 b0-e0
+t4 eadom
 ```
 
 `e49ad80`에서 perception 팀원이 기록한 Semantic20 SegFormer-B0 E0 모델 계약을
 사용한다. 여기서 checkpoint는 목적지나 주행 경로가 아니라 학습된 perception 신경망의
 가중치가 저장된 `.pth` 파일이다.
 
-Git에는 checkpoint가 포함되지 않는다. perception 팀의 다음 파일을 Jetson으로 복사한다.
+Git에는 checkpoint가 포함되지 않는다. B0-E0와 E-ADOM 파일을 서로 다른 디렉터리로
+Jetson에 복사한다.
 
 ```text
-best_mIoU_iter_6000.pth
+models/checkpoints/b0-e0/best_mIoU_iter_6000.pth
+models/checkpoints/eadom/checkpoint.pth
 ```
 
 권장 저장 위치는 다음과 같다. `models/checkpoints/`는 Git에서 제외된다.
 
 ```bash
 mkdir -p "$HOME/ADOM/models/checkpoints/b0-e0"
-# 전달받은 파일을 위 디렉터리에 복사한다.
+mkdir -p "$HOME/ADOM/models/checkpoints/eadom"
+# 각 디렉터리에는 해당 profile의 .pth 파일을 정확히 하나만 둔다.
 ```
 
 `~/.bashrc`의 기존 `t4` 함수 전체를 다음 wrapper로 교체하고 설정을 다시 읽는다.
 
 ```bash
 t4() {
-    "$HOME/ADOM/scripts/run_jetson_t4.sh"
+    "$HOME/ADOM/scripts/run_jetson_t4.sh" "$@"
 }
 
 source ~/.bashrc
 ```
 
-wrapper는 다음 B0-E0 config를 고정해 사용한다.
+wrapper는 profile별 config와 checkpoint SHA256을 고정해 사용한다.
 
 ```text
-configs/adom/runtime/segformer_b0_640x384_rellis3d.py
+b0-e0: configs/adom/runtime/segformer_b0_640x384_rellis3d.py
+eadom: configs/adom/runtime/segformer_b0_640x384_eadom.py
 ```
 
 이 config는 `segformer_b0_stage2_e0_rellis.py`를 기반으로 하며 Semantic20 ID `0..18`,
 ignore `255`, 640x384 resize/padding 계약을 사용한다. ROS 추론에서는 data
 preprocessor가 padding metadata를 기록해 mask 복원 전에 하단 padding을 제거한다.
-E1, B2 또는 Cost4 checkpoint를 같은 디렉터리에 넣지 않는다.
+E1, B2, Cost4 또는 다른 profile checkpoint를 같은 디렉터리에 넣지 않는다. 기본
+B0-E0 SHA256은
+`d76229ff623eb382fd48011decf54c342d88a113bcbe650fb58cc20e42cabe73`, E-ADOM SHA256은
+`f4cc41fd91e9df8e7aa3f726498e80636b736dfadf0e1baf338fe7c82a83399c`다. 불일치하면
+launch 전에 실패한다.
 
 기본 디렉터리 밖의 파일을 사용하려면 실행 전에 정확한 B0-E0 파일을 지정한다.
 
 ```bash
 export ADOM_CHECKPOINT="/absolute/path/to/best_mIoU_iter_6000.pth"
-t4
+t4 b0-e0
 ```
 
-script는 checkpoint가 없거나 여러 개면 launch를 시작하지 않고 원인을 출력한다.
+script는 profile을 생략하거나 checkpoint가 없거나 여러 개이거나 SHA가 다르면 launch를
+시작하지 않고 원인을 출력한다. B0-E0가 기본/fallback이고 E-ADOM은 현장 A/B 후보다.
+현재 둘 다 PyTorch/MMSeg CUDA backend를 사용하며 TensorRT engine의 ROS 연결은 후속
+작업이다.
 별도 프로세스로 실행되므로 실패해도 현재 SSH shell은 종료되지 않는다. 빌드할 때
 동일 workspace의 기존 install을 의도적으로 갱신하므로
 `--allow-overriding adom_perception_ros`를 사용한다.

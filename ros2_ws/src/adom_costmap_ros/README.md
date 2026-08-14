@@ -13,6 +13,13 @@ inflation 활성화만으로 hard-stop cost 100으로 승격되지는 않는다.
 /adom/navigation/costmap_status    std_msgs/String (JSON)
 ```
 
+`costmap_status`는 투영 성공 여부와 함께 sampled/finite/in-range depth pixel 수,
+Semantic20 label과 결합된 pixel 수, 높이 필터 통과 point 수, 변환 후 Z 최솟값/최댓값,
+grid 내부 point 수와 observed cell 수를 발행한다. `observed_cells`가 0이면
+`empty_reason`은 `no_depth_in_range`, `no_depth_with_semantic_label`, `height_filter`,
+`outside_costmap`, `rasterization` 중 해당 단계를 가리킨다. 이 진단은 empty costmap의
+즉시 STOP 동작을 완화하거나 우회하지 않는다.
+
 RGB mask와 registered depth의 원본 camera timestamp는 depth matching과 TF lookup까지
 그대로 사용한다. 완성된 `OccupancyGrid.header.stamp`는 costmap 노드의 ROS 현재 시각으로
 새로 기록한다. ZED가 device/monotonic timestamp를 발행해도 planner가 system ROS clock과

@@ -20,7 +20,10 @@ from adom.autonomy import (
     plan_corridor,
     speed_to_pwm_us,
 )
-from adom.autonomy.costmap import project_mask_depth
+from adom.autonomy.costmap import (
+    project_mask_depth,
+    project_mask_depth_with_diagnostics,
+)
 from adom.perception import COST4_PALETTE_BGR, colorize_mask
 
 
@@ -154,6 +157,29 @@ class SemanticCostmapTests(unittest.TestCase):
         )
         self.assertEqual(len(points), 0)
         self.assertEqual(len(labels), 0)
+
+    def test_projection_diagnostics_distinguish_depth_and_height_filters(self):
+        config = CostmapConfig(sample_stride=1)
+        rotation = np.asarray(
+            [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+        )
+        points, _, diagnostics = project_mask_depth_with_diagnostics(
+            np.asarray([[3, 3]], dtype=np.uint8),
+            np.asarray([[float("nan"), 1.0]], dtype=np.float32),
+            (1.0, 1.0, 0.0, 0.0),
+            rotation,
+            np.asarray([0.0, 0.0, -0.06]),
+            config,
+        )
+        self.assertEqual(len(points), 0)
+        self.assertEqual(diagnostics.sampled_pixels, 2)
+        self.assertEqual(diagnostics.finite_depth_pixels, 1)
+        self.assertEqual(diagnostics.in_range_depth_pixels, 1)
+        self.assertEqual(diagnostics.semantic_label_pixels, 2)
+        self.assertEqual(diagnostics.depth_label_pixels, 1)
+        self.assertEqual(diagnostics.height_valid_points, 0)
+        self.assertAlmostEqual(diagnostics.transformed_z_min_m, -0.06)
+        self.assertAlmostEqual(diagnostics.transformed_z_max_m, -0.06)
 
     def test_zed_depth_config_and_costmap_range_match_field_contract(self):
         root = Path(__file__).resolve().parents[1]

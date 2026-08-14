@@ -32,6 +32,18 @@ class CostmapConfig:
         return max(1, int(round(self.width_m / self.resolution_m)))
 
 
+@dataclass(frozen=True)
+class ProjectionDiagnostics:
+    sampled_pixels: int
+    finite_depth_pixels: int
+    in_range_depth_pixels: int
+    semantic_label_pixels: int
+    depth_label_pixels: int
+    height_valid_points: int
+    transformed_z_min_m: float | None
+    transformed_z_max_m: float | None
+
+
 def quaternion_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
     norm = x * x + y * y + z * z + w * w
     if norm < 1e-12:
@@ -68,6 +80,21 @@ def project_mask_depth(
     config: CostmapConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return base-frame XYZ points and configured semantic IDs."""
+    points, labels, _ = project_mask_depth_with_diagnostics(
+        mask, depth_m, intrinsics, rotation, translation, config
+    )
+    return points, labels
+
+
+def project_mask_depth_with_diagnostics(
+    mask: np.ndarray,
+    depth_m: np.ndarray,
+    intrinsics: tuple[float, float, float, float],
+    rotation: np.ndarray,
+    translation: np.ndarray,
+    config: CostmapConfig,
+) -> tuple[np.ndarray, np.ndarray, ProjectionDiagnostics]:
+    """Project mask/depth and report which filter removed observations."""
     if mask.ndim != 2 or depth_m.ndim != 2:
         raise ValueError("mask and depth must both be HxW")
     if mask.shape != depth_m.shape:
@@ -80,14 +107,26 @@ def project_mask_depth(
     v, u = np.mgrid[0 : mask.shape[0] : stride, 0 : mask.shape[1] : stride]
     z = depth_m[::stride, ::stride].astype(np.float64, copy=False)
     labels = mask[::stride, ::stride]
-    valid = (
-        np.isfinite(z)
-        & (z >= config.min_range_m)
-        & (z <= config.max_range_m)
-        & (labels < len(config.class_costs))
-    )
+    finite = np.isfinite(z)
+    in_range = finite & (z >= config.min_range_m) & (z <= config.max_range_m)
+    semantic = labels < len(config.class_costs)
+    valid = in_range & semantic
     if not np.any(valid):
-        return np.empty((0, 3), dtype=np.float64), np.empty(0, dtype=np.uint8)
+        diagnostics = ProjectionDiagnostics(
+            sampled_pixels=int(z.size),
+            finite_depth_pixels=int(np.count_nonzero(finite)),
+            in_range_depth_pixels=int(np.count_nonzero(in_range)),
+            semantic_label_pixels=int(np.count_nonzero(semantic)),
+            depth_label_pixels=0,
+            height_valid_points=0,
+            transformed_z_min_m=None,
+            transformed_z_max_m=None,
+        )
+        return (
+            np.empty((0, 3), dtype=np.float64),
+            np.empty(0, dtype=np.uint8),
+            diagnostics,
+        )
 
     z = z[valid]
     optical = np.stack(
@@ -98,7 +137,21 @@ def project_mask_depth(
         (points[:, 2] >= config.min_height_m)
         & (points[:, 2] <= config.max_height_m)
     )
-    return points[height_valid], labels[valid][height_valid].astype(np.uint8)
+    diagnostics = ProjectionDiagnostics(
+        sampled_pixels=int(finite.size),
+        finite_depth_pixels=int(np.count_nonzero(finite)),
+        in_range_depth_pixels=int(np.count_nonzero(in_range)),
+        semantic_label_pixels=int(np.count_nonzero(semantic)),
+        depth_label_pixels=int(np.count_nonzero(valid)),
+        height_valid_points=int(np.count_nonzero(height_valid)),
+        transformed_z_min_m=float(np.min(points[:, 2])),
+        transformed_z_max_m=float(np.max(points[:, 2])),
+    )
+    return (
+        points[height_valid],
+        labels[valid][height_valid].astype(np.uint8),
+        diagnostics,
+    )
 
 
 def _inflate(grid: np.ndarray, config: CostmapConfig) -> np.ndarray:

@@ -667,6 +667,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   config가 padding metadata 수정을 우회하지 못하게 한다. 같은 날 frozen E-ADOM과 ZED
   640x360 live input에서 단일 publisher/subscriber 및 perception status 반환을 확인했다.
   source/mask dimension evidence와 통제 latency benchmark는 별도 미완료다.
+- **[2026-08-14] 간헐적 empty costmap의 단계별 투영 진단을 상태에 추가**
+  이유: 기존 `projected_points=0`만으로는 depth 범위, Semantic20 label, 지면 기준 높이
+  필터와 costmap 경계 중 어느 단계에서 관측이 사라졌는지 구분할 수 없었다.
+  `/adom/navigation/costmap_status`에 필터별 count, 변환 후 Z 범위와 `empty_reason`을
+  추가한다. Empty costmap 즉시 STOP과 watchdog 동작은 유지한다. 상세 근거는 decision
+  record 0032를 따른다.
 - **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
   이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
   `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을

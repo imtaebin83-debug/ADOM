@@ -21,7 +21,7 @@ from tf2_ros import Buffer, TransformException, TransformListener
 from adom.autonomy.costmap import (
     CostmapConfig,
     build_costmap,
-    project_mask_depth,
+    project_mask_depth_with_diagnostics,
     quaternion_matrix,
 )
 from adom.perception import load_semantic20_ontology
@@ -216,10 +216,33 @@ class SemanticCostmapNode(Node):
             t = transform.transform.translation
             rotation = quaternion_matrix(q.x, q.y, q.z, q.w)
             translation = np.asarray([t.x, t.y, t.z], dtype=np.float64)
-            points, labels = project_mask_depth(
+            points, labels, projection = project_mask_depth_with_diagnostics(
                 mask, depth, intrinsics, rotation, translation, self._config
             )
             grid = build_costmap(points, labels, self._config)
+            if len(points):
+                grid_in_bounds = (
+                    (points[:, 0] >= 0.0)
+                    & (points[:, 0] < self._config.length_m)
+                    & (points[:, 1] >= -self._config.width_m / 2.0)
+                    & (points[:, 1] < self._config.width_m / 2.0)
+                )
+                grid_in_bounds_points = int(np.count_nonzero(grid_in_bounds))
+            else:
+                grid_in_bounds_points = 0
+            observed_cells = int(np.count_nonzero(grid >= 0))
+            empty_reason = None
+            if observed_cells == 0:
+                if projection.in_range_depth_pixels == 0:
+                    empty_reason = "no_depth_in_range"
+                elif projection.depth_label_pixels == 0:
+                    empty_reason = "no_depth_with_semantic_label"
+                elif projection.height_valid_points == 0:
+                    empty_reason = "height_filter"
+                elif grid_in_bounds_points == 0:
+                    empty_reason = "outside_costmap"
+                else:
+                    empty_reason = "rasterization"
 
             # Preserve camera timestamps through mask/depth synchronization and
             # TF lookup, then cross into the planner's ROS clock domain here.
@@ -241,7 +264,17 @@ class SemanticCostmapNode(Node):
                 "ok",
                 ontology=self._ontology,
                 projected_points=int(len(points)),
-                observed_cells=int(np.count_nonzero(grid >= 0)),
+                observed_cells=observed_cells,
+                empty_reason=empty_reason,
+                sampled_pixels=projection.sampled_pixels,
+                finite_depth_pixels=projection.finite_depth_pixels,
+                in_range_depth_pixels=projection.in_range_depth_pixels,
+                semantic_label_pixels=projection.semantic_label_pixels,
+                depth_label_pixels=projection.depth_label_pixels,
+                height_valid_points=projection.height_valid_points,
+                transformed_z_min_m=projection.transformed_z_min_m,
+                transformed_z_max_m=projection.transformed_z_max_m,
+                grid_in_bounds_points=grid_in_bounds_points,
                 sync_error_sec=round(sync_error, 3),
                 processing_ms=round(
                     (time.monotonic() - processing_started) * 1000.0, 2

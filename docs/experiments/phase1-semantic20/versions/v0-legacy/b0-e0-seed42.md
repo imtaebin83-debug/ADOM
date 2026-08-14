@@ -42,7 +42,8 @@
 - Selection evidence: validation mIoU `51.07` at iter 6,000; canonical test was
   executed with the same checkpoint
 - `checkpoint_selection.json`: not produced by this pre-Clean-v1 legacy run
-- Checkpoint SHA256: pending direct calculation on the Network Volume
+- Checkpoint SHA256:
+  `d76229ff623eb382fd48011decf54c342d88a113bcbe650fb58cc20e42cabe73`
 
 The immutable image revision, W&B run, exact checkpoint path, selection rule, and
 SHA256 must all be copied into the ONNX export report. The later Clean-v1

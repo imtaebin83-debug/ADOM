@@ -1,0 +1,31 @@
+schema_version: adom-rc-eval-config-v1
+status: BLOCKED_UNVERIFIED_ROS_GRAPH
+ros_version: 2
+ros_distro: null
+clock: ROS_TIME_IF_SIM_ELSE_SYSTEM_TIME
+topics:
+  camera: null
+  segmentation_mask: null
+  hazard_detection: null
+  go_stop_decision: null
+  motor_command: null
+  emergency_stop: null
+topic_types:
+  camera: null
+  segmentation_mask: null
+  hazard_detection: null
+  go_stop_decision: null
+  motor_command: null
+  emergency_stop: null
+model_profiles:
+  b0-e0:
+    command: null
+    checkpoint_sha256: null
+  eadom:
+    command: null
+    checkpoint_sha256: f4cc41fd91e9df8e7aa3f726498e80636b736dfadf0e1baf338fe7c82a83399c
+safety:
+  default_mode: dry-run
+  publishes_commands: false
+  requires_human_emergency_stop_operator: true
+  maximum_requested_speed_mps: 0.30

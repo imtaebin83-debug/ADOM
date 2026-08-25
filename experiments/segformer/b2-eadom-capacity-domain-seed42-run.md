@@ -1,6 +1,6 @@
 # B2-E-ADOM capacity × domain seed 42 run record
 
-> 상태: **protocol/config freeze in progress; RunPod gates not yet passed**
+> 상태: **protocol/config frozen; pre-image static gate passed; GPU gates blocked on immutable image**
 > 실행 계약: [B2-E-ADOM capacity × domain study](b2-eadom-capacity-domain-study.md)
 > branch: `codex/b2-eadom-capacity-domain`
 > base commit: `5426f297c05568c11445c0b86510195ebf6f4646`
@@ -71,8 +71,8 @@ under a truthful immutable-image SHA. Static and GPU gates stay closed until
 | Gate | Status | Evidence |
 | --- | --- | --- |
 | local source/config tests | PASS with MMEngine import deferred to training image | `test_b2_eadom_contract`, `test_runtime_contracts`, `test_semantic20_training` |
-| resolved architecture-only diff | PENDING | RunPod `static_contract.json` |
-| split/mapping/manifest/content digest | PENDING recheck | RunPod `static_contract.json`; must equal frozen values above |
+| resolved architecture-only diff | PASS on isolated commit replay; immutable-image replay pending | Stage 1/2 contain only the six allowlisted B0→B2 architecture paths |
+| split/mapping/manifest/content digest | PASS on isolated commit replay; immutable-image replay pending | all values equal the frozen table above |
 | RTX 4090 memory probe 16/1 → 8/2 → 4/4 | PENDING | `gates/probe/b2/batch_plan.json` and probe log |
 | 50-update smoke | PENDING | isolated `gates/smoke` output |
 | 500-update mini + RELLIS validation | PENDING | isolated `gates/mini` output |
@@ -81,6 +81,31 @@ under a truthful immutable-image SHA. Static and GPU gates stay closed until
 | checkpoint freeze from RELLIS val only | PENDING | checkpoint SHA-256 and selection JSON |
 | fresh RELLIS 899 evaluation | PENDING | raw prediction/metric provenance under `/workspace` |
 | fresh Korean held-out 61 evaluation | LOCKED until checkpoint freeze | test-only; never recipe, threshold, or checkpoint input |
+
+### Pre-image static replay artifact
+
+Because the active `/opt/adom` image still reports Git SHA `9d4f08e4...`, the
+frozen commit was replayed only in an isolated `/tmp/adom-acdb0c75-runtime`
+tree. No optimizer update or checkpoint was produced. The replay used the
+training image's MMEngine 0.10.7 and decoded all dataset pairs.
+
+- source commit: `acdb0c75c156bef8f42744f1d3fb3ac9ae869678`
+- runtime archive SHA-256:
+  `293330ac0ee32c1a45433705e58c3ab7b9ec6f704e6b8236fbc5015723aced3d`
+- report:
+  `/workspace/adom/runs/semantic20/eadom/seed42/protocol/static_contract_preimage_acdb0c75.json`
+- report SHA-256:
+  `88fd5efbe907b8d42acb7ca4302af97f40297b837b0562d9261214064da00f59`
+- log SHA-256:
+  `5c771f6d370712f347e8ca0d4b81f877563533ed7c4f52a3bed9de434b79fccf`
+- Stage 1 non-architecture resolved-config SHA-256:
+  `a4134e45a57ea4ea7b6ccf3c7e83d5ee178d4391bebcde1fb6d3f70d12e9f0a0`
+- Stage 2 non-architecture resolved-config SHA-256:
+  `b1d4ca6a9d8c2b3ffae4c741089e75b04b92a4b083cdf258257abcc0ec65f1f4`
+
+This replay proves that the committed contract resolves and matches the frozen
+dataset. It does not authorize a GPU probe from `/tmp` and does not replace the
+required `/opt/adom` immutable-image SHA check.
 
 ## Reporting limits frozen before results
 

@@ -17,6 +17,72 @@ RunPod, Docker, dataset, training 및 배포 과정에서 재현된 오류와 �
 - 수정 내용, 회귀 테스트 및 운영 복구 절차
 - 남아 있는 검증 항목
 
+## ERR-2026-08-14-010: ZED live Semantic20 mask 세로 압축과 하단 sky 오탐
+
+- 상태: 원인 확정, 팀 수정 완료 보고, config 정적 회귀 검증 완료
+- 환경: Jetson Orin Nano, ROS 2 Jazzy, ZED 2i,
+  Semantic20 SegFormer-B0 E0 PyTorch/MMSeg `t4`
+- 영향: 실차 주행 중 저장한 live mask, 산악 환경 sky FP 및 logit 해석
+
+### 증상과 재현 근거
+
+- 동일 프레임의 사후 주입 mask는 화면 전체를 채웠지만, live mask는
+  장면이 상단 약 203–204행으로 압축되고 나머지 하단이 대부분 sky였다.
+- 사후 mask를 세로로 약 203–204 px로 압축하고 하단을 sky로 채운 결과는
+  두 live mask와 픽셀 기준 약 88–90% 일치했다.
+- 오류 export config에 640x360 가상 입력을 넣은 pipeline 정적 점검은
+  tensor shape `(3, 640, 640)`, `ori_shape=(360,640)`,
+  `img_shape=(640,640)`을 재현했다. `padding_size`/`img_padding_size`는
+  metadata에 없었다.
+
+### 직접 원인
+
+`configs/adom/export/segformer_b0_640x384_rellis3d.py`의 기존
+pipeline이 `(384,640)` 하나를 서로 다른 순서 계약에 재사용했다.
+
+```python
+export_size = (384, 640)
+model = dict(data_preprocessor=dict(size=export_size))  # (H, W)
+dict(type="Pad", size=export_size, ...)                # (W, H)
+```
+
+- `SegDataPreProcessor.size` 계약은 `(H,W)`이지만 MMCV `Pad.size`는
+  `(W,H)`다.
+- `Pad(size=(384,640))`는 width 384, height 640으로 해석됐다. 이미 640인
+  width는 줄이지 못하고, 360인 height만 640까지 padding되어 실제
+  입력이 `640x640`이 됐다.
+- 기본 `PackSegInputs` metadata에 정확한 padding 크기가 없어 MMSeg
+  postprocess가 하단 280행을 제거하지 않았다.
+- 전체 640행을 원본 높이 360으로 복원하면 유효 영상은
+  `360 * 360 / 640 = 202.5` 행이 된다. 이 값이 관측된 압축 높이와
+  일치한다.
+- black padding 영역에서 모델이 주로 sky를 출력해 화면 하단의
+  거대한 sky FP처럼 보였다.
+
+### 수정과 판정
+
+- Jetson `t4` wrapper는 live runtime 전용
+  `configs/adom/runtime/segformer_b0_640x384_rellis3d.py`를 사용하도록
+  수정됐다.
+- runtime pipeline은 explicit `Pad` transform을 제거하고 640x360을 유지한 뒤,
+  `SegDataPreProcessor.test_cfg.size=(384,640)`에서 하단 24행을
+  padding하도록 했다. 이 경로는 padding metadata를 기록해 postprocess가
+  padding을 crop한 뒤 640x360으로 복원한다.
+- runtime config 정적 점검은 pipeline tensor `(3,360,640)`,
+  `ori_shape=img_shape=(360,640)`, preprocessor `test_cfg.size=(384,640)`을
+  확인했다.
+- `semantic20_colorizer_node` 및 `rqt_image_view`는 mask를 resize하지 않으므로
+  원인에서 배제했다.
+- `t4`는 TensorRT가 아닌 PyTorch/MMSeg `.pth` 추론 경로다. 사후 주입이
+  TensorRT였다면 동일 frozen tensor의 PyTorch↔TensorRT parity는 별도로 검증한다.
+
+### 실험 자료 주의사항
+
+- 오류 config로 생성된 live mask의 하단 sky는 domain-shift FP, class
+  imbalance 또는 logit uncertainty 근거로 사용하지 않는다.
+- 수정된 runtime config로 동일 RGB를 재추론한 뒤에도 남는 FP만 실제
+  산악 domain 오류로 분석한다.
+
 ## ERR-2026-08-07-009: Semantic20 ONNX export와 Jetson TensorRT hand-off 오류
 
 - 상태: export/parity 및 target Jetson FP16 engine build 검증 완료

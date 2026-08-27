@@ -102,7 +102,7 @@ class CanonicalTestLockHook(Hook):
             raise RuntimeError(
                 "Canonical test is locked. Select the final model using validation "
                 "and run it through semantic20_cycle --run-test "
-                "--final-test-model <b0|b2>."
+                "--final-test-model <b0|b2|b5>."
             )
 
 

@@ -1,6 +1,6 @@
 # SegFormer Experiments
 
-SegFormer-B0/B2 기반 fine-tuning과 runtime 비교를 진행합니다.
+SegFormer-B0/B2 기반 비교와, B2 evidence에 조건부인 B5 사전등록을 관리합니다.
 
 초기 목표:
 
@@ -13,3 +13,5 @@ SegFormer-B0/B2 기반 fine-tuning과 runtime 비교를 진행합니다.
 
 - [B2-E-ADOM capacity × domain study](b2-eadom-capacity-domain-study.md)
 - [B2-E-ADOM seed 42 run record](b2-eadom-capacity-domain-seed42-run.md)
+- [B5-E0/B5-E-ADOM preregistration](b5-eadom-capacity-domain-preregistration.md)
+- [B5 GO/NO-GO artifact template](b5-go-decision.template.json)

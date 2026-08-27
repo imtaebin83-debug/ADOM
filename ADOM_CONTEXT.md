@@ -504,6 +504,9 @@ MMDeploy는 ONNX export/graph rewrite까지만 사용한다. Jetson에는 traini
 ### 모델·데이터
 
 - pole/log/water 등 target 확장과 3-seed evaluation
+- B5-E0/B5-E-ADOM은 B2 결과가 capacity 결론을 바꿀 불확실성을 남기고 별도 GO
+  artifact가 이를 증명할 때만 offline으로 실행한다. primary 4,568 matched-legacy와
+  clean 4,556 sensitivity, Korean test-only 계약을 섞지 않는다.
 - Semantic23 ontology와 source mapping audit
 - RELLIS/RUGD/YCOR/Freiburg/GOOSE 통합 package의 라이선스·split·provenance 정리
 - 공개 가능한 변환 script, mapping, manifest, dataset card 작성
@@ -585,6 +588,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   호환되는 Ada GPU가 필요하다. E-ADOM wrapper만 RTX 4090 22GiB doctor 계약을 사용하고
   다른 cycle의 A100 75GiB 기본값 및 E-ADOM의 effective batch 16/44k update는 유지한다.
   상세 계약은 decision record 0012를 따른다.
+- **[2026-08-27] B5 capacity × domain 실험을 B2 불확실성 기반 조건부 경로로 사전등록**
+  이유: B2 결론이 capacity 축에서 실제로 흔들릴 때만 B5 compute가 정보를 추가한다.
+  B5-E0/E-ADOM은 official MiT-B5 ImageNet init와 B2 대비 architecture-only config를
+  사용하며, Korean held-out은 checkpoint freeze 뒤 test-only로 유지한다. A100 40/80GB,
+  RTX A6000 48GB, RTX PRO 6000 Blackwell 96GB는 exact runtime profile로 분리한다.
+  상세 계약은 decision record 0013을 따른다.
 
 ## 17. Primary References
 

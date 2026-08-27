@@ -51,6 +51,17 @@ conflicts with the diagnostic validation export. The conflict-free 4,556-row
 split remains a separate sensitivity condition and is not materialized or used
 by this primary run.
 
+### Provenance integrity blocker found during B5 preregistration
+
+The evaluation-contract, ordered-manifest, split/manifest/content values written
+above are each 65 hexadecimal characters, so they cannot be SHA-256 digests.
+The checkpoint values and canonical mapping value are valid 64-character
+SHA-256 strings. The 65-character legacy values are preserved verbatim rather
+than guessed, truncated, or silently corrected. Before B5 or any new comparison
+uses them as a lock, recompute them from the original `/workspace` artifacts,
+record the commands and corrected 64-character values in a new provenance
+amendment, and update the mechanical lock in the same reviewed change.
+
 ## RunPod pre-training observation
 
 Observed before any B2-E-ADOM gate on 2026-08-25 UTC:

@@ -45,7 +45,7 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
             )
 
     def test_stage1_all_targets_scale_with_accumulation(self) -> None:
-        for accumulative in (1, 2, 4):
+        for accumulative in (1, 2, 4, 8, 16):
             config = self._load_schedule(
                 "stage1_head_4k_updates.py", accumulative
             )
@@ -56,7 +56,7 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
             self.assertEqual(config["param_scheduler"][1]["end"], 4000 * accumulative)
 
     def test_stage2_all_targets_scale_with_accumulation(self) -> None:
-        for accumulative in (1, 2, 4):
+        for accumulative in (1, 2, 4, 8, 16):
             config = self._load_schedule(
                 "stage2_full_40k_updates.py", accumulative
             )
@@ -165,7 +165,7 @@ class OptimizerUpdateScalingTests(unittest.TestCase):
 
     def test_checkpoint_interval_scales_with_accumulation(self) -> None:
         runtime = CONFIG_ROOT / "_base_" / "semantic_default_runtime.py"
-        for accumulative in (1, 2, 4):
+        for accumulative in (1, 2, 4, 8, 16):
             with patch.dict(
                 os.environ,
                 {"ADOM_ACCUMULATIVE_COUNTS": str(accumulative)},
@@ -329,7 +329,7 @@ class Semantic20ConfigImportTests(unittest.TestCase):
         self.assertEqual(stage1.train_cfg.max_iters, 2000)
         self.assertEqual(stage2.train_cfg.max_iters, 10000)
 
-    def test_all_e0_e1_e2_b0_b2_stage_configs_import(self) -> None:
+    def test_all_supported_e0_e1_e2_stage_configs_import(self) -> None:
         from mmengine.config import Config
 
         with tempfile.TemporaryDirectory() as directory, patch.dict(
@@ -342,8 +342,13 @@ class Semantic20ConfigImportTests(unittest.TestCase):
             },
             clear=False,
         ):
-            for experiment in ("e0_rellis", "e1_combined", "e2_combined_goose"):
-                for model in ("b0", "b2"):
+            experiment_models = {
+                "e0_rellis": ("b0", "b2", "b5"),
+                "e1_combined": ("b0", "b2"),
+                "e2_combined_goose": ("b0", "b2"),
+            }
+            for experiment, models in experiment_models.items():
+                for model in models:
                     for stage in ("stage1", "stage2"):
                         config = Config.fromfile(
                             CONFIG_ROOT

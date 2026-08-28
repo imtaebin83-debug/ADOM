@@ -24,6 +24,7 @@ from adom.evaluation_semantic20 import (
     VAL_SUPPORTED13,
 )
 from adom.runtime.checkpoints import resolve_single_best_checkpoint
+from adom.runtime.b5_gate import validate_b5_go_decision
 from adom.runtime.cycle import (
     CONFIG_ROOT,
     EFFECTIVE_BATCH,
@@ -35,6 +36,7 @@ from adom.runtime.cycle import (
     _tool_path,
     _tracking_env,
 )
+from adom.runtime.doctor import GPU_PROFILES
 
 
 CONFIG_DIR = CONFIG_ROOT / "adom" / "phase1_semantic20"
@@ -560,8 +562,31 @@ def _config(model: str, stage: str, experiment: str) -> Path:
     return CONFIG_DIR / f"segformer_{model}_{stage}_{suffix}.py"
 
 
-def _batch_candidates(model: str) -> list[int]:
-    return [16] if model == "b0" else [16, 8, 4]
+def _batch_candidates(model: str, gpu_profile: str | None = None) -> list[int]:
+    if model == "b0":
+        return [16]
+    if model == "b2":
+        return [16, 8, 4]
+    if model == "b5":
+        if gpu_profile not in GPU_PROFILES:
+            raise RuntimeError("B5 requires an exact --gpu-profile")
+        return list(GPU_PROFILES[gpu_profile]["proposed_micro_batches"])
+    raise RuntimeError(f"Unsupported Semantic20 model: {model}")
+
+
+def _requested_models(value: str, experiment: str) -> list[str]:
+    models = [item.strip().lower() for item in value.split(",") if item.strip()]
+    if not models or any(item not in {"b0", "b2", "b5"} for item in models):
+        raise RuntimeError("--models accepts b0, b2, and/or b5")
+    if len(models) != len(set(models)):
+        raise RuntimeError("--models contains duplicates")
+    if experiment in TA_EXPERIMENTS and models != ["b0"]:
+        raise RuntimeError("TA0/TA1/TA2 are locked to --models b0")
+    if experiment == EADOM_EXPERIMENT and len(models) != 1:
+        raise RuntimeError("E-ADOM runs exactly one architecture at a time")
+    if "b5" in models and experiment not in {"e0", EADOM_EXPERIMENT}:
+        raise RuntimeError("B5 is preregistered only for E0 and E-ADOM")
+    return models
 
 
 def _probe_batch(
@@ -573,12 +598,13 @@ def _probe_batch(
     train_tool: Path,
     resume: bool,
     load_from: Path | None = None,
+    gpu_profile: str | None = None,
 ) -> tuple[int, int]:
     plan_path = output_root / model / "batch_plan.json"
     if resume and plan_path.is_file():
         value = json.loads(plan_path.read_text(encoding="utf-8"))
         return int(value["micro_batch"]), int(value["accumulative_counts"])
-    for micro_batch in _batch_candidates(model):
+    for micro_batch in _batch_candidates(model, gpu_profile):
         accumulative = EFFECTIVE_BATCH // micro_batch
         probe_dir = output_root / model / "probes" / f"micro_batch_{micro_batch}"
         probe_dir.mkdir(parents=True, exist_ok=True)
@@ -626,7 +652,8 @@ def _probe_batch(
                     "micro_batch": micro_batch,
                     "accumulative_counts": accumulative,
                     "effective_batch": micro_batch * accumulative,
-                    "fallback_order": _batch_candidates(model),
+                    "fallback_order": _batch_candidates(model, gpu_profile),
+                    "gpu_profile": gpu_profile,
                     "probe_log": str(log_path.resolve()),
                 },
             )
@@ -755,6 +782,46 @@ def _train_stage(
     return best
 
 
+def validate_stage2_handoff(
+    output_root: Path,
+    model: str,
+    stage1_checkpoint: Path,
+) -> dict[str, Any]:
+    """Prove Stage 2 consumes the RELLIS-val-selected Stage 1 checkpoint."""
+    stage1_root = (output_root / model / "stage1").resolve()
+    checkpoint = stage1_checkpoint.resolve()
+    if stage1_root not in checkpoint.parents:
+        raise RuntimeError(
+            f"Stage 2 handoff escaped {stage1_root}: {checkpoint}"
+        )
+    selection_path = stage1_root / "checkpoint_selection.json"
+    if not selection_path.is_file():
+        raise RuntimeError("Stage 2 handoff requires Stage 1 checkpoint selection")
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    if selection.get("schema_version") != "semantic20-clean-v1":
+        raise RuntimeError("Stage 1 selection schema mismatch")
+    selected = selection.get("selected", {})
+    selected_checkpoint = Path(str(selected.get("checkpoint", ""))).resolve()
+    if selected_checkpoint != checkpoint:
+        raise RuntimeError(
+            "Stage 2 checkpoint differs from Stage 1 RELLIS-val selection: "
+            f"selected={selected_checkpoint}, handoff={checkpoint}"
+        )
+    report = {
+        "schema_version": "semantic20-stage2-handoff-v1",
+        "status": "PASS",
+        "model": model,
+        "selection_schema": selection["schema_version"],
+        "selection_rule": selection.get("rule"),
+        "selected_iteration": selected.get("iteration"),
+        "stage1_checkpoint": str(checkpoint),
+        "stage1_checkpoint_sha256": _file_sha256(checkpoint),
+        "stage2_load_from": str(checkpoint),
+    }
+    write_json(output_root / model / "stage2_handoff.json", report)
+    return report
+
+
 def _run_resume_gate(
     *,
     state: CycleState,
@@ -855,6 +922,16 @@ def _run_resume_gate(
 def run_cycle(args: argparse.Namespace) -> None:
     dataset_root = args.dataset.resolve()
     output_root = args.output.resolve()
+    b5_go_contract: dict[str, Any] | None = None
+    models = _requested_models(args.models, args.experiment)
+    if "b5" in models:
+        if args.b5_go_decision is None:
+            raise RuntimeError("B5 requires --b5-go-decision")
+        if args.gpu_profile is None:
+            raise RuntimeError("B5 requires an exact --gpu-profile")
+        b5_go_contract = validate_b5_go_decision(args.b5_go_decision)
+    elif args.b5_go_decision is not None:
+        raise RuntimeError("--b5-go-decision is reserved for B5")
     if output_root.exists() and not args.resume:
         raise RuntimeError(f"Output exists: {output_root}; use --resume explicitly")
     output_root.mkdir(parents=True, exist_ok=True)
@@ -882,6 +959,9 @@ def run_cycle(args: argparse.Namespace) -> None:
         "dataset_content_sha256": dataset_contract["dataset_content_sha256"],
         "initial_checkpoint_sha256": (
             initial_checkpoint_contract["sha256"] if initial_checkpoint_contract else None
+        ),
+        "b5_go_decision_sha256": (
+            b5_go_contract["sha256"] if b5_go_contract else None
         ),
     }
     if args.resume and "resume_contract" in state.value:
@@ -918,16 +998,6 @@ def run_cycle(args: argparse.Namespace) -> None:
     )
     env["WANDB_TAGS"] = ",".join(dict.fromkeys(tags))
 
-    models = [item.strip().lower() for item in args.models.split(",") if item.strip()]
-    if not models or any(item not in {"b0", "b2"} for item in models):
-        raise RuntimeError("--models accepts b0 and/or b2")
-    if len(models) != len(set(models)):
-        raise RuntimeError("--models contains duplicates")
-    if args.experiment in TA_EXPERIMENTS and models != ["b0"]:
-        raise RuntimeError("TA0/TA1/TA2 are locked to --models b0")
-    if args.experiment == EADOM_EXPERIMENT and models != ["b0"]:
-        raise RuntimeError("Emergency E-ADOM is locked to --models b0")
-
     doctor_path = output_root / "doctor.json"
     doctor_command = [
         sys.executable,
@@ -942,6 +1012,17 @@ def run_cycle(args: argparse.Namespace) -> None:
         "--output",
         str(doctor_path),
     ]
+    if args.gpu_profile:
+        doctor_command.extend(["--gpu-profile", args.gpu_profile])
+    else:
+        doctor_command.extend(
+            [
+                "--require-gpu-name",
+                args.require_gpu_name,
+                "--minimum-gpu-memory-gib",
+                str(args.minimum_gpu_memory_gib),
+            ]
+        )
     if args.expected_image_sha:
         doctor_command.extend(["--expected-image-sha", args.expected_image_sha])
     _run_phase(
@@ -962,6 +1043,8 @@ def run_cycle(args: argparse.Namespace) -> None:
             "gate": args.gate,
             "dataset_root": str(dataset_root),
             "initial_checkpoint": initial_checkpoint_contract,
+            "b5_go_decision": b5_go_contract,
+            "gpu_profile": args.gpu_profile,
             "resume_contract": resume_contract,
             "optimizer_update_domain": True,
             "export": "independent/not part of Phase 1 training cycle",
@@ -981,10 +1064,10 @@ def run_cycle(args: argparse.Namespace) -> None:
 
     for model in models:
         if args.micro_batch is not None:
-            if args.micro_batch not in _batch_candidates(model):
+            if args.micro_batch not in _batch_candidates(model, args.gpu_profile):
                 raise RuntimeError(
                     f"Unsupported {model} micro-batch {args.micro_batch}; "
-                    f"choose from {_batch_candidates(model)}"
+                    f"choose from {_batch_candidates(model, args.gpu_profile)}"
                 )
             micro_batch = args.micro_batch
             accumulative = EFFECTIVE_BATCH // micro_batch
@@ -1000,6 +1083,7 @@ def run_cycle(args: argparse.Namespace) -> None:
                 train_tool=train_tool,
                 resume=args.resume,
                 load_from=initial_checkpoint,
+                gpu_profile=args.gpu_profile,
             )
         if args.gate == "probe":
             continue
@@ -1033,6 +1117,10 @@ def run_cycle(args: argparse.Namespace) -> None:
             continue
         if stage1_best is None:
             raise RuntimeError("TA/full Stage 2 requires a Stage 1 checkpoint")
+        if args.gate != "smoke":
+            handoff = validate_stage2_handoff(output_root, model, stage1_best)
+            state.value["phases"][f"{model}_stage1"]["stage2_handoff"] = handoff
+            state.save()
         stage2_best = _train_stage(
             state=state,
             model=model,
@@ -1143,19 +1231,29 @@ def main(argv: list[str] | None = None) -> None:
         default=75.0,
         help="Minimum physical GPU memory; defaults to the A100 80GB contract.",
     )
+    parser.add_argument(
+        "--gpu-profile",
+        choices=tuple(GPU_PROFILES),
+        help="Exact model/VRAM profile required by the preregistered B5 study.",
+    )
     parser.add_argument("--seed", type=int, choices=(42, 43, 44), default=42)
     parser.add_argument(
         "--run-test",
         action="store_true",
         help="Unlock canonical test for the one final model named by --final-test-model.",
     )
-    parser.add_argument("--final-test-model", choices=("b0", "b2"))
+    parser.add_argument("--final-test-model", choices=("b0", "b2", "b5"))
     parser.add_argument(
         "--expected-image-sha",
         help="Require ADOM_GIT_SHA inside the immutable Docker image to match.",
     )
     parser.add_argument("--initial-checkpoint", type=Path)
     parser.add_argument("--expected-initial-checkpoint-sha256")
+    parser.add_argument(
+        "--b5-go-decision",
+        type=Path,
+        help="Frozen B2 evidence decision artifact required before any B5 gate.",
+    )
     parser.add_argument(
         "--skip-export",
         action="store_true",

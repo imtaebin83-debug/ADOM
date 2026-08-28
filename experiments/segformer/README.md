@@ -13,3 +13,4 @@ SegFormer-B0/B2 기반 fine-tuning과 runtime 비교를 진행합니다.
 
 - [B2-E-ADOM capacity × domain study](b2-eadom-capacity-domain-study.md)
 - [B2-E-ADOM seed 42 run record](b2-eadom-capacity-domain-seed42-run.md)
+- [Capacity × domain paper analysis and B5 proposal](capacity-domain-paper-analysis-and-b5-proposal.md)

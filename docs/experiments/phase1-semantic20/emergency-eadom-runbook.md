@@ -5,6 +5,10 @@ E-ADOM은 내일 Jetson 배포를 위한 단일-seed data-only 후보이다. Ima
 standalone 133의 `ta1_train.txt`로 바꾼다. TA0 method ablation이나 canonical test를
 이 실행에 섞지 않는다.
 
+긴급 실행 hardware는 RTX 4090 24GB를 허용한다. wrapper는 runtime doctor에
+`RTX 4090`과 최소 22GiB를 명시하되 micro-batch/effective batch와 optimizer update
+계약은 변경하지 않는다. 다른 cycle의 기본 A100 75GiB 계약은 그대로 유지한다.
+
 ## RunPod
 
 GitHub Actions가 E-ADOM commit의 immutable Git-SHA image를 Docker Hub에 push한 뒤

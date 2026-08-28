@@ -27,6 +27,7 @@ htmlcov/
 .ipynb_checkpoints/
 .tox/
 .nox/
+.worktrees/
 
 # Build artifacts
 build/
@@ -52,6 +53,7 @@ rosbag2_*/
 # ML experiment artifacts
 outputs/
 runs/
+paper_eval_outputs/
 wandb/
 mlruns/
 lightning_logs/

@@ -26,12 +26,50 @@ from adom.runtime.onnx_parity import (
     normalized_polygon_mask,
     parse_normalized_polygon,
 )
+from adom.runtime.semantic20_cycle import main as semantic20_cycle_main
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class RuntimeContractTests(unittest.TestCase):
+    def test_semantic20_cycle_gpu_contract_defaults_and_overrides(self) -> None:
+        with patch("adom.runtime.semantic20_cycle.run_cycle") as run_cycle:
+            semantic20_cycle_main(
+                [
+                    "--dataset",
+                    "/dataset",
+                    "--experiment",
+                    "e0",
+                    "--output",
+                    "/output",
+                ]
+            )
+        args = run_cycle.call_args.args[0]
+        self.assertEqual(args.require_gpu_name, "A100")
+        self.assertEqual(args.minimum_gpu_memory_gib, 75.0)
+
+        with patch("adom.runtime.semantic20_cycle.run_cycle") as run_cycle:
+            semantic20_cycle_main(
+                [
+                    "--dataset",
+                    "/dataset",
+                    "--experiment",
+                    "eadom",
+                    "--models",
+                    "b0",
+                    "--output",
+                    "/output",
+                    "--require-gpu-name",
+                    "RTX 4090",
+                    "--minimum-gpu-memory-gib",
+                    "22",
+                ]
+            )
+        args = run_cycle.call_args.args[0]
+        self.assertEqual(args.require_gpu_name, "RTX 4090")
+        self.assertEqual(args.minimum_gpu_memory_gib, 22.0)
+
     def test_official_split_snapshot(self) -> None:
         split_root = REPO_ROOT / "data" / "splits" / "rellis3d" / "official"
         expected = {

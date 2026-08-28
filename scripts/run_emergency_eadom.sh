@@ -5,6 +5,8 @@ TA_ROOT="${EADOM_DATA_ROOT:-/workspace/adom/datasets/processed/adom_semantic20_t
 OUT="${EADOM_RUN_ROOT:-/workspace/adom/runs/semantic20/eadom/seed42/full}"
 LOG_ROOT="${EADOM_LOG_ROOT:-/workspace/adom/logs/eadom}"
 IMAGE_SHA="${EADOM_IMAGE_SHA:-}"
+GPU_NAME="${EADOM_GPU_NAME:-RTX 4090}"
+GPU_MEMORY_GIB="${EADOM_GPU_MEMORY_GIB:-22}"
 MODE="${1:-full}"
 
 export PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
@@ -40,6 +42,8 @@ run_cycle() {
     --output "$OUT"
     --gate full
     --micro-batch 16
+    --require-gpu-name "$GPU_NAME"
+    --minimum-gpu-memory-gib "$GPU_MEMORY_GIB"
     --seed 42
     --expected-image-sha "$IMAGE_SHA"
   )

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adom.local/schemas/trial_metadata.schema.json",
+  "title": "ADOM RC evaluation trial metadata",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "trial_id",
+    "operator",
+    "model",
+    "scene_id",
+    "hazard_type",
+    "hazard_present",
+    "start_position_marker",
+    "commanded_speed_mps"
+  ],
+  "properties": {
+    "trial_id": {"type": "string", "minLength": 1},
+    "operator": {"type": "string", "minLength": 1},
+    "model": {"enum": ["b0-e0", "eadom"]},
+    "checkpoint_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "scene_id": {"type": "string", "minLength": 1},
+    "hazard_type": {"enum": ["log", "rubble", "none"]},
+    "hazard_present": {"type": "boolean"},
+    "start_position_marker": {"type": "string", "minLength": 1},
+    "obstacle_position_marker": {"type": ["string", "null"]},
+    "commanded_speed_mps": {"type": "number", "minimum": 0},
+    "battery_voltage": {"type": ["number", "null"]},
+    "lighting_weather_note": {"type": ["string", "null"]},
+    "rosbag_path": {"type": ["string", "null"]},
+    "video_path": {"type": ["string", "null"]},
+    "emergency_intervention": {"type": ["boolean", "null"]},
+    "human_final_outcome": {"type": ["string", "null"]},
+    "exclusion_reason": {"type": ["string", "null"]}
+  }
+}

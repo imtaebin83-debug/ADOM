@@ -935,9 +935,9 @@ def run_cycle(args: argparse.Namespace) -> None:
         "adom.runtime.doctor",
         "--require-gpu",
         "--require-gpu-name",
-        "A100",
+        args.require_gpu_name,
         "--minimum-gpu-memory-gib",
-        "75",
+        str(args.minimum_gpu_memory_gib),
         "--skip-deployment",
         "--output",
         str(doctor_path),
@@ -1132,6 +1132,17 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-batch-probe", action="store_true")
     parser.add_argument("--micro-batch", type=int)
+    parser.add_argument(
+        "--require-gpu-name",
+        default="A100",
+        help="Substring required in the runtime GPU name; defaults to the A100 contract.",
+    )
+    parser.add_argument(
+        "--minimum-gpu-memory-gib",
+        type=float,
+        default=75.0,
+        help="Minimum physical GPU memory; defaults to the A100 80GB contract.",
+    )
     parser.add_argument("--seed", type=int, choices=(42, 43, 44), default=42)
     parser.add_argument(
         "--run-test",
@@ -1151,6 +1162,10 @@ def main(argv: list[str] | None = None) -> None:
         help="Compatibility flag; export is already independent from this training cycle",
     )
     args = parser.parse_args(argv)
+    if not args.require_gpu_name.strip():
+        parser.error("--require-gpu-name must not be empty")
+    if args.minimum_gpu_memory_gib <= 0:
+        parser.error("--minimum-gpu-memory-gib must be positive")
     if args.run_test != bool(args.final_test_model):
         parser.error("--run-test and --final-test-model must be provided together")
     if args.run_test and args.gate != "full":

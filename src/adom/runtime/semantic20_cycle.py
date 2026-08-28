@@ -564,6 +564,19 @@ def _batch_candidates(model: str) -> list[int]:
     return [16] if model == "b0" else [16, 8, 4]
 
 
+def _requested_models(value: str, experiment: str) -> list[str]:
+    models = [item.strip().lower() for item in value.split(",") if item.strip()]
+    if not models or any(item not in {"b0", "b2"} for item in models):
+        raise RuntimeError("--models accepts b0 and/or b2")
+    if len(models) != len(set(models)):
+        raise RuntimeError("--models contains duplicates")
+    if experiment in TA_EXPERIMENTS and models != ["b0"]:
+        raise RuntimeError("TA0/TA1/TA2 are locked to --models b0")
+    if experiment == EADOM_EXPERIMENT and len(models) != 1:
+        raise RuntimeError("E-ADOM runs exactly one architecture at a time")
+    return models
+
+
 def _probe_batch(
     *,
     model: str,
@@ -918,15 +931,7 @@ def run_cycle(args: argparse.Namespace) -> None:
     )
     env["WANDB_TAGS"] = ",".join(dict.fromkeys(tags))
 
-    models = [item.strip().lower() for item in args.models.split(",") if item.strip()]
-    if not models or any(item not in {"b0", "b2"} for item in models):
-        raise RuntimeError("--models accepts b0 and/or b2")
-    if len(models) != len(set(models)):
-        raise RuntimeError("--models contains duplicates")
-    if args.experiment in TA_EXPERIMENTS and models != ["b0"]:
-        raise RuntimeError("TA0/TA1/TA2 are locked to --models b0")
-    if args.experiment == EADOM_EXPERIMENT and models != ["b0"]:
-        raise RuntimeError("Emergency E-ADOM is locked to --models b0")
+    models = _requested_models(args.models, args.experiment)
 
     doctor_path = output_root / "doctor.json"
     doctor_command = [

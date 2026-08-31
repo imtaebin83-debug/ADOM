@@ -107,21 +107,34 @@ class B5SourceContractTests(unittest.TestCase):
 class B5GpuProfileTests(unittest.TestCase):
     def test_profiles_distinguish_ambiguous_hardware_names_and_vram(self) -> None:
         cases = {
-            "a100-40gb": ("NVIDIA A100-SXM4-40GB", 39.5),
-            "a100-80gb": ("NVIDIA A100-SXM4-80GB", 79.2),
-            "rtx-a6000-48gb": ("NVIDIA RTX A6000", 47.5),
+            "a100-40gb": ("NVIDIA A100-SXM4-40GB", 39.5, (8, 0)),
+            "a100-80gb": ("NVIDIA A100-SXM4-80GB", 79.2, (8, 0)),
+            "rtx-a6000-48gb": ("NVIDIA RTX A6000", 47.5, (8, 6)),
             "rtx-pro-6000-blackwell-96gb": (
                 "NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
                 95.5,
+                (12, 0),
             ),
+            "rtx-pro-4500-blackwell-32gb": (
+                "NVIDIA RTX PRO 4500 Blackwell",
+                31.86,
+                (12, 0),
+            ),
+            "rtx-5090-32gb": ("NVIDIA GeForce RTX 5090", 31.84, (12, 0)),
         }
-        for profile, (name, memory_gib) in cases.items():
+        for profile, (name, memory_gib, capability) in cases.items():
             with self.subTest(profile=profile):
                 report = validate_gpu_profile(
-                    profile, name, int(memory_gib * 1024**3)
+                    profile,
+                    name,
+                    int(memory_gib * 1024**3),
+                    capability,
+                    [f"sm_{capability[0]}{capability[1]}"],
                 )
                 self.assertTrue(report["name_matches"])
                 self.assertTrue(report["memory_matches"])
+                self.assertTrue(report["compute_capability_matches"])
+                self.assertTrue(report["native_arch_supported"])
                 self.assertEqual(report["errors"], [])
 
     def test_profile_rejects_same_family_wrong_vram_or_model(self) -> None:
@@ -133,6 +146,47 @@ class B5GpuProfileTests(unittest.TestCase):
             "rtx-a6000-48gb", "NVIDIA RTX 6000 Ada Generation", int(47.5 * 1024**3)
         )
         self.assertFalse(wrong_model["name_matches"])
+
+    def test_blackwell_profiles_reject_mig_or_wrong_product(self) -> None:
+        mig = validate_gpu_profile(
+            "rtx-pro-4500-blackwell-32gb",
+            "NVIDIA RTX PRO 4500 Blackwell",
+            int(15.9 * 1024**3),
+            (12, 0),
+            ["compute_90"],
+        )
+        self.assertFalse(mig["memory_matches"])
+        wrong_product = validate_gpu_profile(
+            "rtx-5090-32gb",
+            "NVIDIA RTX PRO 4500 Blackwell",
+            int(31.86 * 1024**3),
+            (12, 0),
+            ["compute_90"],
+        )
+        self.assertFalse(wrong_product["name_matches"])
+
+    def test_blackwell_ptx_fallback_is_explicitly_provisional(self) -> None:
+        report = validate_gpu_profile(
+            "rtx-5090-32gb",
+            "NVIDIA GeForce RTX 5090",
+            int(31.84 * 1024**3),
+            (12, 0),
+            ["sm_90", "compute_90"],
+        )
+        self.assertEqual(report["errors"], [])
+        self.assertFalse(report["native_arch_supported"])
+        self.assertRegex(report["warnings"][0], "PTX JIT compatibility")
+
+    def test_profile_rejects_wrong_compute_capability(self) -> None:
+        report = validate_gpu_profile(
+            "rtx-5090-32gb",
+            "NVIDIA GeForce RTX 5090",
+            int(31.84 * 1024**3),
+            (8, 9),
+            ["sm_89"],
+        )
+        self.assertFalse(report["compute_capability_matches"])
+        self.assertRegex(report["errors"][-1], "compute capability 12.0")
 
 
 class B5GoDecisionTests(unittest.TestCase):

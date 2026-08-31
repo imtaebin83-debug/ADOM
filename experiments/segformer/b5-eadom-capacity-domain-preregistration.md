@@ -201,6 +201,8 @@ Stage 2 진입 직전 runtime은 `stage1/checkpoint_selection.json`의 selected 
 | `a100-80gb` | A100 name에 80GB 명시 | 80 GB | `16/1 → 8/2 → 4/4 → 2/8 → 1/16` | proposal |
 | `rtx-a6000-48gb` | NVIDIA RTX A6000 | 48 GB | `8/2 → 4/4 → 2/8 → 1/16` | proposal |
 | `rtx-pro-6000-blackwell-96gb` | RTX PRO 6000 Blackwell, edition 기록 | 96 GB | `16/1 → 8/2 → 4/4 → 2/8 → 1/16` | proposal |
+| `rtx-pro-4500-blackwell-32gb` | RTX PRO 4500 Blackwell, full device | 32 GB | `8/2 → 4/4 → 2/8 → 1/16` | proposal; PTX-JIT preflight required |
+| `rtx-5090-32gb` | NVIDIA GeForce RTX 5090 | 32 GB | `8/2 → 4/4 → 2/8 → 1/16` | proposal; PTX-JIT preflight required |
 
 표의 `micro-batch/accumulation`은 실제 수용량 주장이 아니다. 각 GPU의 첫 실행에서
 2 runner-iteration memory probe를 큰 micro-batch부터 수행하고, 첫 non-OOM 조합을
@@ -208,6 +210,13 @@ freeze한다. OOM만 다음 fallback을 허용한다. non-OOM error, effective b
 MIG/vGPU slice, profile name/VRAM mismatch는 즉시 중단한다. accumulation을 늘리면
 max/warmup/validation/checkpoint runner iteration도 함께 배율 조정해 optimizer update
 수가 유지돼야 한다.
+
+RTX PRO 4500 Blackwell Server Edition은 16GB MIG 두 개로 분할할 수 있으므로
+`rtx-pro-4500-blackwell-32gb`는 runtime에서 약 32GB 전체 장치와 compute capability
+12.0을 함께 확인한다. RTX 5090도 별도 name pattern과 32GB range를 사용해 PRO 4500
+profile과 서로 대체하지 않는다. 현재 NGC 23.10/PyTorch 2.1 image가 native `sm_120`
+binary를 포함하지 않으면 doctor는 PTX-JIT provisional warning을 기록하고, 실제 B5
+forward/backward 및 2-iteration memory probe를 통과하기 전에는 학습을 허용하지 않는다.
 
 runtime doctor는 marketing GB와 driver GiB 표기의 차이를 허용하는 좁은 VRAM range와
 정확한 name pattern을 함께 검사한다. 예를 들어 A100 40GB를 A100 80GB profile로,
@@ -218,6 +227,8 @@ RTX 6000 Ada를 RTX A6000 profile로 통과시키지 않는다.
 - A100 40/80GB: <https://www.nvidia.com/en-us/data-center/a100/>
 - RTX A6000 48GB: <https://www.nvidia.com/en-gb/products/workstations/rtx-a6000/>
 - RTX PRO 6000 Blackwell 96GB: <https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000-family/>
+- RTX PRO 4500 Blackwell 32GB: <https://www.nvidia.com/en-us/data-center/rtx-pro-4500-blackwell-server-edition/>
+- GeForce RTX 5090 32GB: <https://marketplace.nvidia.com/en-us/consumer/graphics-cards/geforce-rtx-5090-founders-edition/>
 
 ### 시간·비용 산정 — probe 전 수치 금지
 

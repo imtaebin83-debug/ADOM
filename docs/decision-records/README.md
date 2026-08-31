@@ -37,6 +37,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0011](0011-emergency-eadom-e0-recipe.md) | Emergency E-ADOM using the E0 recipe | Accepted | 내일 Jetson 배포용 data-only 단일-seed 경로 |
 | [0012](0012-emergency-eadom-rtx4090-runtime.md) | Emergency E-ADOM on RTX 4090 | Accepted | A100 재고 소진 시 Ada-compatible 긴급 runtime 계약 |
 | [0013](0013-b5-capacity-domain-preregistration.md) | B5 capacity × domain preregistration | Accepted | B2 uncertainty GO artifact와 exact GPU profile 없이는 실행 금지 |
+| [0014](0014-b5-blackwell-32gb-runtime-profiles.md) | B5 Blackwell 32GB runtime profiles | Accepted | RTX PRO 4500/RTX 5090 exact profile, PTX-JIT warning과 probe 의무화 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

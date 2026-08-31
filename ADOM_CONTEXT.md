@@ -594,6 +594,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   사용하며, Korean held-out은 checkpoint freeze 뒤 test-only로 유지한다. A100 40/80GB,
   RTX A6000 48GB, RTX PRO 6000 Blackwell 96GB는 exact runtime profile로 분리한다.
   상세 계약은 decision record 0013을 따른다.
+- **[2026-09-01] B5 조건부 실행 GPU에 RTX PRO 4500 Blackwell 32GB와 RTX 5090 32GB 추가**
+  이유: A100/RTX 4090 재고가 없는 상황에서 실제 대여 가능한 32GB Blackwell GPU를
+  사용하되, 두 제품과 RTX PRO 4500의 16GB MIG slice를 혼동하지 않아야 한다. exact
+  name, full-device VRAM, compute capability 12.0을 함께 검사하고 현재 image의 native
+  `sm_120` 부재는 PTX-JIT provisional warning과 필수 active memory probe로 공개한다.
+  상세 계약은 decision record 0014를 따른다.
 
 ## 17. Primary References
 

@@ -7,9 +7,10 @@
 
 ## Folder Rules
 
-- Put learning notes and one-off checks in `study/<member>/`.
-- Put reproducible experiments in `experiments/<experiment-name>/`.
-- Move reusable training, inference, mapping, or integration code into `src/`.
+- Keep reusable training, inference, mapping, or integration code in `src/`.
+- Keep ROS2 nodes in `ros2_ws/` as thin adapters over `src/` logic.
+- Keep offline paper/RC evaluation scripts in `tools/`.
+- Add or update `tests/` whenever a data, evaluation, or runtime contract changes.
 - Keep large files out of git. Use `data/` and `models/` only for README files, metadata, and path conventions.
 
 ## Experiment Checklist
@@ -22,21 +23,14 @@ Each experiment should include:
 - metrics to compare
 - hardware/runtime environment
 - result summary and known failure cases
-- one row in `results/benchmark-results.csv` when it produces benchmark numbers
 
 ## Documentation
 
-- 작업 시작 전 루트 `ADOM_CONTEXT.md`와 `docs/status/README.md`를 읽는다.
-- 범위, 인터페이스, 담당자, 성공 기준이 바뀌면 같은 PR에서
-  `ADOM_CONTEXT.md`와 decision record를 함께 갱신한다.
-- 프로젝트 진행률, blocker, 다음 hand-off는 `docs/status/`에 기록하고
-  계획이나 계약을 중복 작성하지 않는다.
-- Use `docs/meeting-notes/` for meeting logs.
-- Use `docs/decision-records/` for decisions that affect repo structure, model choice, data policy, or deployment.
-- AI 대화에서 나온 중요한 결론은 원문을 복사하지 않고
-  `docs/ai-collaboration/`에 근거, 결정 후보, 미검증 사항, 후속 조치만 요약한다.
+- 인터페이스나 데이터 계약이 바뀌면 같은 PR에서 관련 문서를 함께 갱신한다.
+- Use `docs/decision-records/` for decisions that affect repo structure, model choice, data policy, or deployment. 기존 record는 지우거나 다시 쓰지 않고 새 record에서 `Supersedes` 관계를 남긴다.
 - Use `docs/system-architecture/` for diagrams and integration notes.
 - Use `docs/setup-guides/` for reproducible setup instructions.
+- Use `docs/metrics/` for benchmark and metric definitions.
 
 ## Required Benchmark Metrics
 

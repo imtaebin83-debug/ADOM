@@ -231,6 +231,14 @@ class B5GoDecisionTests(unittest.TestCase):
             FROZEN_KOREAN_TEST_MANIFEST_SHA256,
             "1eb86ff65620fb5c0afc1d58c572c517cacc937468ebd865375aaa26d81eb782",
         )
+        self.assertEqual(
+            b5_capacity_domain_contract.FROZEN_PRIMARY_DATASET["mapping_sha256"],
+            {
+                "bridge_mapping.yaml": (
+                    "ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21d389933a6bc55"
+                )
+            },
+        )
         values = [
             FROZEN_EVALUATION_CONTRACT_SHA256,
             FROZEN_RELLIS_TEST_MANIFEST_SHA256,
@@ -240,6 +248,9 @@ class B5GoDecisionTests(unittest.TestCase):
                 for value in b5_capacity_domain_contract.FROZEN_PRIMARY_DATASET.values()
                 if isinstance(value, str)
             ),
+            *b5_capacity_domain_contract.FROZEN_PRIMARY_DATASET[
+                "mapping_sha256"
+            ].values(),
         ]
         self.assertTrue(all(len(value) == 64 for value in values))
         self.assertTrue(all(set(value) <= set("0123456789abcdef") for value in values))

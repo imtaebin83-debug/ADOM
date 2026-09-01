@@ -140,7 +140,7 @@ run의 `dataset_contract.json` 필드와 fresh-evaluation manifest summary를 �
 | image content | `ce06265e6146bcd37692938786386cbd9b844e9742f831284ee5d26aedd15305` |
 | mask content | `5ae15ab1eff69921168b15811683edab41472456a439b58aa6384c6d472c377e` |
 | combined content | `a70c6b9467b692a4797976659c6dcd501c80938626226000a6c214efcdec5e42` |
-| canonical mapping SHA-256 | `ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21dd389933a6bc55` |
+| canonical mapping SHA-256 | `ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21d389933a6bc55` |
 
 Evaluation lock은 model-resolved contract와 ordered data manifest를 구분한다. B0와 B2
 fresh evaluation은 같은 evaluator policy를 사용하지만 resolved model architecture가

@@ -64,7 +64,7 @@ FROZEN_PRIMARY_DATASET = {
     ),
     "mapping_sha256": {
         "bridge_mapping.yaml": (
-            "ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21dd389933a6bc55"
+            "ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21d389933a6bc55"
         )
     },
 }
@@ -114,10 +114,21 @@ def _canonical_source_contract() -> dict[str, Any]:
 
 
 def _frozen_primary_dataset(dataset_root: Path) -> dict[str, Any]:
+    recorded_digests = {
+        field: value
+        for field, value in FROZEN_PRIMARY_DATASET.items()
+        if isinstance(value, str)
+    }
+    recorded_digests.update(
+        {
+            f"mapping_sha256.{name}": digest
+            for name, digest in FROZEN_PRIMARY_DATASET["mapping_sha256"].items()
+        }
+    )
     invalid_recorded_digests = {
         field: len(value)
-        for field, value in FROZEN_PRIMARY_DATASET.items()
-        if isinstance(value, str) and not re.fullmatch(r"[0-9a-f]{64}", value)
+        for field, value in recorded_digests.items()
+        if not re.fullmatch(r"[0-9a-f]{64}", value)
     }
     if invalid_recorded_digests:
         raise RuntimeError(

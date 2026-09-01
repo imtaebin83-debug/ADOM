@@ -44,7 +44,7 @@ it before any optimizer update:
 | image content SHA-256 | `ce06265e6146bcd37692938786386cbd9b844e9742f831284ee55d26aedd15305` |
 | mask content SHA-256 | `5ae15ab1eff69921168b15811683edab41472456a439b58aa63844c6d472c377e` |
 | combined content SHA-256 | `a70c6b9467b692a4797976659c6dcd501c80938626226000a6cc214efcdec5e42` |
-| canonical mapping SHA-256 | `ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21dd389933a6bc55` |
+| canonical mapping SHA-256 | `ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21d389933a6bc55` |
 
 This is the legacy-matched primary run, including the known 12 train-RGB
 conflicts with the diagnostic validation export. The conflict-free 4,556-row

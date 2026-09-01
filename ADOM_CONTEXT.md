@@ -152,7 +152,7 @@ held-out test를 이 문서와 새 decision record에 함께 기록한다. 그 �
 
 | 항목 | 초기값 | 규칙 |
 | --- | ---: | --- |
-| planner command profile | 0.30..3.00 m/s | 승인된 autonomous command 범위; 실제 속도는 지상 주행 전 실측 필요 |
+| planner command profile | 0.10..1.00 m/s | 승인된 autonomous command 범위; 실제 속도는 지상 주행 전 실측 필요 |
 | target | 미동결 | Semantic20 IDs 0..18 전체를 먼저 검토 |
 | ROI | 하단 중앙 trapezoid 후보 | padding 제외 source-image 좌표로 카메라 장착 후 고정 |
 | target area ratio | 미동결 | 선택 class validation에서 조정 |
@@ -794,6 +794,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   TF lookup까지 유지하고, 완성된 `OccupancyGrid.header.stamp`만 costmap 노드의 ROS 현재
   시각으로 기록한다. ZED timestamp 설정은 변경하지 않으며 downstream watchdog age는
   costmap 생성 이후 freshness를 뜻한다. 상세 근거는 decision record 0024를 따른다.
+- **[2026-09-01] autonomous command profile을 0.10..1.00 m/s로 확정**
+  이유: `b2b3a4c`가 현장 조정으로 배포 YAML만 0.10..1.00 m/s로 낮추고 ROS node
+  fallback, reusable defaults, 테스트와 0029를 갱신하지 않아 계층간 불일치가 남았다. jetson
+  병합 후 CI에서 드러난 이 불일치를 배포 값 기준으로 해소한다. node fallback을 그대로 두면
+  파라미터 누락 시 3배 속도를 명령하므로 함께 정렬한다. gamepad/PCA9685 12.0 m/s ceiling과
+  STOP/watchdog은 변경하지 않는다. 상세 근거는 decision record 0043을 따른다.
 
 ## 17. Primary References
 

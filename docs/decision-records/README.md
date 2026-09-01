@@ -52,7 +52,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0026](0026-paired-manual-perception-evidence.md) | Paired manual perception evidence | Superseded in part | sampled RGB 설계는 0027이 full-rate source RGB로 대체 |
 | [0027](0027-full-rate-manual-perception-evidence.md) | Full-rate manual perception evidence | Accepted | `t2 evidence`는 full-rate source RGB + 2 Hz mask 기록 |
 | [0028](0028-semantic20-mask-color-monitor.md) | Semantic20 mask color monitor | Accepted | mono8 ID mask를 canonical BGR image와 JSON legend로 변환 |
-| [0029](0029-autonomous-speed-profile.md) | Autonomous 0.30..3.00 m/s speed profile | Accepted | planner/local controller 범위 통일 |
+| [0029](0029-autonomous-speed-profile.md) | Autonomous 0.30..3.00 m/s speed profile | Superseded | 0043이 0.10..1.00 m/s로 대체 |
 | [0030](0030-sampled-semantic-preview.md) | Sampled Semantic20 preview evidence | Accepted | `t2 preview`는 2 Hz mask + 동일-frame 45% overlay 기록 |
 | [0031](0031-jetson-dual-model-profiles.md) | Jetson dual Semantic20 model profiles | Accepted | `t4`는 SHA-locked `b0-e0`/`eadom`; TensorRT ROS 연결은 후속 |
 | [0032](0032-empty-costmap-diagnostics.md) | Empty costmap projection diagnostics | Accepted | depth/label/height/grid 단계별 count와 `empty_reason` 상태 추가 |
@@ -66,6 +66,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0040](0040-blocked-release-debounce.md) | BLOCKED release debounce | Superseded in part | release 유지; no-gap trigger는 0021이 제거 |
 | [0041](0041-b5-provenance-gate-repair.md) | B5 provenance gate repair | Accepted | raw B2 artifact에서 64-hex lock과 B2 evidence contract를 재감사 |
 | [0042](0042-training-image-ci-scope.md) | Training-image CI scope separation | Accepted | 전체 smoke는 유지하고 학습 이미지에는 명시적 contract allowlist 적용 |
+| [0043](0043-autonomous-speed-profile-realignment.md) | Autonomous 0.10..1.00 m/s speed profile | Accepted | 배포 YAML 값으로 fallback·defaults·test 정렬; 0029 대체 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

@@ -31,8 +31,8 @@ class PathControlConfig:
     wheelbase_m: float = 0.33
     lookahead_m: float = 0.80
     max_steering_deg: float = 20.0
-    max_speed_mps: float = 3.0
-    min_speed_mps: float = 0.30
+    max_speed_mps: float = 1.0
+    min_speed_mps: float = 0.10
     curvature_speed_gain: float = 1.5
     speed_kp: float = 0.6
     path_stop_distance_m: float = 0.50

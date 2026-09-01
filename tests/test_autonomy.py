@@ -377,8 +377,8 @@ class LocalPathControlTests(unittest.TestCase):
         pca = vehicle["pca9685_control"]["ros__parameters"]
         gamepad = vehicle["gamepad_control"]["ros__parameters"]
 
-        self.assertEqual(planner["min_speed_mps"], 0.30)
-        self.assertEqual(planner["max_speed_mps"], 3.0)
+        self.assertEqual(planner["min_speed_mps"], 0.10)
+        self.assertEqual(planner["max_speed_mps"], 1.00)
         self.assertEqual(local["min_speed_mps"], planner["min_speed_mps"])
         self.assertEqual(local["max_speed_mps"], planner["max_speed_mps"])
         self.assertEqual(planner["max_steering_deg"], 24.0)

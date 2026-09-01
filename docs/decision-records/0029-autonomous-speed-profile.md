@@ -1,6 +1,6 @@
 # 0029. Autonomous 0.30..3.00 m/s speed profile
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-08-14
 - Owners: ADOM control integration
 - Supersedes: speed-profile portions of 0039 and 0018

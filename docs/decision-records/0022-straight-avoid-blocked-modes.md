@@ -34,7 +34,7 @@ BLOCKED다. 좌우 누적 cost가 같으면 왼쪽을 deterministic tie-break로
 ## Consequences
 
 `rule_status`는 `planner_mode`, `straight_obstacle_distance_m`와 후보 수를 제공한다.
-BLOCKED 해제에는 0020의 서로 다른 clear costmap 3개 debounce가 계속 적용된다.
+BLOCKED 해제에는 0040의 서로 다른 clear costmap 3개 debounce가 계속 적용된다.
 
 ## Validation and rollback
 

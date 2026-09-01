@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM team
-- Supersedes: 0019와 0020의 no-gap BLOCKED 입력 부분; 0020 release debounce는 유지
+- Supersedes: 0019와 0040의 no-gap BLOCKED 입력 부분; 0040 release debounce는 유지
 
 ## Context
 
@@ -21,7 +21,7 @@ score로 평가한다. 좌우 총 cost가 같으면 방향을 제한하지 않�
 
 좌우 보조 결과는 BLOCKED를 직접 만들지 않는다. BLOCKED는 6a4db6b 이전과 동일하게
 선택된 최저-score tree path의 첫 lethal clearance가 `stop_distance_m` 이하일 때만
-발생한다. watchdog과 empty costmap STOP, 0020의 3-frame clear release debounce는
+발생한다. watchdog과 empty costmap STOP, 0040의 3-frame clear release debounce는
 유지한다.
 
 ## Rationale and evidence

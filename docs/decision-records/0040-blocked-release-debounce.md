@@ -1,4 +1,4 @@
-# 0020. BLOCKED release debounce
+# 0040. BLOCKED release debounce
 
 - Status: Accepted
 - Date: 2026-08-12

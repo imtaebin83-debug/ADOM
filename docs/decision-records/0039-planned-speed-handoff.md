@@ -1,9 +1,9 @@
-# 0014. Preserve planner speed through local control
+# 0039. Preserve planner speed through local control
 
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM planning/control integration
-- Supersedes: speed handoff and 0.25 m/s controller-limit portions of 0010
+- Supersedes: speed handoff and 0.25 m/s controller-limit portions of 0035
 
 ## Context
 

@@ -1,4 +1,4 @@
-# 0009. Semantic20 local gap planning
+# 0034. Semantic20 local gap planning
 
 - Status: Accepted
 - Date: 2026-08-07

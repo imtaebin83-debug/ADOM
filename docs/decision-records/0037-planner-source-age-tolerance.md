@@ -1,4 +1,4 @@
-# 0012. Planner source-age tolerance
+# 0037. Planner source-age tolerance
 
 - Status: Accepted
 - Date: 2026-08-12

@@ -1,9 +1,9 @@
-# 0011. Live autonomy bag bandwidth policy
+# 0036. Live autonomy bag bandwidth policy
 
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM team
-- Supersedes: 0010의 confidence/overlay live recording 부분
+- Supersedes: 0035의 confidence/overlay live recording 부분
 
 ## Context
 

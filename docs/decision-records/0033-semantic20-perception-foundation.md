@@ -1,4 +1,4 @@
-# 0008. Semantic20 autonomous perception foundation
+# 0033. Semantic20 autonomous perception foundation
 
 - Status: Accepted
 - Date: 2026-08-07

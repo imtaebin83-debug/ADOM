@@ -1,9 +1,9 @@
-# 0010. Low-level direction-tree autonomy and session logging
+# 0035. Low-level direction-tree autonomy and session logging
 
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM team
-- Supersedes: 0009의 single-corridor planning 및 GPS speed-feedback 부분
+- Supersedes: 0034의 single-corridor planning 및 GPS speed-feedback 부분
 
 ## Context
 

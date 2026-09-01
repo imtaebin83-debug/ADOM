@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-13
 - Owners: ADOM team
-- Supersedes: 0008b와 0009의 downstream camera timestamp 보존, 0012의 camera source-age 해석
+- Supersedes: 0033과 0034의 downstream camera timestamp 보존, 0037의 camera source-age 해석
 
 ## Context
 

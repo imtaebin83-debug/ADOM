@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-14
 - Owners: ADOM control integration
-- Supersedes: speed-profile portions of 0014 and 0018
+- Supersedes: speed-profile portions of 0039 and 0018
 
 ## Context
 

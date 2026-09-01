@@ -64,7 +64,7 @@ trial의 `t2 evidence`는 t4의 full-rate 원본 RGB stream과 2 Hz mask를 함�
 Mask header로 실제 추론 frame을 RGB stream에서 결합한다. GPS 경로는 raw fix 시계열로
 재구성한다.
 기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
-분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020,
+분리한다. 상세 계약은 decision records 0035, 0036과 이를 일부 대체하는 0016, 0020,
 0025, 0026과 이를 일부 대체하는 0027, 0030을 따른다.
 
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
@@ -725,12 +725,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: 감속용 cost 60~89가 inflation 활성화만으로 cost 100 hard stop으로 승격되는
   동작을 제거한다. 원래 lethal cell과 geometric obstacle은 계속 정지 seed이며,
   주변 inflation ring은 감속·회피 비용으로 유지한다. 상세 근거는 decision record
-  0013을 따른다.
+  0038을 따른다.
 - **[2026-08-12] planner 속도 profile을 local control까지 보존**
   이유: planner가 계산한 0.25..3.0 m/s가 geometry-only Path 경계에서 유실되어 local
   controller의 0.25 m/s로 대체되고 있었다. `/adom/navigation/planned_speed`를 추가해
   speed freshness watchdog과 함께 `/cmd_vel`로 전달하고, 이후에는 기존 gamepad/PCA9685
-  당시 6.0 m/s control ceiling과 PWM 파라미터를 적용했다. 상세 근거는 decision record 0014를
+  당시 6.0 m/s control ceiling과 PWM 파라미터를 적용했다. 상세 근거는 decision record 0039를
   따른다.
 - **[2026-08-12] 2000 us를 nominal 12 m/s로 재정의하고 IMU 단기 보정을 활성화**
   이유: control calibration 요청에 따라 forward PWM 1500..2000 us를 0..12 m/s로 선형
@@ -758,7 +758,7 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   이유: sparse costmap에서 lethal cell이 frame마다 나타나고 사라질 때 BLOCKED와
   DRIVING이 즉시 반복되는 현장을 확인했다. 위험 감지 시 정지는 즉시 적용하되 서로
   다른 유효 costmap 3개에서 연속으로 안전 경로가 확인된 뒤에만 주행을 재개한다.
-  상세 근거는 decision record 0020을 따른다.
+  상세 근거는 decision record 0040을 따른다.
 - **[2026-08-12] gap 폭 판정을 전체 좌우 cost 보조 선택으로 대체**
   이유: sparse costmap의 gap 폭·거리 판정이 BLOCKED를 추가로 발생시켰다. 전체 costmap의
   좌우 누적 cost는 25개 tree의 첫 방향만 제한하며 BLOCKED에는 관여하지 않는다.

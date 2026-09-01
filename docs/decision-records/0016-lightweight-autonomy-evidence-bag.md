@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM team
-- Supersedes: 0010과 0011의 live autonomy bag topic 범위
+- Supersedes: 0035와 0036의 live autonomy bag topic 범위
 
 ## Context
 

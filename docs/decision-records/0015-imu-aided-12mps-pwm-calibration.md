@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM control integration
-- Supersedes: 6.0 m/s downstream mapping portions of 0014
+- Supersedes: 6.0 m/s downstream mapping portions of 0039
 
 ## Context
 

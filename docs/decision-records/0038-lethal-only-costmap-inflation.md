@@ -1,4 +1,4 @@
-# 0013. Lethal-only semantic costmap inflation
+# 0038. Lethal-only semantic costmap inflation
 
 - Status: Accepted
 - Date: 2026-08-12

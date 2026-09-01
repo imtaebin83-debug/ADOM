@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-12
 - Owners: ADOM team
-- Supersedes: 0010의 중앙 장애물 방향 선택 부분
+- Supersedes: 0035의 중앙 장애물 방향 선택 부분
 
 ## Context
 

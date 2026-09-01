@@ -38,24 +38,16 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0012](0012-emergency-eadom-rtx4090-runtime.md) | Emergency E-ADOM on RTX 4090 | Accepted | A100 재고 소진 시 Ada-compatible 긴급 runtime 계약 |
 | [0013](0013-b5-capacity-domain-preregistration.md) | B5 capacity × domain preregistration | Accepted | B2 uncertainty GO artifact와 exact GPU profile 없이는 실행 금지 |
 | [0014](0014-b5-blackwell-32gb-runtime-profiles.md) | B5 Blackwell 32GB runtime profiles | Accepted | RTX PRO 4500/RTX 5090 exact profile, PTX-JIT warning과 probe 의무화 |
-| [0008b](0008-semantic20-perception-foundation.md) | Semantic20 autonomous perception foundation | Accepted | ontology별 runtime topic 분리 |
-| [0009](0009-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Superseded in part | 방향 선택/control은 0010 우선 |
-| [0010](0010-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Superseded in part | tree 방향 선택은 0019 우선; logging 계약 유지 |
-| [0011](0011-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Superseded in part | 0016이 live bag topic 범위를 더 축소 |
-| [0012](0012-planner-source-age-tolerance.md) | Planner source-age tolerance | Superseded in part | 0024 이후 costmap output age 기준 |
-| [0013](0013-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
-| [0014](0014-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; profile은 0029가 대체 |
 | [0015](0015-imu-aided-12mps-pwm-calibration.md) | IMU-aided nominal 12 m/s PWM calibration | Accepted | 1500..2000 us = 0..12 m/s, IMU bias/ZUPT/P-feedback |
 | [0016](0016-lightweight-autonomy-evidence-bag.md) | Lightweight autonomy evidence bag | Accepted | t2는 수치·상태·raw GPS만 기록; rec는 RGB 전용 유지 |
 | [0017](0017-zed-depth-ground-filter.md) | ZED depth and ground-frame filtering | Accepted | NEURAL 0.30--8.0 m, verified 0.21 m mount height |
 | [0018](0018-autonomy-speed-cap-from-bag-latency.md) | Autonomous speed cap from bag latency | Superseded | 0029가 autonomous profile을 대체; latency evidence는 유효 |
 | [0019](0019-gap-guided-direction-tree.md) | Gap-guided direction tree | Superseded | 0021이 gap 폭/거리와 no-gap BLOCKED를 제거 |
-| [0020](0020-blocked-release-debounce.md) | BLOCKED release debounce | Superseded in part | release 유지; no-gap trigger는 0021이 제거 |
+| [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Superseded in part | status/costmap 유지; sampled mask 기본 활성화는 0025가 대체 |
 | [0021](0021-side-cost-assisted-tree.md) | Side-cost-assisted direction tree | Superseded in part | 좌우 cost 선택 유지; activation은 0022 우선 |
 | [0022](0022-straight-avoid-blocked-modes.md) | Straight/avoid/blocked modes | Accepted | 직진 장애물 거리로 mode 전환 |
 | [0023](0023-avoid-trigger-distance-tuning.md) | Avoid trigger distance tuning | Accepted | AVOID 진입 거리 3.50 m → 1.50 m |
 | [0024](0024-costmap-clock-domain-boundary.md) | Costmap clock-domain boundary | Accepted | 센서 stamp는 sync까지 유지, costmap 출력은 ROS clock |
-| [0020](0020-sampled-semantic-autonomy-evidence.md) | Sampled semantic autonomy evidence | Superseded in part | status/costmap 유지; sampled mask 기본 활성화는 0025가 대체 |
 | [0025](0025-optional-sampled-mask-recording.md) | Optional sampled mask recording | Accepted | `t2`는 mask 제외, `t2 mask`만 2 Hz evidence mask 추가 |
 | [0026](0026-paired-manual-perception-evidence.md) | Paired manual perception evidence | Superseded in part | sampled RGB 설계는 0027이 full-rate source RGB로 대체 |
 | [0027](0027-full-rate-manual-perception-evidence.md) | Full-rate manual perception evidence | Accepted | `t2 evidence`는 full-rate source RGB + 2 Hz mask 기록 |
@@ -64,6 +56,14 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0030](0030-sampled-semantic-preview.md) | Sampled Semantic20 preview evidence | Accepted | `t2 preview`는 2 Hz mask + 동일-frame 45% overlay 기록 |
 | [0031](0031-jetson-dual-model-profiles.md) | Jetson dual Semantic20 model profiles | Accepted | `t4`는 SHA-locked `b0-e0`/`eadom`; TensorRT ROS 연결은 후속 |
 | [0032](0032-empty-costmap-diagnostics.md) | Empty costmap projection diagnostics | Accepted | depth/label/height/grid 단계별 count와 `empty_reason` 상태 추가 |
+| [0033](0033-semantic20-perception-foundation.md) | Semantic20 autonomous perception foundation | Accepted | ontology별 runtime topic 분리 |
+| [0034](0034-semantic20-local-gap-planning.md) | Semantic20 local gap planning | Superseded in part | 방향 선택/control은 0035 우선 |
+| [0035](0035-low-level-tree-autonomy-logging.md) | Low-level direction-tree autonomy and logging | Superseded in part | tree 방향 선택은 0019 우선; logging 계약 유지 |
+| [0036](0036-live-bag-bandwidth-policy.md) | Live autonomy bag bandwidth policy | Superseded in part | 0016이 live bag topic 범위를 더 축소 |
+| [0037](0037-planner-source-age-tolerance.md) | Planner source-age tolerance | Superseded in part | 0024 이후 costmap output age 기준 |
+| [0038](0038-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
+| [0039](0039-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; profile은 0029가 대체 |
+| [0040](0040-blocked-release-debounce.md) | BLOCKED release debounce | Superseded in part | release 유지; no-gap trigger는 0021이 제거 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

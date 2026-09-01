@@ -41,11 +41,9 @@ Use:
 
 - `data/` for local dataset placement conventions
 - `models/` for local checkpoint/export placement conventions
-- `experiments/<name>/` for scripts, configs, and result summaries
 
 ## First Setup Tasks
 
 1. Decide the first dataset split convention.
 2. Decide the first baseline command format.
-3. Create the first benchmark result row in `results/benchmark-results.csv`.
 4. Keep ROS2 integration code under `ros2_ws/` in this mono repo.

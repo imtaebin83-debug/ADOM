@@ -27,8 +27,7 @@
 
 각 benchmark run은 다음 두 곳에 기록한다.
 
-1. 실험별 Markdown 요약: `experiments/<track>/README.md` 또는 별도 run note
-2. 통합 CSV 로그: `results/benchmark-results.csv`
+1. `tools/paper_eval/`의 평가 스크립트가 생성하는 run 요약 JSON/CSV
 
 ## Minimum Run Metadata
 

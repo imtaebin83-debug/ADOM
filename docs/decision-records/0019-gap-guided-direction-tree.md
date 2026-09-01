@@ -28,7 +28,7 @@ steering score로 평가한다. 이전 방향과 반대 방향의 차이가 swit
 ## Rationale and evidence
 
 gap layer는 빠져나갈 좌·우 방향을 담당하고 tree는 선택 방향 안의 차량 가능 경로를
-담당한다. `experiments/benchmark_gap_planner.py`로 80x60 costmap과 production tree
+담당한다. `tools/benchmark_gap_planner.py`로 80x60 costmap과 production tree
 설정을 비교한 결과, P95 추가 비용 최댓값은 clear scene의 0.515 ms였다. 좌·우 회피
 scene은 후보가 125개에서 25개로 줄어 P95가 각각 11.810 ms, 11.733 ms 감소했다. 이는
 사용자가 정한 50 ms 기각 기준을 통과한다. 이 수치는 개발 호스트 측정이며 Jetson
@@ -53,6 +53,6 @@ watchdog, no-gap STOP, manual mode와 actuator timeout은 유지한다.
 ## Validation and rollback
 
 합성 costmap에서 좌측 우세, 우측 우세, 양쪽 폐쇄, clear scene과 25개 후보 제한을
-검증한다. 재현 성능 검사는 `PYTHONPATH=src python experiments/benchmark_gap_planner.py`로
+검증한다. 재현 성능 검사는 `PYTHONPATH=src python tools/benchmark_gap_planner.py`로
 실행하며 P95 증가가 50 ms 이상이면 `gap_enabled: false`로 rollback한다. 이후 shadow
 mode, wheels-off, 저속 실차 순서로 방향 부호와 hysteresis를 확인한다.

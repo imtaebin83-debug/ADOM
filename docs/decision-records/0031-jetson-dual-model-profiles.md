@@ -35,7 +35,7 @@ automatic legacy-load permission.
 
 Both profiles continue to use the current MMSeg/PyTorch CUDA ROS backend. Target
 Jetson TensorRT engine generation, standalone ONNX-to-TensorRT parity and the native
-TensorRT ROS backend connection are tracked separately in `docs/TODO.md`.
+TensorRT ROS backend connection are tracked separately.
 
 ## Rationale and evidence
 

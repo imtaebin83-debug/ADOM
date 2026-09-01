@@ -2,9 +2,8 @@
 
 > **포맷:** `[YYYY-MM-DD] 결정 사항 | 결정 사유(Why)`
 >
-> 이 파일은 번호형 decision record 도입 전의 historical log다. 현재 계약은
-> [`ADOM_CONTEXT.md`](../../ADOM_CONTEXT.md), 2026-08-06 이후의 결정 근거는
-> [`0006-d5-poc-pivot.md`](0006-d5-poc-pivot.md)를 우선한다.
+> 이 파일은 번호형 decision record 도입 전의 historical log다.
+> 2026-08-06 이후의 결정 근거는 [`0006-d5-poc-pivot.md`](0006-d5-poc-pivot.md)를 우선한다.
 
 - **[2026-08-03] 하드웨어 최적화 비중 축소 및 연구 가치(Data & Architecture) 중심 피벗**
   - *결정 사항:* Orin Nano 8GB 타겟의 엄격한 30 FPS 방어 및 TensorRT 최적화 태스크의 우선순위를 PoC 수준으로 낮춤.

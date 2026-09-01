@@ -4,7 +4,7 @@
 Phase 1 Semantic20은 `configs/adom/phase1_semantic20/` 아래에 분리되어 있으며
 원 ontology 20개 중 void를 제외한 train ID `0..18`, ignore `255`를 사용한다.
 RunPod gate와 optimizer-update 환산 규약은
-[`docs/semantic20-runpod-gates.md`](../docs/semantic20-runpod-gates.md)를 따른다.
+[`docs/runpod-one-cycle.md`](../docs/runpod-one-cycle.md)를 따른다.
 
 ```text
 configs/

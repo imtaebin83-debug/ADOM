@@ -54,8 +54,7 @@
 
 ## Validation and rollback
 
-- 상세 gate와 rollback 조건은 [D-5 status](../status/d5-poc.md)와
-  [Source of Truth](../../ADOM_CONTEXT.md)를 따른다.
+- 상세 gate와 rollback 조건은 결정 당시의 내부 status 문서를 따랐다.
 - Day 2 종료까지 live mask가 없으면 recorded ZED input으로 전환한다.
 - 신규 fine-tuning이 개선되지 않으면 기존 rubble 비교 또는 E0 pipeline evidence를 쓴다.
 - 발표 종료 후 연구 우선순위를 다시 결정할 때는 이 record를 덮어쓰지 않고 새 record를 만든다.

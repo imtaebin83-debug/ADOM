@@ -2,7 +2,7 @@
 
 Phase 1 Semantic20 B0/B2 gate는 `run_semantic20_cycle.sh`로 실행한다. 데이터
 root는 `--dataset` 또는 `ADOM_DATA_ROOT`로 전달하며 ONNX export는 학습과
-분리되어 있다. 자세한 명령은 `docs/semantic20-runpod-gates.md`에 있다.
+분리되어 있다. 자세한 명령은 `docs/runpod-one-cycle.md`에 있다.
 
 Semantic20 B0 E0 배포는 다음 재사용 entry point를 사용한다.
 
@@ -48,7 +48,7 @@ scripts/run_jetson_t4.sh eadom
 전달 및 실기 검증은
 [`jetson-model-checkpoint-handoff.md`](../docs/setup-guides/jetson-model-checkpoint-handoff.md)를
 따른다. 현재 두 profile 모두 PyTorch/MMSeg CUDA backend이며 TensorRT ROS backend
-연결은 [`docs/TODO.md`](../docs/TODO.md)에 남긴다.
+연결은 아직 적용되지 않았다.
 
 ## Jetson autonomy logging
 
@@ -97,5 +97,4 @@ python scripts/check_git_artifacts.py
 ```
 
 학습 데이터, checkpoint, ONNX, TensorRT engine, 로그와 새 개인 절대경로가 Git에
-들어오는 것을 차단한다. `study/gahyung/Datasets_Repo`는 검증 근거용 legacy
-snapshot이라 검사 예외지만 canonical 코드에서는 import하지 않는다.
+들어오는 것을 차단한다.

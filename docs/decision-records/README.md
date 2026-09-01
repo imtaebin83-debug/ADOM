@@ -1,8 +1,13 @@
 # Decision Records
 
-되돌리기 비용이 크거나 여러 팀원의 작업 계약을 바꾸는 결정을 기록한다. 현재
-유효한 상태는 항상 루트 [ADOM_CONTEXT.md](../../ADOM_CONTEXT.md)가 우선하며,
+되돌리기 비용이 크거나 여러 팀원의 작업 계약을 바꾸는 결정을 기록한다.
 decision record는 결정 당시의 맥락과 근거를 보존한다.
+
+> **공개 릴리스 안내:** 이 기록들은 결정 시점의 원문을 그대로 보존한 것이다.
+> 공개 저장소를 정리하면서 내부 운영 문서(`ADOM_CONTEXT.md`, `docs/status/`,
+> `docs/experiments/`)와 `study/`, `experiments/`, `results/` 디렉터리를 제거했으므로,
+> 초기 record에 나오는 일부 경로는 현재 저장소 구조와 다를 수 있다.
+> 현재 구조는 루트 [README](../../README.md)를 따른다.
 
 ## When to write one
 

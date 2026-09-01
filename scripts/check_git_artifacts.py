@@ -42,10 +42,6 @@ FORBIDDEN_PATH_PREFIXES = tuple(
     )
 )
 ALLOWED_DATA_PREFIX = PurePosixPath("data/splits")
-LEGACY_PATH_PREFIX = PurePosixPath("study/gahyung/Datasets_Repo")
-PERSONAL_PATH_ALLOWLIST = {
-    PurePosixPath("docs/dataset-preprocessing-migration-plan.md"),
-}
 PERSONAL_PATH_PATTERNS = (
     re.compile(rb"[A-Za-z]:[\\/]+Users[\\/]+", re.IGNORECASE),
     re.compile(rb"/Users/[A-Za-z0-9._-]+/"),
@@ -77,7 +73,6 @@ def main() -> None:
                 for prefix in FORBIDDEN_PATH_PREFIXES
             )
             and not relative.is_relative_to(ALLOWED_DATA_PREFIX)
-            and relative.parts[0] != "study"
         ):
             errors.append(f"forbidden artifact directory: {relative}")
         if not path.is_file():
@@ -85,15 +80,11 @@ def main() -> None:
         if path.stat().st_size > 10 * 1024 * 1024:
             errors.append(f"tracked file exceeds 10 MiB: {relative}")
             continue
-        if (
-            relative not in PERSONAL_PATH_ALLOWLIST
-            and not relative.is_relative_to(LEGACY_PATH_PREFIX)
-        ):
-            content = path.read_bytes()
-            for pattern in PERSONAL_PATH_PATTERNS:
-                if pattern.search(content):
-                    errors.append(f"personal absolute path found: {relative}")
-                    break
+        content = path.read_bytes()
+        for pattern in PERSONAL_PATH_PATTERNS:
+            if pattern.search(content):
+                errors.append(f"personal absolute path found: {relative}")
+                break
     if errors:
         print("\n".join(f"ERROR: {error}" for error in errors), file=sys.stderr)
         raise SystemExit(2)

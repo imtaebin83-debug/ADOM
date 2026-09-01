@@ -1,9 +1,7 @@
 # RunPod 학습·평가·ONNX 1-cycle
 
-> 이 문서는 Cost4 reference cycle을 설명한다. Semantic20 E0/B0의 실제 선택
-> checkpoint와 결과는
-> `docs/experiments/phase1-semantic20/versions/v0-legacy/b0-e0-seed42.md`에
-> 누적하며 Cost4 selection/export 규칙을 Semantic20에 적용하지 않는다.
+> 이 문서는 Cost4 reference cycle을 설명한다. Cost4의 selection/export 규칙을
+> Semantic20에 그대로 적용하지 않는다.
 
 ## 사전 조건
 

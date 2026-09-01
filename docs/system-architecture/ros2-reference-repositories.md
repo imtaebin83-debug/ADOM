@@ -19,4 +19,4 @@ not copied into this mono repository.
   - Jetson-side PCA9685 API
 
 Use ROS 2 Humble binary packages where available and pin external source dependencies outside
-the ADOM packages. Do not vendor whole upstream repositories into `study/` or `src/`.
+the ADOM packages. Do not vendor whole upstream repositories into `src/`.

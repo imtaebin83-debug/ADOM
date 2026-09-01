@@ -1,3 +1,0 @@
-[saved] dataset_info.json
-[saved] mmseg_dataset_snippet.py
-08_write_training_info.py: PASS

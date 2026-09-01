@@ -654,6 +654,13 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   resolved architecture를 포함해 서로 다르므로 B5 GO evidence에는 B2 contract SHA를
   고정한다. 재감사된 `DID02=38.41105305671128 pp`는 등록된 10 pp GO 기준을 충족한다.
   상세 계약은 decision record 0041을 따른다.
+- **[2026-09-01] training-image acceptance와 repository-wide smoke를 분리**
+  이유: 전체 smoke의 autonomy speed-contract 실패는 계속 공개하고 수정해야 하지만
+  MMSeg 학습 이미지의 데이터·B2/B5 provenance·runtime 계약과는 독립적이다. Docker
+  workflow는 학습 surface의 명시적 positive allowlist, artifact guard와 immutable
+  Git-SHA 검사를 통과한 경우에만 image를 push한다. 전체 `unittest discover`는 기존
+  code-smoke job에 그대로 남기며 autonomy test를 skip하거나 기대값을 바꾸지 않는다.
+  상세 계약은 decision record 0042를 따른다.
 - **[2026-08-12] 저수준 방향 tree planning과 autonomy rosbag을 채택**
   이유: 현재 목표는 GPS/Nav2 기반 전역 자율주행이 아니라 Semantic20 costmap에서의
   직진·근거리 회피다. GPS를 control feedback에서 제거하고 이동경로 evidence로만

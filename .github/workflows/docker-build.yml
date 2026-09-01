@@ -33,6 +33,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Run repository artifact guard
+        run: python scripts/check_git_artifacts.py
+
       - name: Build image for project smoke test
         uses: docker/build-push-action@v6
         with:
@@ -46,13 +49,32 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run project tests inside the dependency image
+      - name: Run training-image contract tests inside the dependency image
+        # Keep this as an explicit training-surface allowlist. The repository-wide
+        # suite, including autonomy/ROS, remains mandatory in code-smoke.yml.
         run: >-
           docker run --rm
           -v "${GITHUB_WORKSPACE}:/opt/adom-tests/repo:ro"
-          -e PYTHONPATH=/opt/adom/src
+          -e PYTHONPATH=/opt/adom/src:/opt/adom-tests/repo
           adom-mmseg:smoke
-          python -m unittest discover -s /opt/adom-tests/repo/tests -v
+          python -m unittest -v
+          tests.test_adom_data_preprocessing
+          tests.test_b2_eadom_contract
+          tests.test_b5_capacity_domain_contract
+          tests.test_data_pipeline
+          tests.test_evaluation
+          tests.test_mmseg_integration
+          tests.test_paper_eval
+          tests.test_runtime_contracts
+          tests.test_semantic20_aggregate
+          tests.test_semantic20_clean_contract
+          tests.test_semantic20_evaluation
+          tests.test_semantic20_handoff
+          tests.test_semantic20_preprocessing
+          tests.test_semantic20_training
+          tests.test_semantic20_uncertainty
+          tests.test_ta0_recipe
+          tests.test_target_adaptation
 
       - name: Verify immutable image source and Semantic20 assets
         run: >-

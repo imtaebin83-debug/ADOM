@@ -196,22 +196,8 @@ class B5GoDecisionTests(unittest.TestCase):
         return path
 
     def test_go_decision_accepts_registered_threshold_and_frozen_manifests(self) -> None:
-        replacements = {
-            "FROZEN_EVALUATION_CONTRACT_SHA256": "c" * 64,
-            "FROZEN_RELLIS_TEST_MANIFEST_SHA256": "d" * 64,
-            "FROZEN_KOREAN_TEST_MANIFEST_SHA256": "e" * 64,
-        }
         payload = _decision_payload()
-        payload["provenance"].update(
-            {
-                "evaluation_contract_sha256": "c" * 64,
-                "rellis_test_manifest_sha256": "d" * 64,
-                "korean_test_manifest_sha256": "e" * 64,
-            }
-        )
-        with patch.multiple(
-            "adom.runtime.b5_gate", **replacements
-        ), tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory:
             report = validate_b5_go_decision(self._write(Path(directory), payload))
         self.assertEqual(report["status"], "PASS")
         self.assertEqual(report["decision"], "GO")
@@ -225,37 +211,61 @@ class B5GoDecisionTests(unittest.TestCase):
                 validate_b5_go_decision(self._write(root, leaked))
 
     def test_go_decision_rejects_unsupported_trigger(self) -> None:
-        replacements = {
-            "FROZEN_EVALUATION_CONTRACT_SHA256": "c" * 64,
-            "FROZEN_RELLIS_TEST_MANIFEST_SHA256": "d" * 64,
-            "FROZEN_KOREAN_TEST_MANIFEST_SHA256": "e" * 64,
-        }
-        with patch.multiple(
-            "adom.runtime.b5_gate", **replacements
-        ), tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             below_threshold = _decision_payload()
-            below_threshold["provenance"].update(
-                {
-                    "evaluation_contract_sha256": "c" * 64,
-                    "rellis_test_manifest_sha256": "d" * 64,
-                    "korean_test_manifest_sha256": "e" * 64,
-                }
-            )
             below_threshold["metrics_pp"]["b2_difference_in_differences"] = 9.99
             with self.assertRaisesRegex(RuntimeError, "not supported"):
                 validate_b5_go_decision(self._write(root, below_threshold))
 
-    def test_preserved_b2_evaluation_identifiers_block_b5(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(RuntimeError, "not a valid 64-character"):
-                validate_b5_go_decision(
-                    self._write(Path(directory), _decision_payload())
-                )
+    def test_reaudited_provenance_identifiers_are_valid_sha256(self) -> None:
+        self.assertEqual(
+            FROZEN_EVALUATION_CONTRACT_SHA256,
+            "4adfcb3ae550274ed3436c695c872e030c804bb8c16c09025958797312d8d592",
+        )
+        self.assertEqual(
+            FROZEN_RELLIS_TEST_MANIFEST_SHA256,
+            "2e078a3ac89d870b4dfb5838f8cc2772e788ecdd7cb011c309d59b4ca6a66918",
+        )
+        self.assertEqual(
+            FROZEN_KOREAN_TEST_MANIFEST_SHA256,
+            "1eb86ff65620fb5c0afc1d58c572c517cacc937468ebd865375aaa26d81eb782",
+        )
+        values = [
+            FROZEN_EVALUATION_CONTRACT_SHA256,
+            FROZEN_RELLIS_TEST_MANIFEST_SHA256,
+            FROZEN_KOREAN_TEST_MANIFEST_SHA256,
+            *(
+                value
+                for value in b5_capacity_domain_contract.FROZEN_PRIMARY_DATASET.values()
+                if isinstance(value, str)
+            ),
+        ]
+        self.assertTrue(all(len(value) == 64 for value in values))
+        self.assertTrue(all(set(value) <= set("0123456789abcdef") for value in values))
 
-    def test_preserved_primary_dataset_identifiers_block_static_contract(self) -> None:
+    def test_reaudited_primary_dataset_identifiers_unlock_static_contract(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(RuntimeError, "preserved B2 primary dataset"):
+            expected = b5_capacity_domain_contract.FROZEN_PRIMARY_DATASET
+            with patch.object(
+                b5_capacity_domain_contract,
+                "validate_semantic20_dataset",
+                return_value=expected,
+            ):
+                actual = b5_capacity_domain_contract._frozen_primary_dataset(
+                    Path(directory)
+                )
+        self.assertEqual(actual, expected)
+
+    def test_reaudited_primary_dataset_still_rejects_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            drifted = dict(b5_capacity_domain_contract.FROZEN_PRIMARY_DATASET)
+            drifted["manifest_sha256"] = "0" * 64
+            with patch.object(
+                b5_capacity_domain_contract,
+                "validate_semantic20_dataset",
+                return_value=drifted,
+            ), self.assertRaisesRegex(RuntimeError, "primary dataset lock changed"):
                 b5_capacity_domain_contract._frozen_primary_dataset(Path(directory))
 
     def test_committed_go_template_is_safe_no_go(self) -> None:

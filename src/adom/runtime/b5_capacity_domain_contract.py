@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -47,19 +48,19 @@ FROZEN_PRIMARY_DATASET = {
     "split_counts": {"train": 4568, "val": 900, "test": 899},
     "verified_pairs": 14636,
     "split_contract_sha256": (
-        "fab9c136c81081464d9db099656680dac3bf2921a4ae2bbd76055c383b309ab93"
+        "fab9c136c81081464d9db099656680dac3bf2921a4ae2bbd7605c383b309ab93"
     ),
     "manifest_sha256": (
-        "183dda705e76b451dc383a81f517d36df3d6032f00002ab225421b9ae3316b9dd"
+        "183dda705e76b451dc383a81f517d36df3d6032f00002ab225421b9ae316b9dd"
     ),
     "dataset_images_sha256": (
-        "ce06265e6146bcd37692938786386cbd9b844e9742f831284ee55d26aedd15305"
+        "ce06265e6146bcd37692938786386cbd9b844e9742f831284ee5d26aedd15305"
     ),
     "dataset_masks_sha256": (
-        "5ae15ab1eff69921168b15811683edab41472456a439b58aa63844c6d472c377e"
+        "5ae15ab1eff69921168b15811683edab41472456a439b58aa6384c6d472c377e"
     ),
     "dataset_content_sha256": (
-        "a70c6b9467b692a4797976659c6dcd501c80938626226000a6cc214efcdec5e42"
+        "a70c6b9467b692a4797976659c6dcd501c80938626226000a6c214efcdec5e42"
     ),
     "mapping_sha256": {
         "bridge_mapping.yaml": (
@@ -116,7 +117,7 @@ def _frozen_primary_dataset(dataset_root: Path) -> dict[str, Any]:
     invalid_recorded_digests = {
         field: len(value)
         for field, value in FROZEN_PRIMARY_DATASET.items()
-        if isinstance(value, str) and len(value) != 64
+        if isinstance(value, str) and not re.fullmatch(r"[0-9a-f]{64}", value)
     }
     if invalid_recorded_digests:
         raise RuntimeError(
@@ -303,6 +304,7 @@ def build_contract(
         "primary_dataset": _frozen_primary_dataset(dataset_root),
         "evaluation_lock": {
             "evaluation_contract_sha256": FROZEN_EVALUATION_CONTRACT_SHA256,
+            "evaluation_contract_role": "B2 resolved GO evidence",
             "rellis_test_manifest_sha256": FROZEN_RELLIS_TEST_MANIFEST_SHA256,
             "korean_test_manifest_sha256": FROZEN_KOREAN_TEST_MANIFEST_SHA256,
             "korean_heldout_policy": (

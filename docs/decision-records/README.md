@@ -64,6 +64,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0038](0038-lethal-only-costmap-inflation.md) | Lethal-only semantic costmap inflation | Accepted | cost 90 이상만 inflation seed로 사용 |
 | [0039](0039-planned-speed-handoff.md) | Preserve planner speed through local control | Superseded in part | speed handoff 유지; profile은 0029가 대체 |
 | [0040](0040-blocked-release-debounce.md) | BLOCKED release debounce | Superseded in part | release 유지; no-gap trigger는 0021이 제거 |
+| [0041](0041-b5-provenance-gate-repair.md) | B5 provenance gate repair | Accepted | raw B2 artifact에서 64-hex lock과 B2 evidence contract를 재감사 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

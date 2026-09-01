@@ -29,7 +29,7 @@ def generate_launch_description():
             DeclareLaunchArgument("start_rviz", default_value="true"),
             package_launch(
                 "adom_perception_ros",
-                "perception.launch.py",
+                "perception_cost4.launch.py",
                 {
                     "model_config": LaunchConfiguration("model_config"),
                     "checkpoint": LaunchConfiguration("checkpoint"),

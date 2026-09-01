@@ -80,6 +80,27 @@ class MMSegIntegrationTests(unittest.TestCase):
                 self.assertEqual(tuple(resize.scale), expected_wh)
                 self.assertEqual(tuple(config.test_pipeline[2].size), expected_wh)
 
+    def test_semantic20_ros_runtime_config_preserves_padding_metadata(self) -> None:
+        from mmengine.config import Config
+
+        path = (
+            REPO_ROOT
+            / "configs"
+            / "adom"
+            / "runtime"
+            / "segformer_b0_640x384_rellis3d.py"
+        )
+        config = Config.fromfile(path)
+        self.assertEqual(config.model.decode_head.num_classes, 19)
+        self.assertEqual(tuple(config.model.data_preprocessor.size), (384, 640))
+        self.assertEqual(
+            tuple(config.model.data_preprocessor.test_cfg.size), (384, 640)
+        )
+        self.assertEqual(
+            [step.type for step in config.test_pipeline],
+            ["LoadImageFromFile", "Resize", "PackSegInputs"],
+        )
+
     def test_semantic20_wandb_backend_respects_mode(self) -> None:
         from mmengine.config import Config
 

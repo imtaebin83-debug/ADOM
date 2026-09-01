@@ -55,7 +55,9 @@ class MmsegBackend:
             str(config_path), str(checkpoint_path), device=str(device)
         )
 
-    def infer(self, bgr_image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def infer(
+        self, bgr_image: np.ndarray, *, include_confidence: bool = True
+    ) -> tuple[np.ndarray, np.ndarray | None]:
         if bgr_image.ndim != 3 or bgr_image.shape[2] != 3:
             raise ValueError(f"image must be HxWx3 BGR, got {bgr_image.shape}")
 
@@ -69,6 +71,9 @@ class MmsegBackend:
                 (bgr_image.shape[1], bgr_image.shape[0]),
                 interpolation=cv2.INTER_NEAREST,
             )
+
+        if not include_confidence:
+            return mask, None
 
         logits = getattr(result, "seg_logits", None)
         if logits is None:

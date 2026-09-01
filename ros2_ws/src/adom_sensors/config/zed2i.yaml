@@ -4,21 +4,49 @@
       camera_model: zed2i
       grab_resolution: HD720
       grab_frame_rate: 30
+      grab_compute_capping_fps: 0.0
+      pub_resolution: CUSTOM
+      pub_downscale_factor: 2.0
       pub_frame_rate: 30.0
+      async_image_retrieval: false
+    
+    video:
+      # Keep the wrapper's compatible BGRA path. The 24-bit SDK path produced
+      # empty RGB messages with the installed ZED/cv_bridge runtime.
+      enable_24bit_output: false
+      publish_rgb: true
+      publish_left_right: false
+      publish_raw: false
+      publish_gray: false
+      publish_stereo: false
+
     depth:
-      depth_mode: NEURAL
-      point_cloud_freq: 15.0
+      # Field-tuning candidates: prefer reliable near-field measurements over
+      # maximum depth density. Validate these against a fixed 1 m reference.
+      depth_mode: NEURAL_LIGHT
+      depth_stabilization: 0
+      # In the ZED ROS 2 wrapper, lower thresholds reject more uncertain data.
+      # Invalidated pixels remain preferable to false 0.4 m lethal obstacles.
+      depth_confidence: 50
+      depth_texture_conf: 50
+      remove_saturated_areas: true
+      point_cloud_freq: 5.0
+      publish_depth_map: true
+      publish_depth_info: false
+      publish_point_cloud: false
+      publish_depth_confidence: false
+      publish_disparity: false
     pos_tracking:
-      pos_tracking_enabled: true
-      imu_fusion: true
+      pos_tracking_enabled: false
+      imu_fusion: false
       two_d_mode: false
       # The external localization stack owns map->odom and odom->base_link.
       publish_tf: false
       publish_map_tf: false
     sensors:
       publish_imu: true
-      publish_imu_raw: true
-      publish_mag: true
+      publish_imu_raw: false
+      publish_mag: false
       publish_imu_tf: true
     gnss_fusion:
       # ADOM initially uses robot_localization. Do not enable both fusion paths.

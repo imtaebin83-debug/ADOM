@@ -45,18 +45,47 @@ ros2 launch adom_planning sequential_gps.launch.py \
 
 차량 실측 후 `minimum_turning_radius`, footprint, 속도/가속도 제한을 수정한다.
 
-## Cost4 rule planning
+## Semantic20 low-level tree planning
 
-`rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는 여러
-Ackermann corridor를 평가한다. 가장 낮은 비용의 corridor를 `/cmd_vel`로 발행하며,
-가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.40초 이상 오래된 센서
+이 로컬 플래너는 GPS 경로를 만들거나 입력으로 사용하지 않는다. 로봇 기준 semantic
+costmap 위에서 `좌/약좌/직진/약우/우` 방향을 기본 3단계 tree로 전개하고, 각
+root-to-leaf Ackermann corridor 중 충돌 비용과 평균 비용이 낮은 방향열을 선택해
+`/adom/navigation/local_path` (`nav_msgs/Path`)를 발행한다. `local_path_control`이 이
+경로와 IMU freshness 정보로 `/cmd_vel`을 만든다. 다음 planning cycle에는 최신
+costmap에서 tree를 다시 만들기 때문에 첫 번째 방향만 실제로 실행하는 receding-horizon
+방식이다. GPS는 `adom_logging`에서 이동 궤적 기록에만 사용한다.
+
+Semantic20 costmap과 로컬 플래너는 다음 명령으로 함께 실행한다.
+
+```bash
+ros2 launch adom_planning semantic20_local_planning.launch.py
+```
+
+`rule_planner`는 로봇 중심 semantic costmap에서 휠베이스와 조향 한계를 만족하는
+방향 tree를 평가한다. 기본은 단일 직진 경로다. 직진 corridor의 depth-projected lethal
+장애물이 0.30 m 초과 1.50 m 이하에 들어오면 avoid mode를 켜고, 전체 costmap을 좌우
+절반으로 나눠 unknown을 포함한 보수적 누적 cost가 낮은 쪽의 첫 조향을 고정해 25개
+tree path를 평가한다. 좌우 cost가 같으면 왼쪽으로 고정해 항상 25개를 유지한다.
+직진 장애물이 0.30 m 이하이면 BLOCKED다.
+가까운 lethal cost, 0.20초 이상 갱신되지 않은 costmap, 0.80초 이상 오래된 센서
 timestamp 또는 관측 cell이 없는 costmap에서는 반드시 정지한다.
 
-기본 최대 속도 0.25 m/s는 `adom_control`의 0.30 m/s 하드웨어 제한보다 낮다. `/cmd_vel`은
-gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로 전달되며 PCA9685에 직접
-연결하지 않는다.
+Planner의 현재 속도 profile은 0.30..3.0 m/s이며
+`/adom/navigation/planned_speed`로 local controller에 전달된다. Controller는 이를
+`/cmd_vel`에 보존하고, gamepad control의 자율 모드(A 버튼)를 거쳐야만 `/drive`로
+전달한다. PCA9685에 직접 연결하지 않는다. Downstream gamepad/PCA9685 nominal ceiling은
+`vehicle.yaml`의 12.0 m/s이며, camera source stamp부터 controller command까지의 지연은
+`/adom/control/local_path_status`의 `source_to_command_ms`로 확인한다. 엔코더가 없어
+PWM 속도 대응은 nominal open-loop이다. Local controller는 정지 중 IMU bias를 학습하고
+주행 중 short-horizon 적분 속도로 제한된 feedback 보정을 수행한다.
 
 ```bash
 ros2 launch adom_planning rule_planning.launch.py
 ros2 topic echo /adom/navigation/rule_status
 ```
+
+`rule_status`의 `steering_sequence_deg`가 선택된 tree 방향열이고 첫 원소가 이번 cycle의
+실행 조향이다. `side_cost_left`, `side_cost_right`, `side_cost_selected_side`와
+`tree_candidate_count`, `planner_mode`, `straight_obstacle_distance_m`로 보조 판단을
+확인한다. BLOCKED는 즉시 적용하며 서로 다른 clear costmap 3개가 연속된 뒤에만
+DRIVING으로 복귀한다.

@@ -55,6 +55,7 @@ RareRisk-4에 남겨 비열화 여부를 감시하지만, 현재 source mapping�
 
 - [v0-legacy](versions/v0-legacy/README.md)
 - [v1-clean-baseline](versions/v1-clean-baseline/README.md)
+- [E-ADOM B0 seed 42 result](versions/v1-clean-baseline/eadom-b0-seed42.md)
 - [Clean Baseline v1 protocol](protocols/clean-baseline-v1.md)
 - [TA0/TA1/TA2 parallel RunPod runbook](target-adaptation-runbook.md)
 - [TA method-recipe selection plan](ta-method-recipe-selection.md)

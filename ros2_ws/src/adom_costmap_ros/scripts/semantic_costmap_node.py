@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import deque
 import json
+import time
 
 import cv2
 from cv_bridge import CvBridge
@@ -20,9 +21,10 @@ from tf2_ros import Buffer, TransformException, TransformListener
 from adom.autonomy.costmap import (
     CostmapConfig,
     build_costmap,
-    project_mask_depth,
+    project_mask_depth_with_diagnostics,
     quaternion_matrix,
 )
+from adom.perception import load_semantic20_ontology
 
 
 def stamp_ns(message) -> int:
@@ -31,11 +33,24 @@ def stamp_ns(message) -> int:
     )
 
 
+def elapsed_ms_if_compatible(later_ns: int, earlier_ns: int) -> float | None:
+    if earlier_ns <= 0:
+        return None
+    elapsed_ns = later_ns - earlier_ns
+    # A live costmap cannot legitimately take a minute. Treat a larger delta
+    # as evidence that the sensor and ROS clocks have different epochs.
+    if elapsed_ns < 0 or elapsed_ns > 60_000_000_000:
+        return None
+    return round(elapsed_ns / 1e6, 2)
+
+
 class SemanticCostmapNode(Node):
     def __init__(self) -> None:
         super().__init__("semantic_costmap")
         defaults = {
             "mask_topic": "/adom/perception/semantic_mask",
+            "ontology": "cost4",
+            "bridge_mapping_path": "",
             "depth_topic": "/zed/zed_node/depth/depth_registered",
             "camera_info_topic": "/zed/zed_node/rgb/color/rect/camera_info",
             "costmap_topic": "/adom/navigation/semantic_costmap",
@@ -47,11 +62,12 @@ class SemanticCostmapNode(Node):
             "min_range_m": 0.30,
             "max_range_m": 8.0,
             "sample_stride": 4,
-            "min_height_m": -0.50,
+            "min_height_m": -0.05,
             "max_height_m": 1.50,
             "class_costs": [0, 15, 60, 100],
             "geometric_obstacle_min_height_m": 0.10,
             "inflation_radius_m": 0.25,
+            "inflation_seed_cost": 90,
             "inflation_min_cost": 60,
             "depth_queue_size": 15,
             "max_sync_error_sec": 0.35,
@@ -61,10 +77,28 @@ class SemanticCostmapNode(Node):
             self.declare_parameter(name, value)
         self.p = {name: self.get_parameter(name).value for name in defaults}
         costs = tuple(int(value) for value in self.p["class_costs"])
-        if len(costs) != 4 or any(value < 0 or value > 100 for value in costs):
+        ontology = str(self.p["ontology"]).strip().lower()
+        if ontology == "semantic20":
+            mapping_path = str(self.p["bridge_mapping_path"]).strip() or None
+            expected_classes = load_semantic20_ontology(mapping_path).num_classes
+        elif ontology == "cost4":
+            expected_classes = 4
+        else:
+            raise ValueError("ontology must be 'semantic20' or 'cost4'")
+        if len(costs) != expected_classes or any(
+            value < 0 or value > 100 for value in costs
+        ):
             raise ValueError(
-                "class_costs must contain four OccupancyGrid costs in [0,100]"
+                f"class_costs must contain {expected_classes} values in [0,100]"
             )
+        inflation_seed_cost = int(self.p["inflation_seed_cost"])
+        inflation_min_cost = int(self.p["inflation_min_cost"])
+        if not 0 <= inflation_min_cost <= inflation_seed_cost <= 100:
+            raise ValueError(
+                "inflation costs must satisfy "
+                "0 <= inflation_min_cost <= inflation_seed_cost <= 100"
+            )
+        self._ontology = ontology
         self._config = CostmapConfig(
             resolution_m=float(self.p["resolution_m"]),
             length_m=float(self.p["length_m"]),
@@ -79,7 +113,8 @@ class SemanticCostmapNode(Node):
                 self.p["geometric_obstacle_min_height_m"]
             ),
             inflation_radius_m=float(self.p["inflation_radius_m"]),
-            inflation_min_cost=int(self.p["inflation_min_cost"]),
+            inflation_seed_cost=inflation_seed_cost,
+            inflation_min_cost=inflation_min_cost,
         )
         self._bridge = CvBridge()
         self._camera_info: CameraInfo | None = None
@@ -140,6 +175,7 @@ class SemanticCostmapNode(Node):
         self._status_pub.publish(message)
 
     def _on_mask(self, mask_message: Image) -> None:
+        processing_started = time.monotonic()
         if self._camera_info is None:
             self._publish_status("waiting", reason="camera_info")
             return
@@ -180,13 +216,39 @@ class SemanticCostmapNode(Node):
             t = transform.transform.translation
             rotation = quaternion_matrix(q.x, q.y, q.z, q.w)
             translation = np.asarray([t.x, t.y, t.z], dtype=np.float64)
-            points, labels = project_mask_depth(
+            points, labels, projection = project_mask_depth_with_diagnostics(
                 mask, depth, intrinsics, rotation, translation, self._config
             )
             grid = build_costmap(points, labels, self._config)
+            if len(points):
+                grid_in_bounds = (
+                    (points[:, 0] >= 0.0)
+                    & (points[:, 0] < self._config.length_m)
+                    & (points[:, 1] >= -self._config.width_m / 2.0)
+                    & (points[:, 1] < self._config.width_m / 2.0)
+                )
+                grid_in_bounds_points = int(np.count_nonzero(grid_in_bounds))
+            else:
+                grid_in_bounds_points = 0
+            observed_cells = int(np.count_nonzero(grid >= 0))
+            empty_reason = None
+            if observed_cells == 0:
+                if projection.in_range_depth_pixels == 0:
+                    empty_reason = "no_depth_in_range"
+                elif projection.depth_label_pixels == 0:
+                    empty_reason = "no_depth_with_semantic_label"
+                elif projection.height_valid_points == 0:
+                    empty_reason = "height_filter"
+                elif grid_in_bounds_points == 0:
+                    empty_reason = "outside_costmap"
+                else:
+                    empty_reason = "rasterization"
 
+            # Preserve camera timestamps through mask/depth synchronization and
+            # TF lookup, then cross into the planner's ROS clock domain here.
+            output_stamp = self.get_clock().now()
             output = OccupancyGrid()
-            output.header = mask_message.header
+            output.header.stamp = output_stamp.to_msg()
             output.header.frame_id = str(self.p["output_frame"])
             output.info.resolution = float(self._config.resolution_m)
             output.info.width = self._config.rows
@@ -196,11 +258,30 @@ class SemanticCostmapNode(Node):
             output.info.origin.orientation.w = 1.0
             output.data = grid.reshape(-1).astype(np.int8).tolist()
             self._costmap_pub.publish(output)
+            output_ns = output_stamp.nanoseconds
+            source_ns = stamp_ns(mask_message)
             self._publish_status(
                 "ok",
+                ontology=self._ontology,
                 projected_points=int(len(points)),
-                observed_cells=int(np.count_nonzero(grid >= 0)),
+                observed_cells=observed_cells,
+                empty_reason=empty_reason,
+                sampled_pixels=projection.sampled_pixels,
+                finite_depth_pixels=projection.finite_depth_pixels,
+                in_range_depth_pixels=projection.in_range_depth_pixels,
+                semantic_label_pixels=projection.semantic_label_pixels,
+                depth_label_pixels=projection.depth_label_pixels,
+                height_valid_points=projection.height_valid_points,
+                transformed_z_min_m=projection.transformed_z_min_m,
+                transformed_z_max_m=projection.transformed_z_max_m,
+                grid_in_bounds_points=grid_in_bounds_points,
                 sync_error_sec=round(sync_error, 3),
+                processing_ms=round(
+                    (time.monotonic() - processing_started) * 1000.0, 2
+                ),
+                source_to_costmap_output_ms=elapsed_ms_if_compatible(
+                    output_ns, source_ns
+                ),
             )
         except TransformException as error:
             self._publish_status("waiting", reason="transform", message=str(error))

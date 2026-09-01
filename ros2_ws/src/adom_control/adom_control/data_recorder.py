@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -42,15 +43,24 @@ class DataRecorder(Node):
             "record_button": 4,
             "capture_root": "data/captures",
             "topic_regex": DEFAULT_TOPIC_REGEX,
+            "record_mask": False,
+            "mask_topic": "/adom/perception/semantic20_mask_evidence",
+            "record_evidence": False,
+            "evidence_image_topic": "/zed/zed_node/rgb/color/rect/image",
+            "record_preview": False,
+            "preview_overlay_topic": "/adom/perception/semantic20_overlay_evidence",
             "max_size_gb": 10.0,
             "size_check_period_sec": 0.5,
             "bag_split_size_mb": 1024,
             "status_topic": "/adom/recording/status",
+            "auto_start": False,
+            "session_prefix": "",
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
         self.p = {name: self.get_parameter(name).value for name in defaults}
         self._validate_parameters()
+        self._topic_regex = self._effective_topic_regex()
 
         configured_root = Path(str(self.p["capture_root"]).strip() or "data/captures")
         repo_root = Path(os.environ.get("ADOM_REPO_ROOT", "."))
@@ -80,8 +90,13 @@ class DataRecorder(Node):
         self.create_timer(1.0, self._publish_status)
         self.get_logger().info(
             f"Data recorder ready: Y/button {self.p['record_button']} toggles recording; "
-            f"limit={self.p['max_size_gb']} GB, root={self._capture_root}"
+            f"limit={self.p['max_size_gb']} GB, root={self._capture_root}, "
+            f"record_mask={bool(self.p['record_mask'])}, "
+            f"record_evidence={bool(self.p['record_evidence'])}, "
+            f"record_preview={bool(self.p['record_preview'])}"
         )
+        if bool(self.p["auto_start"]):
+            self.start_recording()
 
     def _validate_parameters(self):
         if int(self.p["record_button"]) < 0:
@@ -94,6 +109,32 @@ class DataRecorder(Node):
             raise ValueError("bag_split_size_mb must be positive")
         if not str(self.p["topic_regex"]).strip():
             raise ValueError("topic_regex must not be empty")
+        if bool(self.p["record_mask"]) and not str(self.p["mask_topic"]).strip():
+            raise ValueError("mask_topic must not be empty when record_mask is true")
+        if bool(self.p["record_evidence"]):
+            if not bool(self.p["record_mask"]):
+                raise ValueError("record_evidence requires record_mask=true")
+            if not str(self.p["evidence_image_topic"]).strip():
+                raise ValueError("evidence_image_topic must not be empty")
+        if bool(self.p["record_preview"]):
+            if not bool(self.p["record_mask"]):
+                raise ValueError("record_preview requires record_mask=true")
+            if not str(self.p["preview_overlay_topic"]).strip():
+                raise ValueError("preview_overlay_topic must not be empty")
+
+    def _effective_topic_regex(self):
+        base_regex = str(self.p["topic_regex"]).strip()
+        extra_topics = []
+        if bool(self.p["record_mask"]):
+            extra_topics.append(str(self.p["mask_topic"]).strip())
+        if bool(self.p["record_evidence"]):
+            extra_topics.append(str(self.p["evidence_image_topic"]).strip())
+        if bool(self.p["record_preview"]):
+            extra_topics.append(str(self.p["preview_overlay_topic"]).strip())
+        regex = base_regex
+        for topic in extra_topics:
+            regex = rf"(?:{regex})|(?:^{re.escape(topic)}$)"
+        return regex
 
     @staticmethod
     def _rising(buttons, previous, index):
@@ -131,6 +172,9 @@ class DataRecorder(Node):
             return
 
         timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%z")
+        prefix = str(self.p["session_prefix"]).strip()
+        if prefix:
+            timestamp = f"{prefix}_{timestamp}"
         session_dir = self._unique_session_dir(timestamp)
         bag_path = session_dir / "rosbag"
         session_dir.mkdir(parents=True)
@@ -141,7 +185,7 @@ class DataRecorder(Node):
             "--output",
             str(bag_path),
             "--regex",
-            str(self.p["topic_regex"]),
+            self._topic_regex,
             "--max-bag-size",
             str(int(self.p["bag_split_size_mb"]) * 1_000_000),
             "--disable-keyboard-controls",
@@ -248,7 +292,23 @@ class DataRecorder(Node):
             "started_at": started_at.isoformat() if started_at else None,
             "updated_at": datetime.now().astimezone().isoformat(),
             "stop_reason": None if state == "recording" else reason,
-            "topic_regex": str(self.p["topic_regex"]),
+            "topic_regex": self._topic_regex,
+            "record_mask": bool(self.p["record_mask"]),
+            "record_evidence": bool(self.p["record_evidence"]),
+            "record_preview": bool(self.p["record_preview"]),
+            "mask_topic": (
+                str(self.p["mask_topic"]) if bool(self.p["record_mask"]) else None
+            ),
+            "evidence_image_topic": (
+                str(self.p["evidence_image_topic"])
+                if bool(self.p["record_evidence"])
+                else None
+            ),
+            "preview_overlay_topic": (
+                str(self.p["preview_overlay_topic"])
+                if bool(self.p["record_preview"])
+                else None
+            ),
             "max_size_bytes": self._max_bytes,
             "size_bytes": directory_size(session_dir),
         }
@@ -273,6 +333,9 @@ class DataRecorder(Node):
                 "size_bytes": self._current_size(),
                 "max_size_bytes": self._max_bytes,
                 "reason": reason,
+                "record_mask": bool(self.p["record_mask"]),
+                "record_evidence": bool(self.p["record_evidence"]),
+                "record_preview": bool(self.p["record_preview"]),
             },
             separators=(",", ":"),
         )

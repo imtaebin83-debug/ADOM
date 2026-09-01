@@ -7,6 +7,7 @@
 - `adom_localization`: ZED VIO + RTK GNSS dual-EKF configuration
 - `adom_planning`: Nav2 and RTK waypoint planning configuration
 - `adom_control`: `/cmd_vel` to Ackermann/PCA9685 PWM
+- `adom_logging`: logging-only GPS trail and bounded autonomy rosbag sessions
 - `adom_bringup`: top-level launch
 
 표준 ROS 메시지만 사용한다. `/emergency_stop`과 command timeout은 `adom_control`이

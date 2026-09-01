@@ -2,9 +2,9 @@ pca9685_control:
   ros__parameters:
     wheelbase_m: 0.33
     # Nominal open-loop command range; this is not measured vehicle speed.
-    max_speed_mps: 6.0
+    max_speed_mps: 12.0
     # Disabled until the XL-5 brake/reverse sequence is tested on this vehicle.
-    max_reverse_speed_mps: 3.0
+    max_reverse_speed_mps: 6.0
     # User-facing angle settings use degrees; ROS messages remain in radians.
     max_steering_angle_deg: 25.7831
 
@@ -28,8 +28,8 @@ pca9685_control:
     esc_neutral_us: 1500.0
     esc_forward_max_us: 2000.0
     esc_reverse_max_us: 1000.0
-    steering_center_us: 1500.0
-    steering_left_us: 1000.0
+    steering_center_us: 1540.0
+    steering_left_us: 1080.0
     steering_right_us: 2000.0
 
 gamepad_control:
@@ -54,8 +54,8 @@ gamepad_control:
     throttle_axis_scale: 1.0
     stick_deadzone: 0.10
 
-    max_forward_speed_mps: 6.0
-    max_reverse_speed_mps: 3.0
+    max_forward_speed_mps: 12.0
+    max_reverse_speed_mps: 6.0
     max_steering_angle_deg: 24.0
     wheelbase_m: 0.33
     joy_timeout_sec: 0.50
@@ -71,8 +71,8 @@ data_recorder:
     capture_root: data/captures
     # RGB-only collection: never record depth, GNSS, IMU, or control data.
     topic_regex: "^/zed(/.*)?/rgb(/.*)?$"
-    max_size_gb: 10.0
+    max_size_gb: 20.0
     size_check_period_sec: 0.5
-    # Smaller split files bound the overshoot when the 10 GB limit is reached.
+    # Smaller split files bound the overshoot when the 20 GB limit is reached.
     bag_split_size_mb: 1024
     status_topic: /adom/recording/status

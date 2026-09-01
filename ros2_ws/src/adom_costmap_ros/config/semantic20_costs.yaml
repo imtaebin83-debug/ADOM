@@ -1,0 +1,38 @@
+semantic_costmap:
+  ros__parameters:
+    ontology: semantic20
+    bridge_mapping_path: ""
+    mask_topic: /adom/perception/semantic20_mask
+    depth_topic: /zed/zed_node/depth/depth_registered
+    camera_info_topic: /zed/zed_node/rgb/color/rect/camera_info
+    costmap_topic: /adom/navigation/semantic_costmap
+    status_topic: /adom/navigation/costmap_status
+    output_frame: base_link
+
+    resolution_m: 0.10
+    length_m: 8.0
+    width_m: 6.0
+    min_range_m: 0.30
+    max_range_m: 8.0
+    # Denser depth sampling improves the chance of retaining distant obstacles;
+    # validate the added CPU cost against the costmap latency status.
+    sample_stride: 3
+    # Height is evaluated in ground-referenced base_link after applying the
+    # measured ZED extrinsic; reject below-ground stereo overshoot.
+    min_height_m: -0.05
+    max_height_m: 1.50
+
+    # Candidate costs ordered by canonical Semantic20 ID 0..18.
+    # dirt, grass, tree, pole, water, sky, vehicle, object, asphalt,
+    # building, log, person, fence, bush, concrete, barrier, puddle, mud, rubble.
+    # These are conservative initial values and require field validation.
+    class_costs: [20, 30, 100, 100, 100, 100, 100, 100, 0, 100, 100, 100, 100, 75, 10, 100, 75, 85, 95]
+    geometric_obstacle_min_height_m: 0.10
+    inflation_radius_m: 0.25
+    # Only already-lethal cells seed inflation. Costs 60..89 remain slowdown
+    # evidence instead of being promoted to a hard stop.
+    inflation_seed_cost: 90
+    inflation_min_cost: 60
+    depth_queue_size: 15
+    max_sync_error_sec: 0.10
+    transform_timeout_sec: 0.10

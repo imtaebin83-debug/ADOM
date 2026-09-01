@@ -31,6 +31,36 @@ B0-E0의 4k/40k recipe를 유지하고 validated superset의 `ta1_train`만 선�
 - `python scripts/check_ta0_config_imports.py`: training image 안에서 모든 독립
   ablation config를 import하고 E0/RELLIS/seed/effective-batch/update 계약을 확인한다.
 
+## Jetson B0-E0 / E-ADOM perception
+
+```bash
+scripts/run_jetson_t4.sh b0-e0
+scripts/run_jetson_t4.sh eadom
+```
+
+명시한 Semantic20 SegFormer-B0 profile의 config, checkpoint 수와 SHA256을 검증한 뒤
+`adom_perception_ros`를 빌드·실행한다. 기본 checkpoint 위치는 각각
+`models/checkpoints/b0-e0/`, `models/checkpoints/eadom/`이며 각 디렉터리에 정확히 한
+개의 `.pth`만 허용한다. 다른 위치를 사용할 때는 `ADOM_CHECKPOINT`에 절대 경로를
+지정한다. SHA override가 필요한 의도적 신규 artifact는
+`ADOM_EXPECTED_CHECKPOINT_SHA256`도 함께 명시해야 한다. 자세한 설치와 `t4` wrapper는
+[`SHORTCUT.md`](../SHORTCUT.md)를 따른다. RunPod, 로컬 컴퓨터와 Jetson 사이 checkpoint
+전달 및 실기 검증은
+[`jetson-model-checkpoint-handoff.md`](../docs/setup-guides/jetson-model-checkpoint-handoff.md)를
+따른다. 현재 두 profile 모두 PyTorch/MMSeg CUDA backend이며 TensorRT ROS backend
+연결은 [`docs/TODO.md`](../docs/TODO.md)에 남긴다.
+
+## Jetson autonomy logging
+
+```bash
+scripts/run_jetson_t2.sh       # raster mask 제외
+scripts/run_jetson_t2.sh mask  # 2 Hz Semantic20 evidence mask 추가
+scripts/run_jetson_t2.sh evidence  # full-rate source RGB + 2 Hz mask 추가
+```
+
+모든 모드가 inference-frame별 class pixel 통계를 기록한다. Jetson의
+`t2` 함수는 이 wrapper에 `"$@"`를 전달하도록 정의한다.
+
 ## RunPod 학습 1-cycle
 
 ```bash

@@ -153,6 +153,66 @@ class RuntimeContractTests(unittest.TestCase):
         )
         self.assertIn('/ "cost4"', cycle_text)
 
+    def test_semantic20_ros_runtime_config_delegates_padding(self) -> None:
+        path = (
+            REPO_ROOT
+            / "configs"
+            / "adom"
+            / "runtime"
+            / "segformer_b0_640x384_rellis3d.py"
+        )
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("segformer_b0_stage2_e0_rellis.py", text)
+        self.assertIn("test_cfg=dict(size=runtime_size)", text)
+        self.assertIn('dict(type="Resize"', text)
+        self.assertIn("keep_ratio=True", text)
+        self.assertNotIn('dict(type="Pad"', text)
+        self.assertIn('dict(type="PackSegInputs")', text)
+
+        launcher = (REPO_ROOT / "scripts" / "run_jetson_t4.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "configs/adom/runtime/segformer_b0_640x384_rellis3d.py",
+            launcher,
+        )
+
+    def test_jetson_t4_model_profiles_are_explicit_and_hash_locked(self) -> None:
+        eadom_config = (
+            REPO_ROOT
+            / "configs"
+            / "adom"
+            / "runtime"
+            / "segformer_b0_640x384_eadom.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("segformer_b0_640x384_rellis3d.py", eadom_config)
+        self.assertIn("eadom-b0-seed42-iter26000", eadom_config)
+
+        launcher = (REPO_ROOT / "scripts" / "run_jetson_t4.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Usage: $0 {b0-e0|eadom}", launcher)
+        self.assertIn("models/checkpoints/b0-e0", launcher)
+        self.assertIn("models/checkpoints/eadom", launcher)
+        self.assertIn(
+            "d76229ff623eb382fd48011decf54c342d88a113bcbe650fb58cc20e42cabe73",
+            launcher,
+        )
+        self.assertIn(
+            "f4cc41fd91e9df8e7aa3f726498e80636b736dfadf0e1baf338fe7c82a83399c",
+            launcher,
+        )
+        self.assertIn("ADOM_MODEL_PROFILE", launcher)
+        self.assertIn("ADOM_EXPECTED_CHECKPOINT_SHA256", launcher)
+        self.assertIn('sha256sum "$adom_checkpoint"', launcher)
+        self.assertIn("trusted-canonical-mmengine", launcher)
+        self.assertIn("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1", launcher)
+        self.assertIn('adom_model_config="$adom_model_config_default"', launcher)
+        self.assertNotIn(
+            'adom_model_config="${ADOM_MODEL_CONFIG:-',
+            launcher,
+        )
+
     def test_parity_defaults_and_roi_polygon_contract(self) -> None:
         self.assertEqual(DEFAULT_MINIMUM_IMAGES, 10)
         self.assertEqual(DEFAULT_EXPECTED_NUM_CLASSES, 19)

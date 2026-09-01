@@ -1,5 +1,79 @@
 # adom_control
 
+## Local path control
+
+`local_path_control`은 `/adom/navigation/local_path`를 pure-pursuit 방식으로 추종하고,
+planner의 `/adom/navigation/planned_speed`를 보존해 `/cmd_vel`을 발행한다. GPS는 제어
+입력으로 사용하지 않는다. 휠 속도 센서가 없으므로
+기본 PWM 대응은 open-loop이다. ZED IMU는 freshness watchdog뿐 아니라 정지 중 x축
+가속도 bias 학습, zero-velocity update, 주행 중 단기 속도 적분과 제한된 P feedback에
+사용한다. IMU 또는 path가 timeout이거나 path가 비어 있으면 zero command를 발행한다.
+
+속도 명령은 아래 순서로 흐른다.
+
+```text
+rule_planner plan.speed_mps (0.30..3.0 m/s, blocked이면 0)
+  -> /adom/navigation/planned_speed
+  -> local_path_control -> /cmd_vel.linear.x
+  -> gamepad_control (A/autonomous mode + 0.25 s watchdog)
+  -> /drive.drive.speed
+  -> pca9685_control -> ESC PWM CH0
+```
+
+PCA9685의 전진 변환은 `vehicle.yaml`의 control 파라미터를 사용한다.
+
+```text
+esc_pwm_us = esc_neutral_us
+             + speed_mps / max_speed_mps
+               * (esc_forward_max_us - esc_neutral_us)
+```
+
+현재 nominal calibration은 `max_speed_mps=12.0`, neutral `1500 us`, positive-command
+start `1570 us`, forward max `2000 us`다. 따라서 planner 최소 0.30 m/s는 약
+1580.75 us, 최대 3.0 m/s는 1677.5 us가 된다. 50 Hz PWM carrier frequency는 고정이며
+속도는 pulse width로 정한다.
+
+| ESC pulse | Nominal speed |
+| ---: | ---: |
+| 1500 us | 0.0 m/s |
+| 1550 us | 1.2 m/s |
+| 1600 us | 2.4 m/s |
+| 1650 us | 3.6 m/s |
+| 1700 us | 4.8 m/s |
+| 1750 us | 6.0 m/s |
+| 1800 us | 7.2 m/s |
+| 1850 us | 8.4 m/s |
+| 1900 us | 9.6 m/s |
+| 1950 us | 10.8 m/s |
+| 2000 us | 12.0 m/s |
+
+이는 encoder feedback 없는 nominal open-loop 대응이며 실제 차량 속도를 보장하지 않는다.
+Path, planned speed, IMU, autonomous command 중 하나라도 timeout이면 downstream neutral
+1500 us로 복귀한다.
+
+```bash
+ros2 topic echo /adom/navigation/planned_speed
+ros2 topic echo /adom/control/local_path_status
+ros2 topic echo /cmd_vel
+ros2 topic echo /adom/control/mode
+ros2 topic echo /drive
+ros2 topic echo /adom/control/pwm_us
+```
+
+```bash
+ros2 launch adom_control local_path_control.launch.py
+ros2 topic echo /adom/control/local_path_status
+```
+
+기본 feedback topic은 `/zed/zed_node/imu/data`이다. GPS `/fix`는 `adom_logging`이
+이동 궤적 기록에만 사용한다. 최종 `/drive.speed`가 0 부근에서 0.5초 유지될 때 raw x축
+가속도로 bias를 EMA 갱신하고 추정 속도를 0으로 리셋한다. 주행 명령 중에는 bias 제거
+가속도를 적분해 short-horizon 속도를 만들고
+`speed_kp`로 command를 보정한다. `local_path_status`의 `imu_bias_x_mps2`,
+`estimated_speed_mps`, `speed_feedback_error_mps`, `imu_stationary_update`로 확인한다.
+IMU만으로 등속 절대 속도는 관측할 수 없으므로 장기 정확도를 위해서는 wheel encoder,
+VESC telemetry 또는 별도 속도 센서가 필요하다.
+
 F1TENTH 호환 `/drive` (`AckermannDriveStamped`)를 PCA9685 CH0/CH1 PWM으로
 출력한다. 8BitDo Ultimate C 2.4G 게임패드의 매뉴얼/자율 모드 전환을 지원한다.
 PWM 노드는 항상 실제 PCA9685 하드웨어를 초기화하고 PWM을 출력한다.

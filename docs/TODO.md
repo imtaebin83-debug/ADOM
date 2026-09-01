@@ -29,6 +29,31 @@
 - [x] 동일 image SHA와 데이터 계약으로 E0 B2 probe/smoke/mini/resume/full을 완료했다.
 - [x] B0/B2 canonical test의 동일 클래스 표를 작성했다. 다중 seed 비교는 별도 미완료다.
 
+## P0: Jetson TensorRT hand-off 후속
+
+- [x] E-ADOM selected checkpoint를 SHA256으로 동결했다.
+- [x] locked canonical test와 export image/metadata/PyTorch-to-ONNX parity를 통과했다.
+- [x] Jetson `t4 b0-e0`/`t4 eadom` profile을 checkpoint SHA까지 분리했다.
+- [x] frozen E-ADOM `.pth`를 target Jetson으로 전송해 SHA, runtime config, checkpoint
+  load, 단일 ZED publisher/perception subscriber와 live status 반환을 확인했다.
+- [ ] target Jetson에서 source RGB와 Semantic20 mask가 모두 640x360으로 복원되는
+  dimension evidence를 저장한다.
+- [ ] E-ADOM export archive를 target Jetson으로 전송하고 `SHA256SUMS`를 검증한다.
+- [ ] target Jetson의 실제 TensorRT 버전/GPU에서 B0-E0와 E-ADOM FP16 engine을 각각
+  생성한다. RunPod에서 생성한 serialized engine은 전달하지 않는다.
+- [ ] 각 profile에서 ONNX-to-TensorRT pixel argmax agreement 99.0% 이상과 reference
+  image 10장 이상을 검증하고 latency/peak memory를 기록한다.
+- [ ] `adom_perception_ros`에 `backend={mmseg,tensorrt}`와 profile별 `engine_path`를
+  추가하고 `preprocess.json`의 resize, padding, channel order, mean/std를 그대로
+  적용하는 native TensorRT backend를 구현한다.
+- [ ] TensorRT backend도 현재 mask/header/topic/watchdog 계약을 보존하고 engine
+  mismatch, deserialize 실패, shape/class 불일치 시 fail-closed하도록 테스트한다.
+- [ ] 동일 recorded input으로 B0-E0/E-ADOM field A/B evidence를 만든 뒤 profile을
+  선택한다. Canonical test를 다시 model-selection loop에 사용하지 않는다.
+
+현재 `t4`의 두 profile은 모두 PyTorch/MMSeg CUDA backend다. TensorRT engine 생성과
+standalone 검증은 진행할 수 있지만 ROS engine 연결이 완료된 것으로 간주하지 않는다.
+
 ## P0: E0 B2 통제 비교
 
 - B0 기준 image Git SHA는

@@ -1,7 +1,7 @@
 # ADOM Project Context — D-5 PoC Single Source of Truth
 
 > 상태: **ACTIVE / 발표 시연 우선**
-> 기준일: **2026-08-07**
+> 기준일: **2026-08-14**
 > 권위: 이 파일이 ADOM의 유일한 프로젝트 Source of Truth다. 기존 설계 문서나
 > 회의 기록과 충돌하면 이 문서를 우선한다.
 > 변경 규칙: 범위, 인터페이스, 담당자, 성공 기준을 변경할 때는 이 파일의
@@ -41,6 +41,32 @@ merge blocker로 관리하며, 그 사실만으로 Draft로 두지는 않는다.
 ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semantic perception이
 차량의 안전 정지로 이어지는 end-to-end 온보드 파이프라인을 시연한다.
 
+### 현재 post-D-5 개발 범위
+
+인지 모델이 동작하는 현재 increment는 복잡한 global navigation 대신 robot-frame
+Semantic20 costmap에서 실행되는 좌우 cost 보조 방향 tree planner를 사용한다. 기본은
+단일 직진 경로다. 직진 corridor의 depth-projected lethal obstacle이 0.30 m 초과
+1.50 m 이하에 들어오면 avoid mode를 켜고, 전체 costmap의 좌우 누적 cost가 낮은 쪽의
+첫 조향을 고정해 25개 tree에서 회피 경로를 선택한다. 좌우 cost 동률은 왼쪽으로
+고정한다. 0.30 m 이하이면 BLOCKED다.
+GPS는 localization, planning, control 입력으로 사용하지 않고 이동경로 기록과 rosbag
+분석에만 사용한다.
+
+자율주행 세션은 perception/costmap/planner/controller 상태, 모드, 속도·조향 명령,
+`/drive`, PWM, E-stop과 raw GPS fix를 bounded rosbag으로 기록한다. 카메라, full-rate
+Semantic20 mask, confidence/overlay, path, 고주기 IMU, TF와 누적 GPS trail은 live
+autonomy bag에서 제외한다. 대신 semantic costmap grid와 inference frame별 class pixel
+count/ratio를 보존한다. 기본 `t2`는 raster mask를 제외하고, 공간 evidence가 필요한
+진단 세션의 `t2 mask`는 2 Hz Semantic20 evidence mask를 추가한다. Manual perception
+trial의 `t2 evidence`는 t4의 full-rate 원본 RGB stream과 2 Hz mask를 함께 추가한다.
+빠른 현장 검토용 `t2 preview`는 full-rate RGB 대신 같은 2 Hz 추론 frame의 mask와
+45% alpha Semantic20 overlay를 함께 기록한다.
+Mask header로 실제 추론 frame을 RGB stream에서 결합한다. GPS 경로는 raw fix 시계열로
+재구성한다.
+기존 RGB-only 학습 데이터 수집 bag과 autonomy evidence bag은 목적과 저장 경로를
+분리한다. 상세 계약은 decision records 0010, 0011과 이를 일부 대체하는 0016, 0020,
+0025, 0026과 이를 일부 대체하는 0027, 0030을 따른다.
+
 현재 집중연구기간은 5일이며, 이 기간의 최우선 목표는 연구 novelty나 최고 성능이
 아니라 **재현 가능하고 안전한 라이브 PoC**다. 모델 고도화, Semantic23 통합,
 웹 기반 MLOps 자동화, depth 기반 costmap과 Nav2 통합은 발표 시연 이후로 연기한다.
@@ -49,15 +75,18 @@ ADOM은 산악·오프로드 환경의 1/10 RC Car에서 카메라 기반 semant
 
 - MMSegmentation 1.2.2 기반 Semantic20 학습·평가 파이프라인
 - RELLIS 기반 SegFormer-B0/B2 E0 checkpoint
+- canonical test와 export parity를 통과한 E-ADOM B0 seed 42 checkpoint
 - RunPod 학습·resume·W&B·고정 split 및 metric contract
 - Jetson Orin Nano 8GB, ZED 2i, PCA9685 PWM, 배터리가 장착된 RC Car
 - ROS 2 control node, gamepad manual/autonomous/stop mode, command watchdog
 - 640x384 ONNX export 설정과 PyTorch↔ONNX logits parity 검사
+- SHA-locked `t4 b0-e0`/`t4 eadom` PyTorch/MMSeg CUDA profile 전환
+- target Jetson에서 frozen E-ADOM checkpoint load와 live Semantic20 status 확인
 
 ### 아직 구현되지 않은 핵심 구간
 
-- TensorRT engine 및 Jetson standalone inference
-- `adom_perception_ros` 실제 inference node
+- target Jetson TensorRT engine 및 standalone ONNX↔TensorRT parity
+- `adom_perception_ros` native TensorRT backend 연결
 - target mask에서 Go/Stop을 결정하는 safety-reflex node
 - perception→`/drive/autonomous`→PCA9685 end-to-end 검증
 - 신규 target-class 촬영·CVAT 라벨·short fine-tuning
@@ -123,7 +152,7 @@ held-out test를 이 문서와 새 decision record에 함께 기록한다. 그 �
 
 | 항목 | 초기값 | 규칙 |
 | --- | ---: | --- |
-| 최대 자율 속도 | 0.30 m/s | 실제 속도는 open-loop이므로 저속 실측 필요 |
+| planner command profile | 0.30..3.00 m/s | 승인된 autonomous command 범위; 실제 속도는 지상 주행 전 실측 필요 |
 | target | 미동결 | Semantic20 IDs 0..18 전체를 먼저 검토 |
 | ROI | 하단 중앙 trapezoid 후보 | padding 제외 source-image 좌표로 카메라 장착 후 고정 |
 | target area ratio | 미동결 | 선택 class validation에서 조정 |
@@ -161,6 +190,7 @@ control node에서 담당자가 검증하기 전까지 확정값으로 간주하
 | semantic mask | `/adom/perception/semantic_mask` | `sensor_msgs/Image` (`mono8`) | 가형 | 제안 |
 | target area ratio | `/adom/perception/target_area_ratio` | `std_msgs/Float32` | 가형 | 제안 |
 | target detected | `/adom/perception/target_detected` | `std_msgs/Bool` | 가형·명섭 | 제안 |
+| planner speed profile | `/adom/navigation/planned_speed` | `std_msgs/Float32` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
 | autonomous command | `/drive/autonomous` | `ackermann_msgs/AckermannDriveStamped` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
 | final actuator command | `/drive` | `ackermann_msgs/AckermannDriveStamped` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
 | emergency stop | `/emergency_stop` | `std_msgs/Bool` | 명섭 | 저장소 코드 기준, 실기 검증 필요 |
@@ -177,6 +207,7 @@ QoS, frame ID, timestamp, message frequency도 `ros2 topic info --verbose`,
 
 - NVIDIA Jetson Orin Nano 8GB
 - ZED 2i with polarizer, 2.1 mm lens
+- ZED optical center height: 지면 기준 0.21 m (2026-08-12 정밀 재측정 완료)
 - USB-C dual-screw 0.3 m cable; USB 3 링크로 직접 연결하고 hub를 사용하지 않는다.
 - PCA9685 PWM, ESC/servo, 별도 안정화된 Jetson 전원
 
@@ -266,6 +297,21 @@ frame은 쌓지 않는 구성을 우선 검토한다. 실제 ZED publisher QoS�
 - Demo precision: TensorRT FP16
 - Shape candidate: static batch 1, `1x3x384x640`; Day 1 parity·latency 후 동결
 - INT8, dynamic shape, batch inference: 금지
+
+### Jetson model profiles
+
+`t4`는 model identity를 생략하지 않고 `t4 b0-e0` 또는 `t4 eadom`으로 실행한다.
+두 profile은 Semantic20 SegFormer-B0와 동일한 640x384 runtime preprocessing을 쓰지만
+config identity, checkpoint 디렉터리와 SHA256을 분리한다. B0-E0가 안전한
+default/fallback 후보이며 E-ADOM은 newly labeled domain의 field A/B 후보다. E-ADOM은
+validation log와 canonical-test rubble을 개선했지만 TestSupported11과 RareRisk4 전체는
+B0-E0보다 낮았으므로 자동 대체하지 않는다.
+
+현재 두 profile의 ROS backend는 PyTorch/MMSeg CUDA다. Export archive가 통과한 것은
+TensorRT ROS 연결 완료를 뜻하지 않는다. Engine은 target Jetson에서 만들고 standalone
+parity를 거친 뒤 별도 backend로 연결한다. 상세 결정은 decision record 0031을 따른다.
+`t4` launcher는 profile-owned runtime config를 강제하고 canonical checkpoint SHA가
+일치한 뒤에만 PyTorch 2.6+ full-MMEngine-checkpoint 호환 모드를 자동 적용한다.
 
 ### 전처리 후보와 동결 조건
 
@@ -519,7 +565,8 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
 ### 배포·시스템
 
 - Jetson runtime Dockerfile와 on-device engine cache
-- depth `NEURAL_LIGHT` 재도입과 semantic-depth projection
+- depth `NEURAL`과 0.30--8.0 m 범위, confidence/texture threshold 50을 사용한
+  semantic-depth projection. `base_link` 높이 -0.05--1.50 m 밖의 점은 제거한다.
 - uncertainty·cost distribution 및 semantic costmap
 - Nav2와 closed-loop obstacle avoidance
 - 모델 export·TensorRT build·CVAT·W&B를 연결한 웹 UI
@@ -600,6 +647,139 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   name, full-device VRAM, compute capability 12.0을 함께 검사하고 현재 image의 native
   `sm_120` 부재는 PTX-JIT provisional warning과 필수 active memory probe로 공개한다.
   상세 계약은 decision record 0014를 따른다.
+- **[2026-08-12] 저수준 방향 tree planning과 autonomy rosbag을 채택**
+  이유: 현재 목표는 GPS/Nav2 기반 전역 자율주행이 아니라 Semantic20 costmap에서의
+  직진·근거리 회피다. GPS를 control feedback에서 제거하고 이동경로 evidence로만
+  기록하며, perception/planning/control/GPS를 같은 시간축의 rosbag으로 보존한다.
+- **[2026-08-12] live autonomy bag에서 confidence와 BGR overlay를 제외**
+  이유: Jetson 실측에서 recorder 실행 시 camera→perception 지연이 약 58 ms 증가했다.
+  판단 재현에 필요한 Semantic20 mask와 상태·costmap·path·command·GPS는 유지하고,
+  미구독 진단 영상의 후처리와 DDS/disk 부하를 제거한다.
+- **[2026-08-12] t2 autonomy bag을 수치·상태 evidence로 경량화**
+  이유: recorder가 mask, costmap, path, IMU, TF를 추가 구독하면 t5와 같은 Jetson에서
+  직렬화·복사·disk I/O가 늘어 timeout 위험이 생긴다. 회피와 속도 분석에는 작은
+  status/command 토픽을 사용하고 GPS 경로는 raw `/fix` 시계열로 보존한다. RGB 학습
+  데이터용 `rec`는 변경하지 않는다. 상세 근거는 decision record 0016을 따른다.
+- **[2026-08-12] sampled semantic evidence를 autonomy bag에 추가**
+  이유: numeric/status-only bag으로는 어떤 Semantic20 class와 공간 cost가 planner 판단에
+  기여했는지 복원할 수 없었다. Full-rate mask 대신 기본 2 Hz evidence mask, 작은
+  semantic costmap grid와 inference-rate class pixel 통계를 기록해 예상 추가 payload를
+  약 0.54 MB/s로 제한한다. Jetson latency 영향은 A/B 실측 전까지 미검증이며 문제가
+  있으면 mask sample부터 비활성화한다. 상세 근거는 decision record 0020을 따른다.
+- **[2026-08-13] t2의 sampled mask 기록을 명시적 선택 모드로 전환**
+  이유: 장시간 기본 주행은 class 통계와 작은 costmap으로 recorder 부하를 낮추고, 공간
+  mask가 필요한 발표·진단 trial에서만 2 Hz raster를 추가해야 한다. `t2`는 mask 없이,
+  `t2 mask`는 evidence mask를 포함하며 full-rate mask와 RGB는 계속 제외한다. 상세 근거는
+  decision record 0025를 따른다.
+- **[2026-08-13] manual perception trial용 paired RGB+mask evidence 모드를 추가**
+  이유: `t0`, `t1`, `t2 evidence`, `t3`, `t4`만 실행한 manual 주행에서 실제 추론 입력과
+  mask를 동일 timestamp로 보존해야 GT 작성과 시각 A/B가 가능하다. Full-rate camera 대신
+  subscriber가 있을 때만 2 Hz BGR image를 mask와 함께 발행하며, t5가 없으면 costmap과
+  planner topic은 기록되지 않는다. 상세 근거는 decision record 0026을 따른다.
+- **[2026-08-13] manual evidence RGB를 full-rate source stream으로 확장**
+  이유: 이동 중 전체 장면 영상을 보존하면서 2 Hz mask를 정확한 추론 RGB timestamp에
+  결합해야 한다. 별도 2 Hz RGB 복제 publisher를 제거하고 t4 source RGB topic을 직접
+  기록한다. Raw RGB 대역폭이 크므로 manual perception의 짧은 trial로 제한하고 full
+  autonomy 기본 모드로 사용하지 않는다. 상세 근거는 decision record 0027을 따른다.
+- **[2026-08-13] Semantic20 mono8 mask용 경량 ROS colorizer를 추가**
+  이유: live와 rosbag replay의 ID `0..18`/ignore `255` mask를 모델 재추론 없이 동일한
+  canonical palette로 모니터링해야 한다. 진단 출력과 legend topic만 추가하며 perception,
+  planning, control 입력에는 연결하지 않는다. 상세 근거는 decision record 0028을 따른다.
+- **[2026-08-14] 2 Hz Semantic20 합성 영상을 기록하는 t2 preview를 추가**
+  이유: full-rate RGB를 기록하지 않는 짧은 현장 확인에서도 mask가 가리키는 장면을 즉시
+  재생할 수 있어야 한다. t4는 evidence mask와 같은 추론 frame에서 canonical palette를
+  원본 RGB에 45% alpha로 합성하고 동일 header의 sampled overlay를 발행한다. `t2 preview`는
+  이 overlay와 2 Hz mask를 함께 기록하며 기존 `t2 evidence` 계약은 유지한다. 상세 근거는
+  decision record 0030을 따른다.
+- **[2026-08-14] Jetson t4의 B0-E0/E-ADOM model profile을 SHA-locked로 분리**
+  이유: E-ADOM export는 통과했지만 canonical test 전체가 B0-E0를 넘지 못했으므로
+  checkpoint를 암묵적으로 교체하지 않고 동일 현장 입력에서 A/B해야 한다. `t4`는
+  `b0-e0` 또는 `eadom`을 명시하고 각 checkpoint SHA를 검증한다. TensorRT ROS backend
+  연결은 target-side engine/parity 이후 TODO로 분리한다. 상세 근거는 decision record
+  0031을 따른다.
+- **[2026-08-14] canonical t4 checkpoint의 PyTorch 2.6+ 호환을 SHA 검증 뒤 자동 적용**
+  이유: target Jetson의 PyTorch 2.12는 MMEngine `HistoryBuffer`가 포함된 full checkpoint를
+  기본 `weights_only=True`로 거부했다. 두 승인된 checkpoint의 고정 SHA가 일치한 뒤에만
+  legacy metadata load를 허용하고, profile-owned runtime config를 강제해 이전 export
+  config가 padding metadata 수정을 우회하지 못하게 한다. 같은 날 frozen E-ADOM과 ZED
+  640x360 live input에서 단일 publisher/subscriber 및 perception status 반환을 확인했다.
+  source/mask dimension evidence와 통제 latency benchmark는 별도 미완료다.
+- **[2026-08-14] 간헐적 empty costmap의 단계별 투영 진단을 상태에 추가**
+  이유: 기존 `projected_points=0`만으로는 depth 범위, Semantic20 label, 지면 기준 높이
+  필터와 costmap 경계 중 어느 단계에서 관측이 사라졌는지 구분할 수 없었다.
+  `/adom/navigation/costmap_status`에 필터별 count, 변환 후 Z 범위와 `empty_reason`을
+  추가한다. Empty costmap 즉시 STOP과 watchdog 동작은 유지한다. 상세 근거는 decision
+  record 0032를 따른다.
+- **[2026-08-12] ZED depth 품질 설정과 지면 기준 높이 필터를 채택**
+  이유: 정밀 재측정된 ZED optical center 높이 0.21 m를 TF에 반영하고, depth를
+  `NEURAL`, 0.30--8.0 m, confidence/texture threshold 50으로 제한한다. Optical Y축을
+  직접 가정하지 않고 `base_link`로 변환한 Z 높이 -0.05--1.50 m만 costmap에 사용해
+  지면 아래 overshoot와 허공 noise를 줄인다. `NEURAL_PLUS`와 SDK floor plane detection은
+  현재 Jetson 부하 및 positional-tracking 계약을 바꾸므로 실측 전 활성화하지 않는다.
+  상세 근거는 decision record 0017을 따른다.
+- **[2026-08-12] planner의 camera source age 폐기 기준을 0.40초에서 0.80초로 완화**
+  이유: 정상 처리 지연은 대체로 기준 이내였지만 Jetson에서 간헐적인 0.4초 초과
+  costmap이 관측돼 현장 진단을 위해 허용 범위를 늘린다. 수신 갱신 watchdog과
+  actuator command timeout은 유지하며, 실차 검증 후 더 짧은 값으로 되돌릴 수 있다.
+- **[2026-08-12] semantic costmap inflation seed를 lethal cost 90 이상으로 분리**
+  이유: 감속용 cost 60~89가 inflation 활성화만으로 cost 100 hard stop으로 승격되는
+  동작을 제거한다. 원래 lethal cell과 geometric obstacle은 계속 정지 seed이며,
+  주변 inflation ring은 감속·회피 비용으로 유지한다. 상세 근거는 decision record
+  0013을 따른다.
+- **[2026-08-12] planner 속도 profile을 local control까지 보존**
+  이유: planner가 계산한 0.25..3.0 m/s가 geometry-only Path 경계에서 유실되어 local
+  controller의 0.25 m/s로 대체되고 있었다. `/adom/navigation/planned_speed`를 추가해
+  speed freshness watchdog과 함께 `/cmd_vel`로 전달하고, 이후에는 기존 gamepad/PCA9685
+  당시 6.0 m/s control ceiling과 PWM 파라미터를 적용했다. 상세 근거는 decision record 0014를
+  따른다.
+- **[2026-08-12] 2000 us를 nominal 12 m/s로 재정의하고 IMU 단기 보정을 활성화**
+  이유: control calibration 요청에 따라 forward PWM 1500..2000 us를 0..12 m/s로 선형
+  대응한다. Planner의 0.25..3.0 m/s profile은 유지한다. 최종 `/drive`가 0으로 0.5초
+  유지될 때 IMU x축 bias와 zero velocity를 온라인 갱신하고, 주행 중 bias 보정 가속도 적분값으로 제한된 P
+  feedback을 적용한다. IMU만으로 등속 절대 속도는 관측할 수 없으므로 12 m/s는 실측값이
+  아닌 nominal mapping이다. 상세 근거는 decision record 0015를 따른다.
+- **[2026-08-12] rosbag 지연 근거로 autonomous 상한을 0.75 m/s로 제한**
+  이유: 정상 종료된 autonomy bag 두 개에서 camera source부터 control command까지의
+  지연 중앙값이 약 0.33초, 95 percentile이 약 0.43초였고 perception 출력은 약
+  10.2 Hz였다. 현장 설정 1.0 m/s의 75%인 0.75 m/s를 planner와 local controller의
+  hard ceiling으로 적용한다. 상세 근거는 decision record 0018을 따른다.
+- **[2026-08-14] autonomous command profile을 0.30..3.00 m/s로 변경**
+  이유: 운영자 요청에 따라 planner와 local controller의 주행 중 최소·최대 명령을
+  각각 0.30 m/s와 3.00 m/s로 통일한다. STOP, watchdog, manual/PWM ceiling은 유지한다.
+  0018에서 측정한 지연은 해소되지 않았으므로 실차 적용 전 wheels-off와 폐쇄 공간
+  저속 검증이 필요하다. 상세 근거는 decision record 0029를 따른다.
+- **[2026-08-12] 중앙 장애물 회피에 gap-guided 25-candidate tree를 채택**
+  이유: 전체 125개 tree의 순간 최저 비용만 선택하면 더 넓게 열린 반대편 대신 국소적으로
+  막힌 방향에 진입할 수 있다. 중앙 장애물 기준 좌·우 gap 폭·깊이를 먼저 비교하고
+  선택 gap 중심각으로 첫 조향을 고정한 뒤 남은 25개 tree를 평가한다. 재현 benchmark의
+  P95 추가 비용 최댓값은 0.515 ms로 50 ms 기각 기준 이내였다. 상세 근거는 decision
+  record 0019를 따른다.
+- **[2026-08-12] planner BLOCKED 해제에 3-frame clear debounce 적용**
+  이유: sparse costmap에서 lethal cell이 frame마다 나타나고 사라질 때 BLOCKED와
+  DRIVING이 즉시 반복되는 현장을 확인했다. 위험 감지 시 정지는 즉시 적용하되 서로
+  다른 유효 costmap 3개에서 연속으로 안전 경로가 확인된 뒤에만 주행을 재개한다.
+  상세 근거는 decision record 0020을 따른다.
+- **[2026-08-12] gap 폭 판정을 전체 좌우 cost 보조 선택으로 대체**
+  이유: sparse costmap의 gap 폭·거리 판정이 BLOCKED를 추가로 발생시켰다. 전체 costmap의
+  좌우 누적 cost는 25개 tree의 첫 방향만 제한하며 BLOCKED에는 관여하지 않는다.
+  BLOCKED 원판정은 6a4db6b 이전의 선택 경로 clearance 기준을 유지한다. 상세 근거는
+  decision record 0021을 따른다.
+- **[2026-08-12] 직진 장애물 거리에 따른 STRAIGHT/AVOID/BLOCKED 상태를 채택**
+  이유: 좌우 cost 차이만으로 항상 회피 tree가 활성화되는 동작을 제거한다. 직진 경로의
+  첫 depth-projected lethal obstacle이 3.50 m보다 멀면 단일 직진, 0.30--3.50 m이면
+  좌우 cost 보조 25-tree 회피, 0.30 m 이하면 BLOCKED를 적용한다. 좌우 cost 동률은
+  왼쪽으로 고정해 회피 후보가 125개로 증가하지 않게 한다. 상세 근거는 decision record
+  0022를 따른다.
+- **[2026-08-12] AVOID 진입 거리를 1.50 m로 조정**
+  이유: 평상시 직진을 더 오래 유지하고 가까운 직진 장애물에만 회피 tree를 활성화하도록
+  `avoid_trigger_distance_m`을 초기 3.50 m에서 1.50 m로 조정한다. 모드 구조와 0.30 m
+  BLOCKED 기준은 유지한다. 상세 근거는 decision record 0023을 따른다.
+- **[2026-08-13] semantic costmap 출력에서 ROS clock domain으로 전환**
+  이유: Jetson ZED의 device/monotonic timestamp를 planner의 system ROS clock과 직접
+  비교해 모든 costmap을 stale로 폐기했다. RGB mask와 depth의 원본 timestamp는 동기화와
+  TF lookup까지 유지하고, 완성된 `OccupancyGrid.header.stamp`만 costmap 노드의 ROS 현재
+  시각으로 기록한다. ZED timestamp 설정은 변경하지 않으며 downstream watchdog age는
+  costmap 생성 이후 freshness를 뜻한다. 상세 근거는 decision record 0024를 따른다.
 
 ## 17. Primary References
 

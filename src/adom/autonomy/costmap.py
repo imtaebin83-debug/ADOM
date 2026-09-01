@@ -13,11 +13,14 @@ class CostmapConfig:
     min_range_m: float = 0.30
     max_range_m: float = 8.0
     sample_stride: int = 4
-    min_height_m: float = -0.50
+    # base_link is ground-referenced. Retain a small tolerance for TF/depth
+    # error, but reject physically impossible points well below the road.
+    min_height_m: float = -0.05
     max_height_m: float = 1.50
-    class_costs: tuple[int, int, int, int] = (0, 15, 60, 100)
+    class_costs: tuple[int, ...] = (0, 15, 60, 100)
     geometric_obstacle_min_height_m: float = 0.10
     inflation_radius_m: float = 0.25
+    inflation_seed_cost: int = 90
     inflation_min_cost: int = 60
 
     @property
@@ -27,6 +30,18 @@ class CostmapConfig:
     @property
     def columns(self) -> int:
         return max(1, int(round(self.width_m / self.resolution_m)))
+
+
+@dataclass(frozen=True)
+class ProjectionDiagnostics:
+    sampled_pixels: int
+    finite_depth_pixels: int
+    in_range_depth_pixels: int
+    semantic_label_pixels: int
+    depth_label_pixels: int
+    height_valid_points: int
+    transformed_z_min_m: float | None
+    transformed_z_max_m: float | None
 
 
 def quaternion_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
@@ -64,7 +79,22 @@ def project_mask_depth(
     translation: np.ndarray,
     config: CostmapConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return base-frame XYZ points and Cost4 IDs sampled from aligned images."""
+    """Return base-frame XYZ points and configured semantic IDs."""
+    points, labels, _ = project_mask_depth_with_diagnostics(
+        mask, depth_m, intrinsics, rotation, translation, config
+    )
+    return points, labels
+
+
+def project_mask_depth_with_diagnostics(
+    mask: np.ndarray,
+    depth_m: np.ndarray,
+    intrinsics: tuple[float, float, float, float],
+    rotation: np.ndarray,
+    translation: np.ndarray,
+    config: CostmapConfig,
+) -> tuple[np.ndarray, np.ndarray, ProjectionDiagnostics]:
+    """Project mask/depth and report which filter removed observations."""
     if mask.ndim != 2 or depth_m.ndim != 2:
         raise ValueError("mask and depth must both be HxW")
     if mask.shape != depth_m.shape:
@@ -77,14 +107,26 @@ def project_mask_depth(
     v, u = np.mgrid[0 : mask.shape[0] : stride, 0 : mask.shape[1] : stride]
     z = depth_m[::stride, ::stride].astype(np.float64, copy=False)
     labels = mask[::stride, ::stride]
-    valid = (
-        np.isfinite(z)
-        & (z >= config.min_range_m)
-        & (z <= config.max_range_m)
-        & (labels < 4)
-    )
+    finite = np.isfinite(z)
+    in_range = finite & (z >= config.min_range_m) & (z <= config.max_range_m)
+    semantic = labels < len(config.class_costs)
+    valid = in_range & semantic
     if not np.any(valid):
-        return np.empty((0, 3), dtype=np.float64), np.empty(0, dtype=np.uint8)
+        diagnostics = ProjectionDiagnostics(
+            sampled_pixels=int(z.size),
+            finite_depth_pixels=int(np.count_nonzero(finite)),
+            in_range_depth_pixels=int(np.count_nonzero(in_range)),
+            semantic_label_pixels=int(np.count_nonzero(semantic)),
+            depth_label_pixels=0,
+            height_valid_points=0,
+            transformed_z_min_m=None,
+            transformed_z_max_m=None,
+        )
+        return (
+            np.empty((0, 3), dtype=np.float64),
+            np.empty(0, dtype=np.uint8),
+            diagnostics,
+        )
 
     z = z[valid]
     optical = np.stack(
@@ -95,14 +137,31 @@ def project_mask_depth(
         (points[:, 2] >= config.min_height_m)
         & (points[:, 2] <= config.max_height_m)
     )
-    return points[height_valid], labels[valid][height_valid].astype(np.uint8)
+    diagnostics = ProjectionDiagnostics(
+        sampled_pixels=int(finite.size),
+        finite_depth_pixels=int(np.count_nonzero(finite)),
+        in_range_depth_pixels=int(np.count_nonzero(in_range)),
+        semantic_label_pixels=int(np.count_nonzero(semantic)),
+        depth_label_pixels=int(np.count_nonzero(valid)),
+        height_valid_points=int(np.count_nonzero(height_valid)),
+        transformed_z_min_m=float(np.min(points[:, 2])),
+        transformed_z_max_m=float(np.max(points[:, 2])),
+    )
+    return (
+        points[height_valid],
+        labels[valid][height_valid].astype(np.uint8),
+        diagnostics,
+    )
 
 
 def _inflate(grid: np.ndarray, config: CostmapConfig) -> np.ndarray:
     radius = int(np.ceil(config.inflation_radius_m / config.resolution_m))
     if radius <= 0:
         return grid
-    danger = grid >= config.inflation_min_cost
+    # Only cells that are already lethal seed inflation.  Lower semantic costs
+    # remain useful for scoring and slowing without being promoted to a hard
+    # stop merely because inflation is enabled.
+    danger = grid >= config.inflation_seed_cost
     if not np.any(danger):
         return grid
     inflated = grid.copy()
@@ -146,7 +205,7 @@ def build_costmap(
         & (lateral >= 0)
         & (lateral < config.columns)
         & (labels >= 0)
-        & (labels < 4)
+        & (labels < len(config.class_costs))
     )
     costs = np.asarray(config.class_costs, dtype=np.int16)[labels[valid]]
     costs = np.where(
@@ -154,6 +213,7 @@ def build_costmap(
         100,
         costs,
     )
-    for row, column, cost in zip(lateral[valid], forward[valid], costs):
-        grid[row, column] = max(int(grid[row, column]), int(cost))
+    # Multiple projected pixels can land in one cell. np.maximum.at preserves
+    # the highest cost without a Python loop over tens of thousands of points.
+    np.maximum.at(grid, (lateral[valid], forward[valid]), costs.astype(np.int8))
     return _inflate(grid, config)

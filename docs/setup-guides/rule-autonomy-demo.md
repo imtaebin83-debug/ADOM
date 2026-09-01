@@ -23,7 +23,7 @@ local/global EKF에 들어간다. gamepad control이 자율 모드로 승인한 
 
 ```bash
 export ADOM_REPO="$(git rev-parse --show-toplevel)"
-export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/export/segformer_b0_640x384_rellis3d.py"
+export ADOM_MODEL_CONFIG="$ADOM_REPO/configs/adom/runtime/segformer_b0_640x384_rellis3d.py"
 export ADOM_CHECKPOINT="<CHECKPOINT_PATH>"
 cd "$ADOM_REPO/ros2_ws"
 source /opt/ros/jazzy/setup.bash

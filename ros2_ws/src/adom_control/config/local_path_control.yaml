@@ -1,0 +1,53 @@
+local_path_control:
+  ros__parameters:
+    local_path_topic: /adom/navigation/local_path
+    planned_speed_topic: /adom/navigation/planned_speed
+    imu_topic: /zed/zed_node/imu/data
+    cmd_vel_topic: /cmd_vel
+    status_topic: /adom/control/local_path_status
+    drive_topic: /drive
+    base_frame: base_link
+
+    control_rate_hz: 50.0
+    path_timeout_sec: 0.25
+    planned_speed_timeout_sec: 0.25
+    imu_timeout_sec: 0.25
+
+    wheelbase_m: 0.33
+    lookahead_m: 0.80
+    max_steering_deg: 24.0
+    # Match the planner and hard-cap the final autonomous command at 1.00 m/s.
+    max_speed_mps: 1.00
+    min_speed_mps: 0.10
+    downstream_max_speed_mps: 12.0
+    curvature_speed_gain: 1.5
+    # Bounded IMU feedback correction. IMU-only velocity remains a short-horizon
+    # estimate and is not an absolute-speed measurement.
+    speed_kp: 0.15
+    path_stop_distance_m: 0.50
+    path_slow_distance_m: 2.0
+
+    imu_accel_bias_x_mps2: 0.0
+    imu_bias_learning_rate: 0.02
+    imu_stationary_accel_threshold_mps2: 0.35
+    imu_max_abs_accel_mps2: 5.0
+    imu_max_integration_dt_sec: 0.10
+    imu_estimated_speed_limit_mps: 4.0
+    imu_velocity_leak_per_sec: 0.02
+    # Learn bias/ZUPT only after the final actuator command has remained neutral.
+    imu_stationary_command_threshold_mps: 0.02
+    imu_stationary_hold_sec: 0.50
+    drive_feedback_timeout_sec: 0.25
+
+    # One bounded escape attempt is allowed only on a persistent turning path
+    # with little longitudinal speed and yaw response. Empty/blocked paths and
+    # every watchdog still stop before this logic is evaluated.
+    stuck_recovery_enabled: true
+    stuck_command_min_mps: 0.12
+    stuck_max_estimated_speed_mps: 0.08
+    stuck_max_abs_yaw_rate_rps: 0.08
+    stuck_min_abs_steering_deg: 12.0
+    stuck_steering_stability_deg: 5.0
+    stuck_hold_sec: 1.50
+    stuck_recovery_duration_sec: 0.75
+    stuck_recovery_speed_mps: 1.00

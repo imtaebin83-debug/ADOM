@@ -1,0 +1,39 @@
+gps_track_logger:
+  ros__parameters:
+    fix_topic: /fix
+    path_topic: /adom/logging/gps_path
+    status_topic: /adom/logging/gps_status
+    # Raw /fix and compact gps_status are sufficient for bag reconstruction.
+    publish_path: false
+    frame_id: gps_recording_origin
+    minimum_step_m: 0.05
+    maximum_covariance_m2: 25.0
+    maximum_points: 20000
+
+autonomy_data_recorder:
+  ros__parameters:
+    capture_root: data/autonomy_bags
+    auto_start: true
+    session_prefix: autonomy
+    max_size_gb: 20.0
+    size_check_period_sec: 0.5
+    bag_split_size_mb: 1024
+    status_topic: /adom/recording/status
+    # Keep full-rate camera/confidence/overlay/path/IMU/TF out of the live bag.
+    # Per-class pixel counts/ratios remain in /adom/perception/status at the
+    # inference rate. Set record_mask=true to additionally record the 2 Hz
+    # evidence mask configured by adom_perception. The full-rate mask is never
+    # recorded by this profile. record_preview adds only the sampled overlay.
+    # Raw /fix samples preserve the driven GPS route without repeatedly writing
+    # the growing nav_msgs/Path published on /adom/logging/gps_path.
+    topic_regex: "^/(adom/perception/status|adom/navigation/(semantic_costmap|rule_status|planned_speed)|adom/control/(local_path_status|mode|pwm_us)|adom/logging/gps_status|cmd_vel|drive(/autonomous)?|emergency_stop|fix)$"
+    record_mask: false
+    mask_topic: /adom/perception/semantic20_mask_evidence
+    record_evidence: false
+    # Full-rate source RGB used by t4. Evidence masks retain the matching source
+    # header stamp so analysis can join each mask to its exact camera frame.
+    evidence_image_topic: /zed/zed_node/rgb/color/rect/image
+    record_preview: false
+    # 2 Hz 45%-alpha Semantic20 overlay paired with the evidence mask. Unlike
+    # /adom/perception/overlay, this does not activate full-rate colorization.
+    preview_overlay_topic: /adom/perception/semantic20_overlay_evidence

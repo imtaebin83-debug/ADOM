@@ -2,24 +2,52 @@ rule_planner:
   ros__parameters:
     costmap_topic: /adom/navigation/semantic_costmap
     cmd_vel_topic: /cmd_vel
+    # The local path controller owns /cmd_vel. Enable only for planner-only tests.
+    publish_cmd_vel: false
+    local_path_topic: /adom/navigation/local_path
+    planned_speed_topic: /adom/navigation/planned_speed
     path_marker_topic: /adom/navigation/rule_path
     status_topic: /adom/navigation/rule_status
-    publish_rate_hz: 20.0
+    # First /cmd_vel causally produced from each camera-stamped costmap.
+    action_latency_topic: /adom/navigation/action_latency
+    action_latency_window: 300
+    publish_rate_hz: 50.0
     # Shorter than the existing 0.25 s gamepad/PCA9685 command watchdog chain.
     costmap_timeout_sec: 0.20
+    # Temporary field tolerance for observed camera/DDS latency spikes.
     max_source_age_sec: 0.40
 
     wheelbase_m: 0.33
-    max_steering_deg: 20.0
-    steering_step_deg: 4.0
-    lookahead_m: 3.0
+    max_steering_deg: 24.0
+    lookahead_m: 4.0
     path_step_m: 0.10
+    # Receding-horizon direction tree: 5 actions (-24,-12,0,12,24) per level.
+    tree_depth: 3
+    tree_branch_steering_deg: 12.0
+    steering_change_penalty: 4.0
     corridor_half_width_m: 0.18
     unknown_cost: 70.0
     lethal_cost: 90
-    stop_distance_m: 0.75
+    stop_distance_m: 0.30
 
-    # Below the hardware control ceiling of 0.30 m/s.
-    max_speed_mps: 0.25
-    min_speed_mps: 0.08
+    # Current autonomous planner command profile: 0.30..3.00 m/s.
+    max_speed_mps: 1.00
+    min_speed_mps: 0.10
+    # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.
+    downstream_max_speed_mps: 12.0
     steering_penalty: 8.0
+    # Keep farther depth-projected risk relevant and start slowing early.
+    distance_decay_m: 2.0
+    clearance_penalty: 35.0
+    slow_distance_m: 3.0
+
+    # Compare total conservative cost over the complete left/right halves.
+    # The lower-cost side fixes the first action, leaving 5^2=25 tree paths.
+    # This helper never decides BLOCKED; selected-path clearance does.
+    side_cost_enabled: true
+    # Straight above this distance; avoidance in (0.30, 1.50] m; BLOCKED at
+    # stop_distance_m or nearer along the straight vehicle corridor.
+    avoid_trigger_distance_m: 1.5
+    # Enter BLOCKED immediately, but require three distinct clear costmaps
+    # before motion resumes. The 50 Hz timer must not count one grid repeatedly.
+    blocked_release_clear_frames: 3

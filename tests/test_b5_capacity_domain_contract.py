@@ -281,12 +281,9 @@ class B5GoDecisionTests(unittest.TestCase):
 
     def test_committed_go_template_is_safe_no_go(self) -> None:
         template = json.loads(
-            (
-                REPO_ROOT
-                / "experiments"
-                / "segformer"
-                / "b5-go-decision.template.json"
-            ).read_text(encoding="utf-8")
+            (CONFIG_ROOT / "b5-go-decision.template.json").read_text(
+                encoding="utf-8"
+            )
         )
         self.assertEqual(template["schema_version"], B5_GO_SCHEMA)
         self.assertEqual(template["decision"], "NO_GO")

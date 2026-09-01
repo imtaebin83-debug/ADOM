@@ -13,6 +13,7 @@ configs/
 │   ├── export/                 # Semantic20 E0 profile별 export config
 │   │   └── cost4/              # 기존 Cost4 reference export config
 │   ├── phase1_semantic20/      # Semantic20 B0/B2 E0/E1/E2 training config
+│   │   └── b5-go-decision.template.json  # B5 실행에 필요한 go/no-go 입력 템플릿
 │   └── segformer_*_stage*.py   # B0/B2 × Stage 1/2
 ├── datasets/rellis3d/
 │   └── label_mapping.yaml      # source ID → Cost4의 유일한 mapping source
@@ -35,6 +36,11 @@ update를 검사한다. 500 update를 넘는 full phase는
 `ADOM_TA0_FULL_TRAINING_APPROVED=user-approved` 없이는 시작되지 않는다.
 `segformer_b0_ta0_r_combined.py`는 개별 결과 검토 전 import 자체가 잠긴 provisional
 interaction-check config다.
+
+B5 실행은 `--b5-go-decision`으로 go/no-go 판정 파일을 반드시 받는다.
+`phase1_semantic20/b5-go-decision.template.json`을 복사해 `provenance`의
+`REPLACE_WITH_REAUDITED_64_HEX` 자리를 재감사한 SHA256으로 채운다. 템플릿 자체는
+`NO_GO`이므로 그대로는 B5를 시작시키지 않는다.
 
 직접 `train.py`를 호출하기보다 `scripts/run_training_cycle.sh`를 사용한다. 이
 실행기가 dataset checksum, freeze audit, checkpoint 연결, test, ONNX parity를

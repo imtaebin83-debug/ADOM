@@ -125,29 +125,34 @@ RELLIS-val-selected checkpoint다.
 ## 3. 데이터·mapping·evaluation lock
 
 Primary matched-legacy E-ADOM identity는 B2 run record의 값을 그대로 사용한다.
-단, 아래 `†` 값은 보존된 run record에서 65 hex로 기록되어 SHA-256일 수 없다.
-원본 `/workspace` artifact에서 재계산해 64 hex로 교정하기 전까지 static/GO gate는
-의도적으로 FAIL한다. 값을 임의로 자르거나 추측하지 않는다.
+2026-09-01 raw `/workspace` artifact 재감사에서 기존 65-hex identifier마다 중복된
+문자 하나가 확인됐다. 아래 64-hex 값은 문자열을 임의로 자른 결과가 아니라 B2 full
+run의 `dataset_contract.json` 필드와 fresh-evaluation manifest summary를 다시 읽어
+확인한 값이다. 이 provenance amendment는 decision record 0041을 따른다.
 
-| Field | Frozen value |
+| Field | Re-audited frozen SHA-256 |
 | --- | --- |
 | train / val / test | 4,568 / 900 / 899 |
 | train composition | RELLIS 4,435 + Korean train 133 |
 | verified manifest pairs | 14,636 |
-| split contract recorded identifier† | `fab9c136c81081464d9db099656680dac3bf2921a4ae2bbd76055c383b309ab93` |
-| manifest recorded identifier† | `183dda705e76b451dc383a81f517d36df3d6032f00002ab225421b9ae3316b9dd` |
-| image content recorded identifier† | `ce06265e6146bcd37692938786386cbd9b844e9742f831284ee55d26aedd15305` |
-| mask content recorded identifier† | `5ae15ab1eff69921168b15811683edab41472456a439b58aa63844c6d472c377e` |
-| combined content recorded identifier† | `a70c6b9467b692a4797976659c6dcd501c80938626226000a6cc214efcdec5e42` |
+| split contract | `fab9c136c81081464d9db099656680dac3bf2921a4ae2bbd7605c383b309ab93` |
+| manifest | `183dda705e76b451dc383a81f517d36df3d6032f00002ab225421b9ae316b9dd` |
+| image content | `ce06265e6146bcd37692938786386cbd9b844e9742f831284ee5d26aedd15305` |
+| mask content | `5ae15ab1eff69921168b15811683edab41472456a439b58aa6384c6d472c377e` |
+| combined content | `a70c6b9467b692a4797976659c6dcd501c80938626226000a6c214efcdec5e42` |
 | canonical mapping SHA-256 | `ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21dd389933a6bc55` |
 
-Evaluation lock도 변경하지 않는다.
+Evaluation lock은 model-resolved contract와 ordered data manifest를 구분한다. B0와 B2
+fresh evaluation은 같은 evaluator policy를 사용하지만 resolved model architecture가
+contract payload에 포함되므로 contract SHA가 다르다. B5 GO artifact는 B2 결과를
+근거로 하므로 B0 contract를 대입하지 않고 B2 evidence contract를 고정한다.
 
-| Artifact | SHA-256 |
-| --- | --- |
-| evaluation contract recorded identifier† | `096467321246732da9d2f4a31ad8f75626b1aba0500e00680ba4ddd778241635e` |
-| ordered RELLIS test 899 manifest recorded identifier† | `2e078a3ac89d870b4dfb5838f8cc2772e788ecdd7cb011c3309d59b4ca6a66918` |
-| ordered Korean held-out 61 manifest recorded identifier† | `1eb86ff65620fb5c0afc1d58c572c517cacc937468ebd8655375aaa26d81eb782` |
+| Artifact | Role | Re-audited SHA-256 |
+| --- | --- | --- |
+| B0 resolved evaluation contract | B0 reference metrics only | `096467321246732da9d2f4a31ad8f75626b1aba0500e0680ba4ddd778241635e` |
+| B2 resolved evaluation contract | B5 GO evidence lock | `4adfcb3ae550274ed3436c695c872e030c804bb8c16c09025958797312d8d592` |
+| ordered RELLIS test 899 manifest | shared B0/B2 evidence | `2e078a3ac89d870b4dfb5838f8cc2772e788ecdd7cb011c309d59b4ca6a66918` |
+| ordered Korean held-out 61 manifest | shared B0/B2 evidence | `1eb86ff65620fb5c0afc1d58c572c517cacc937468ebd865375aaa26d81eb782` |
 
 Korean held-out은 recipe, loss/sampler, memory plan, threshold, early stopping,
 checkpoint selection, GO artifact의 metric 재계산에 사용하지 않는다. RELLIS-val로
@@ -264,6 +269,23 @@ runtime은 `adom-b5-capacity-domain-go-v1` artifact를 검증하지 못하면 pr
 않는다. [`b5-go-decision.template.json`](b5-go-decision.template.json)은 의도적으로
 `NO_GO`와 invalid placeholder로 저장돼 있으며, raw artifact 재감사와 B2 해석 뒤
 별도 run artifact로 복사·작성한다. template 자체를 `GO` evidence로 쓰지 않는다.
+
+2026-09-01 fresh artifact 재감사 결과는 다음과 같아 두 번째 trigger를 충족한다.
+단위는 모두 percentage point다.
+
+| Metric | Re-audited value |
+| --- | ---: |
+| capacity-only common mIoU, B2-E0 minus B0-E0 | 0.11560489282459831 |
+| A0 | 56.95856191044892 |
+| A2 | 95.36961496716020 |
+| DID02 | 38.41105305671128 |
+| log capacity effect within E-ADOM | 24.833576042586145 |
+| rubble capacity effect within E-ADOM | 52.219739856485596 |
+
+따라서 GO artifact의 trigger는
+`abs_b2_difference_in_differences_ge_10pp`로 고정한다. checkpoint SHA는 B2 fresh
+audit의 `checkpoint_manifest.json`, metric은 B0/B2 Korean summary와 per-class CSV,
+ordered manifest SHA는 B2 `dataset_manifest_summary.json`에서 직접 복사한다.
 
 다음은 NO-GO다.
 

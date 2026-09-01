@@ -647,6 +647,13 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   name, full-device VRAM, compute capability 12.0을 함께 검사하고 현재 image의 native
   `sm_120` 부재는 PTX-JIT provisional warning과 필수 active memory probe로 공개한다.
   상세 계약은 decision record 0014를 따른다.
+- **[2026-09-01] raw B2 artifact 재감사로 B5 provenance gate를 교정**
+  이유: 0013에서 보존한 dataset/evaluation identifier 여덟 개가 65 hex라 B5를
+  의도적으로 차단했다. B2 full `dataset_contract.json`, fresh-evaluation summary와
+  ordered-manifest audit에서 실제 64-hex SHA를 재확인했다. B0와 B2 evaluation contract는
+  resolved architecture를 포함해 서로 다르므로 B5 GO evidence에는 B2 contract SHA를
+  고정한다. 재감사된 `DID02=38.41105305671128 pp`는 등록된 10 pp GO 기준을 충족한다.
+  상세 계약은 decision record 0041을 따른다.
 - **[2026-08-12] 저수준 방향 tree planning과 autonomy rosbag을 채택**
   이유: 현재 목표는 GPS/Nav2 기반 전역 자율주행이 아니라 Semantic20 costmap에서의
   직진·근거리 회피다. GPS를 control feedback에서 제거하고 이동경로 evidence로만

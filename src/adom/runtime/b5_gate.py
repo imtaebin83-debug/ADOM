@@ -9,14 +9,17 @@ from typing import Any
 
 
 B5_GO_SCHEMA = "adom-b5-capacity-domain-go-v1"
+# B2 fresh-evaluation summaries embed the resolved B2 model in this contract.
+# The B0 summaries therefore have a different contract SHA and must not be used
+# as provenance for the B2 evidence that authorizes a B5 run.
 FROZEN_EVALUATION_CONTRACT_SHA256 = (
-    "096467321246732da9d2f4a31ad8f75626b1aba0500e00680ba4ddd778241635e"
+    "4adfcb3ae550274ed3436c695c872e030c804bb8c16c09025958797312d8d592"
 )
 FROZEN_RELLIS_TEST_MANIFEST_SHA256 = (
-    "2e078a3ac89d870b4dfb5838f8cc2772e788ecdd7cb011c3309d59b4ca6a66918"
+    "2e078a3ac89d870b4dfb5838f8cc2772e788ecdd7cb011c309d59b4ca6a66918"
 )
 FROZEN_KOREAN_TEST_MANIFEST_SHA256 = (
-    "1eb86ff65620fb5c0afc1d58c572c517cacc937468ebd8655375aaa26d81eb782"
+    "1eb86ff65620fb5c0afc1d58c572c517cacc937468ebd865375aaa26d81eb782"
 )
 TRIGGERS = {
     "abs_capacity_only_common_miou_ge_10pp",

@@ -661,6 +661,12 @@ ORATOR-ATLAS는 ontology와 변환 코드가 공개돼 있고 converted unified 
   Git-SHA 검사를 통과한 경우에만 image를 push한다. 전체 `unittest discover`는 기존
   code-smoke job에 그대로 남기며 autonomy test를 skip하거나 기대값을 바꾸지 않는다.
   상세 계약은 decision record 0042를 따른다.
+- **[2026-09-02] B5 primary mapping lock의 중복 hex 문자를 raw canonical source로 교정**
+  이유: B5 static contract가 실행 중 `bridge_mapping.yaml`의 실제 64-hex SHA-256과
+  repository에 잘못 기록된 65-hex 값을 대조해 fail-closed로 차단했다. source file을
+  직접 재hash해 `ecfa61662ddbf16c801bcac22db11b0e7ee2408d635e3018a21d389933a6bc55`를
+  확인했고, dataset·split·checkpoint를 바꾸지 않은 provenance 표기 오기로 기록한다.
+  상세 계약은 decision record 0044를 따른다.
 - **[2026-08-12] 저수준 방향 tree planning과 autonomy rosbag을 채택**
   이유: 현재 목표는 GPS/Nav2 기반 전역 자율주행이 아니라 Semantic20 costmap에서의
   직진·근거리 회피다. GPS를 control feedback에서 제거하고 이동경로 evidence로만

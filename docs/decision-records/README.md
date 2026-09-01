@@ -67,6 +67,7 @@ decision record는 결정 당시의 맥락과 근거를 보존한다.
 | [0041](0041-b5-provenance-gate-repair.md) | B5 provenance gate repair | Accepted | raw B2 artifact에서 64-hex lock과 B2 evidence contract를 재감사 |
 | [0042](0042-training-image-ci-scope.md) | Training-image CI scope separation | Accepted | 전체 smoke는 유지하고 학습 이미지에는 명시적 contract allowlist 적용 |
 | [0043](0043-autonomous-speed-profile-realignment.md) | Autonomous 0.10..1.00 m/s speed profile | Accepted | 배포 YAML 값으로 fallback·defaults·test 정렬; 0029 대체 |
+| [0044](0044-b5-primary-mapping-lock-repair.md) | B5 primary mapping lock repair | Accepted | raw canonical mapping SHA를 재확인해 65-hex 표기 오기 교정 |
 
 `decision_logs.md`는 번호형 record 도입 전의 historical changelog다. 새 결정은 개별
 번호 파일로 만든다.

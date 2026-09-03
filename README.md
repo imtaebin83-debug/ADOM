@@ -33,8 +33,9 @@ flowchart LR
 
 인지 노드는 `mono8` 마스크(ID `0..18`, ignore `255`)와 confidence, overlay, JSON 상태를
 발행한다. 플래너는 costmap을 3-depth 방향 트리로 탐색해 corridor를 고르고, 컨트롤러가
-`/cmd_vel`을 Ackermann 명령으로 변환한다. **PWM 출력은 기본적으로 꺼져 있고**, 게임패드
-A 버튼을 눌러야 자율 명령이 차량으로 전달된다.
+`/cmd_vel`을 Ackermann 명령으로 변환한다. 자율주행 launch는 **PWM 출력 노드를 띄우지 않는
+것이 기본**이며(`start_pca9685:=false`), 켜더라도 차량은 STOPPED로 시작해 게임패드 A 버튼을
+눌러야 자율 명령이 전달된다.
 
 ## Semantic20 온톨로지
 
@@ -217,8 +218,9 @@ ros2 launch adom_bringup low_level_autonomy.launch.py \
 - **B5 게이트**: B5는 go/no-go 판정 파일 없이 시작할 수 없고, 템플릿 기본값은 `NO_GO`다.
 - **저장소 가드**: `python scripts/check_git_artifacts.py`가 데이터, 체크포인트, 엔진, 로그와
   개인 절대경로의 커밋 유입을 차단한다. CI에서 항상 실행된다.
-- **실차 안전**: PWM 출력 기본 비활성, 게임패드 safety mux, `/emergency_stop`과 command
-  timeout은 `adom_control`이 직접 처리한다. `tools/rc_eval`은 구독 전용으로 어떤 명령도
+- **실차 안전**: 자율주행 launch는 PWM 노드 없이 시작하고, 게임패드 safety mux를 통과해야
+  명령이 전달된다. `/emergency_stop`과 command timeout은 `adom_control`이 직접 처리한다.
+  워치독 계층 전체는 [`ros2_ws/README.md`](ros2_ws/README.md)에 정리돼 있다. `tools/rc_eval`은 구독 전용으로 어떤 명령도
   발행하지 않는다.
 
 ## 문서

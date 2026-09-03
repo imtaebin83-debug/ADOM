@@ -34,8 +34,9 @@ flowchart LR
 The perception node publishes a `mono8` mask (IDs `0..18`, ignore `255`) alongside
 confidence, overlay, and a JSON status topic. The planner searches the costmap with a
 3-depth direction tree to pick a corridor, and the controller converts `/cmd_vel` into
-Ackermann commands. **PWM output is disabled by default**; an operator must hold the
-gamepad A button before autonomous commands reach the vehicle.
+Ackermann commands. The autonomy launch **does not start the PWM node by default**
+(`start_pca9685:=false`), and even with it enabled the vehicle starts STOPPED until an
+operator presses the gamepad A button.
 
 ## Semantic20 ontology
 
@@ -227,9 +228,10 @@ The repository fails closed at several points so results cannot drift silently.
 - **Repository guard** — `python scripts/check_git_artifacts.py` blocks datasets,
   checkpoints, engines, logs, and personal absolute paths from entering git. It runs on
   every CI job.
-- **Vehicle safety** — PWM output is off by default, a gamepad safety mux gates autonomy,
-  and `adom_control` owns `/emergency_stop` and command timeouts. `tools/rc_eval` is
-  subscribe-only and never publishes a command.
+- **Vehicle safety** — the autonomy launch starts without the PWM node, a gamepad safety
+  mux gates autonomy, and `adom_control` owns `/emergency_stop` and command timeouts. The
+  full watchdog chain is documented in [`ros2_ws/README.md`](ros2_ws/README.md).
+  `tools/rc_eval` is subscribe-only and never publishes a command.
 
 ## Documentation
 

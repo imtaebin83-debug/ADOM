@@ -2,7 +2,10 @@ rule_planner:
   ros__parameters:
     costmap_topic: /adom/navigation/semantic_costmap
     cmd_vel_topic: /cmd_vel
-    # The local path controller owns /cmd_vel. Enable only for planner-only tests.
+    # The local path controller owns /cmd_vel. Nothing arbitrates between the
+    # two at runtime, so enabling this while local_path_control runs puts two
+    # publishers on /cmd_vel. Enable only for planner-only tests with the
+    # controller stopped.
     publish_cmd_vel: false
     local_path_topic: /adom/navigation/local_path
     planned_speed_topic: /adom/navigation/planned_speed
@@ -30,7 +33,7 @@ rule_planner:
     lethal_cost: 90
     stop_distance_m: 0.30
 
-    # Current autonomous planner command profile: 0.30..3.00 m/s.
+    # Approved autonomous command profile: 0.10..1.00 m/s (decision record 0043).
     max_speed_mps: 1.00
     min_speed_mps: 0.10
     # Must match the gamepad/PCA9685 forward ceiling in adom_control vehicle.yaml.

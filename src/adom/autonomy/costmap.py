@@ -25,10 +25,23 @@ class CostmapConfig:
 
     @property
     def rows(self) -> int:
+        """Cell count along +X (forward), i.e. OccupancyGrid ``info.width``.
+
+        Note the axis naming: ``rows`` counts forward cells and ``columns``
+        counts lateral cells, but ``build_costmap`` returns an array shaped
+        ``(columns, rows)`` and indexed ``grid[lateral, forward]``. Row-major
+        flattening therefore yields the ``y * info.width + x`` order that
+        nav_msgs/OccupancyGrid requires, with ``info.width = rows`` and
+        ``info.height = columns``.
+        """
         return max(1, int(round(self.length_m / self.resolution_m)))
 
     @property
     def columns(self) -> int:
+        """Cell count along +/-Y (lateral), i.e. OccupancyGrid ``info.height``.
+
+        See :attr:`rows` for the axis-naming caveat.
+        """
         return max(1, int(round(self.width_m / self.resolution_m)))
 
 

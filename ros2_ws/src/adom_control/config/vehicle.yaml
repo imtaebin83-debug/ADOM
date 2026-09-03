@@ -3,18 +3,23 @@ pca9685_control:
     wheelbase_m: 0.33
     # Nominal open-loop command range; this is not measured vehicle speed.
     max_speed_mps: 12.0
-    # Disabled until the XL-5 brake/reverse sequence is tested on this vehicle.
+    # Reverse IS currently allowed up to this speed. The XL-5 brake/reverse
+    # sequence has not been validated on this vehicle, so treat reverse as
+    # untested. Set 0.0 to actually disable it.
     max_reverse_speed_mps: 6.0
     # User-facing angle settings use degrees; ROS messages remain in radians.
     max_steering_angle_deg: 25.7831
 
     command_rate_hz: 50.0
     command_timeout_sec: 0.25
-    # Hold a valid neutral pulse while the XL-5 boots and arms.
-    esc_arm_duration_sec: 3.0
+    # No timed ESC arming hold is implemented. pca9685_control writes neutral
+    # once at startup and returns to neutral whenever /drive is stale, so the
+    # XL-5 sees neutral until a command arrives. Power the ESC only after this
+    # node reports the PCA9685 ready.
     drive_topic: /drive
     cmd_vel_topic: /cmd_vel
-    # Keep false during teleop; add a proper command mux before enabling both sources.
+    # Keep false. gamepad_control is the only intended source of /drive; taking
+    # /cmd_vel here bypasses the safety mux and its mode/timeout handling.
     enable_cmd_vel: false
 
     # Jetson Orin Nano 40-pin header bus. Confirm with `i2cdetect -l`.
@@ -54,6 +59,8 @@ gamepad_control:
     throttle_axis_scale: 1.0
     stick_deadzone: 0.10
 
+    # Outer clamp on any accepted command. This is not an independent autonomy
+    # limit: the planner and local controller cap autonomous speed at 1.00 m/s.
     max_forward_speed_mps: 12.0
     max_reverse_speed_mps: 6.0
     max_steering_angle_deg: 24.0

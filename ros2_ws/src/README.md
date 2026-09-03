@@ -1,6 +1,6 @@
 # ROS 2 Packages
 
-- `adom_description`: vehicle URDF and sensor TF
+- `adom_description`: vehicle URDF, sensor TF, chassis CAD mesh
 - `adom_sensors`: ZED 2i and RTK GNSS launch/config adapters
 - `adom_perception_ros`: TensorRT perception ROS adapter boundary
 - `adom_costmap_ros`: semantic/depth costmap adapter boundary

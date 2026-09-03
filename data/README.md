@@ -9,11 +9,16 @@
 
 ```text
 data/
-├── captures/     # 실차 rosbag 세션 (Git 제외)
-├── splits/       # Git 추적 가능, sample ID 또는 상대경로만 포함
-├── manifests/    # Git 추적 가능, 개인 PC 절대경로 금지
-└── external/     # Git 제외, runtime dataset symlink
+├── splits/          # Git 추적, sample ID 또는 상대경로만 포함
+├── registry/        # Git 추적, 데이터셋 배포본 메타데이터
+├── captures/        # 실차 rosbag 세션 (Git 제외)
+├── autonomy_bags/   # autonomy 세션 rosbag (Git 제외)
+└── external/        # runtime dataset symlink (Git 제외)
 ```
+
+현재 Git이 추적하는 것은 `splits/`와 `registry/`뿐이다. 나머지는
+`scripts/init_workspace.sh`가 실행 시점에 만들며 `scripts/check_git_artifacts.py`가
+커밋 유입을 차단한다.
 
 RunPod container 구조:
 
@@ -34,5 +39,6 @@ RunPod container 구조:
 - preprocessing command
 
 전처리 결과는 `/workspace/adom/outputs/preprocessing/<dataset>`에 저장하며 Git에
-커밋하지 않습니다. 작은 통계와 QC 보고서만 검토 후 `results/datasets/`에
-복사합니다.
+커밋하지 않습니다. 데이터셋 계약과 클래스 매핑 문서는
+[`docs/datasets/`](../docs/datasets/), 변환 스크립트는
+[`src/data/`](../src/README.md)에 있습니다.

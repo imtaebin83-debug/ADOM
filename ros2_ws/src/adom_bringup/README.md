@@ -16,7 +16,13 @@ shadow/wheels-off 검증 뒤에만 `start_pca9685:=true`를 추가한다. 프로
 차량은 STOPPED로 시작하며 게임패드 A 버튼을 눌러야 autonomous command가 `/drive`로
 전달된다. rosbag은 `data/autonomy_bags/`에서 자동 시작되고 Ctrl-C 시 닫힌다.
 
-기본 실행은 planning을 의도적으로 비활성화하고 control을 dry-run으로 시작한다.
+기본 실행은 planning을 의도적으로 비활성화한다. 다만 `start_control`과 `start_pca9685`가
+모두 기본 `true`이므로 **이 launch는 dry-run이 아니다** — I2C 하드웨어가 초기화되고 중립
+펄스가 출력된다. PWM 없이 확인하려면 다음을 쓴다.
+
+```bash
+ros2 launch adom_bringup vehicle.launch.py start_pca9685:=false
+```
 
 ```bash
 ros2 launch adom_bringup vehicle.launch.py

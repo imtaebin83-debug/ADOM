@@ -4,3 +4,6 @@
 *.yml text eol=lf
 Dockerfile text eol=lf
 data/splits/**/*.txt text eol=lf
+
+# Binary assets: never apply text or EOL conversion.
+*.stl binary

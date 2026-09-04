@@ -9,12 +9,15 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
+from pathlib import PurePosixPath
 
 import numpy as np
 from PIL import Image
 
 ALLOWED_IDS = set(range(19)) | {255}
+SPLITS = ("train", "val", "test")
 MANIFEST_FIELDS = [
     "sample_key",
     "source",
@@ -25,6 +28,37 @@ MANIFEST_FIELDS = [
     "mask_path",
     "non_ignore_ratio",
 ]
+SELECTION_FIELDS = [
+    "sample_id",
+    "condition",
+    "sequence_id",
+    "frame",
+    "relative_path",
+    "status",
+]
+EXCLUSION_FIELDS = [
+    "sample_id",
+    "condition",
+    "sequence_id",
+    "frame",
+    "relative_path",
+    "reason",
+    "notes",
+]
+SPLIT_ASSIGNMENT_FIELDS = ["sample_id", "split"]
+
+
+@dataclass(frozen=True)
+class AdomReleaseSample:
+    sample_id: str
+    condition: str
+    sequence_id: str
+    frame: str
+    image_relative: PurePosixPath
+    mask_relative: PurePosixPath
+    image_path: Path
+    mask_path: Path
+    split: str
 
 
 def parse_args() -> argparse.Namespace:
@@ -72,6 +106,16 @@ def parse_args() -> argparse.Namespace:
             "diagnostic: keep legacy RELLIS-only main val/test and write "
             "ADOM-v2 val/test as diagnostic splits. "
             "mixed: append ADOM-v2 val/test to main val/test."
+        ),
+    )
+    p.add_argument(
+        "--adom-split-csv",
+        type=Path,
+        default=None,
+        help=(
+            "Explicit ADOM-v2 release split assignment CSV with columns "
+            "sample_id,split. Required when metadata/selection.csv is used; "
+            "the pipeline never infers an unpublished split policy."
         ),
     )
     p.add_argument(
@@ -262,6 +306,265 @@ def write_split(path: Path, entries: list[str]) -> None:
     path.write_text((text + "\n") if text else "", encoding="utf-8")
 
 
+def read_csv_contract(
+    path: Path,
+    expected_fields: list[str],
+    label: str,
+    *,
+    allow_empty: bool = False,
+) -> list[dict[str, str]]:
+    require_file(path, label)
+    with path.open("r", newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames != expected_fields:
+            raise RuntimeError(
+                f"Unexpected {label} fields in {path}: {reader.fieldnames}. "
+                f"Expected {expected_fields}."
+            )
+        rows = list(reader)
+    if not rows and not allow_empty:
+        raise RuntimeError(f"Empty {label}: {path}")
+    return rows
+
+
+def find_release_metadata(adom_root: Path, name: str) -> Path:
+    candidates = [adom_root / "metadata" / name, adom_root / name]
+    existing = [path for path in candidates if path.is_file()]
+    if len(existing) > 1:
+        raise RuntimeError(
+            f"Multiple ADOM-v2 {name} files found: "
+            f"{[str(path) for path in existing]}"
+        )
+    if existing:
+        return existing[0]
+    raise FileNotFoundError(
+        f"ADOM-v2 {name} not found. Expected {candidates[0]} or {candidates[1]}."
+    )
+
+
+def parse_release_relative_path(value: str, label: str) -> PurePosixPath:
+    if not value or "\\" in value or (len(value) >= 2 and value[1] == ":"):
+        raise RuntimeError(f"Invalid POSIX-relative {label}: {value!r}")
+    relative = PurePosixPath(value)
+    if relative.is_absolute() or ".." in relative.parts or "." in relative.parts:
+        raise RuntimeError(f"Unsafe relative {label}: {value!r}")
+    return relative
+
+
+def resolve_release_file(
+    adom_root: Path,
+    relative: PurePosixPath,
+    label: str,
+) -> Path:
+    root = adom_root.resolve()
+    path = root.joinpath(*relative.parts).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError(f"{label} escapes ADOM-v2 root: {relative}") from exc
+    require_file(path, label)
+    return path
+
+
+def validate_unique_casefold(values: list[str], label: str) -> None:
+    seen: dict[str, str] = {}
+    for value in values:
+        key = value.casefold()
+        if key in seen:
+            raise RuntimeError(
+                f"Duplicate {label} (case-insensitive): {seen[key]!r} and {value!r}"
+            )
+        seen[key] = value
+
+
+def load_adom_release_samples(
+    adom_root: Path,
+    split_csv: Path | None,
+) -> list[AdomReleaseSample]:
+    selection_path = find_release_metadata(adom_root, "selection.csv")
+    exclusions_path = find_release_metadata(adom_root, "exclusions.csv")
+    if split_csv is None:
+        raise RuntimeError(
+            "ADOM-v2 release has no published train/val/test policy. "
+            "Provide --adom-split-csv with explicit sample_id,split assignments."
+        )
+
+    selection_rows = read_csv_contract(
+        selection_path,
+        SELECTION_FIELDS,
+        "ADOM-v2 selection.csv",
+    )
+    exclusion_rows = read_csv_contract(
+        exclusions_path,
+        EXCLUSION_FIELDS,
+        "ADOM-v2 exclusions.csv",
+        allow_empty=True,
+    )
+    split_rows = read_csv_contract(
+        split_csv,
+        SPLIT_ASSIGNMENT_FIELDS,
+        "ADOM-v2 split assignment CSV",
+    )
+
+    selection_ids = [row["sample_id"].strip() for row in selection_rows]
+    selection_paths = [row["relative_path"].strip() for row in selection_rows]
+    if any(not value for value in selection_ids):
+        raise RuntimeError("ADOM-v2 selection.csv contains an empty sample_id.")
+    validate_unique_casefold(selection_ids, "ADOM-v2 selection sample_id")
+    validate_unique_casefold(selection_paths, "ADOM-v2 selection relative_path")
+
+    exclusion_id_values = [row["sample_id"].strip() for row in exclusion_rows]
+    exclusion_path_values = [
+        row["relative_path"].strip() for row in exclusion_rows
+    ]
+    if any(not value for value in exclusion_id_values + exclusion_path_values):
+        raise RuntimeError(
+            "ADOM-v2 exclusions.csv rows require sample_id and relative_path."
+        )
+    validate_unique_casefold(exclusion_id_values, "ADOM-v2 exclusion sample_id")
+    validate_unique_casefold(
+        exclusion_path_values,
+        "ADOM-v2 exclusion relative_path",
+    )
+    for value in exclusion_path_values:
+        parse_release_relative_path(value, "exclusion relative_path")
+    exclusion_ids = {value.casefold() for value in exclusion_id_values}
+    exclusion_paths = {value.casefold() for value in exclusion_path_values}
+    overlap_ids = sorted(
+        sample_id
+        for sample_id in selection_ids
+        if sample_id.casefold() in exclusion_ids
+    )
+    overlap_paths = sorted(
+        relative_path
+        for relative_path in selection_paths
+        if relative_path.casefold() in exclusion_paths
+    )
+    if overlap_ids or overlap_paths:
+        raise RuntimeError(
+            "ADOM-v2 selection/exclusions overlap: "
+            f"sample_ids={overlap_ids[:10]}, relative_paths={overlap_paths[:10]}"
+        )
+
+    split_ids = [row["sample_id"].strip() for row in split_rows]
+    validate_unique_casefold(split_ids, "ADOM-v2 split sample_id")
+    split_by_id: dict[str, str] = {}
+    for row in split_rows:
+        sample_id = row["sample_id"].strip()
+        split = row["split"].strip().lower()
+        if not sample_id or split not in SPLITS:
+            raise RuntimeError(
+                f"Invalid ADOM-v2 split assignment: sample_id={sample_id!r}, "
+                f"split={row['split']!r}. Expected one of {SPLITS}."
+            )
+        split_by_id[sample_id.casefold()] = split
+
+    selected_casefold = {sample_id.casefold() for sample_id in selection_ids}
+    split_casefold = set(split_by_id)
+    missing_assignments = sorted(selected_casefold - split_casefold)
+    extra_assignments = sorted(split_casefold - selected_casefold)
+    if missing_assignments or extra_assignments:
+        raise RuntimeError(
+            "ADOM-v2 split assignments must cover selection.csv exactly once: "
+            f"missing={missing_assignments[:10]}, extra={extra_assignments[:10]}"
+        )
+
+    split_counts = Counter(split_by_id.values())
+    empty_splits = [split for split in SPLITS if split_counts[split] == 0]
+    if empty_splits:
+        raise RuntimeError(
+            f"ADOM-v2 split assignment has empty splits: {empty_splits}"
+        )
+
+    samples: list[AdomReleaseSample] = []
+    sequence_splits: dict[tuple[str, str], set[str]] = {}
+    for row in selection_rows:
+        sample_id = row["sample_id"].strip()
+        condition = row["condition"].strip()
+        sequence_id = row["sequence_id"].strip()
+        frame = row["frame"].strip()
+        status = row["status"].strip()
+        if not all((condition, sequence_id, frame)):
+            raise RuntimeError(f"Incomplete ADOM-v2 selection row: {row}")
+        if status.casefold() != "ok":
+            raise RuntimeError(
+                f"Selected ADOM-v2 sample must have status OK: {sample_id}={status!r}"
+            )
+        expected_sample_id = f"{condition}_{sequence_id}_{frame}"
+        if sample_id != expected_sample_id:
+            raise RuntimeError(
+                f"ADOM-v2 sample_id mismatch: {sample_id!r}, "
+                f"expected {expected_sample_id!r}"
+            )
+
+        image_relative = parse_release_relative_path(
+            row["relative_path"].strip(),
+            "selection relative_path",
+        )
+        if (
+            len(image_relative.parts) < 4
+            or image_relative.parts[0] != "images"
+            or image_relative.parts[1] != condition
+            or image_relative.parts[2] != sequence_id
+            or image_relative.stem != frame
+            or image_relative.suffix.lower() != ".png"
+        ):
+            raise RuntimeError(
+                f"ADOM-v2 metadata/path mismatch for {sample_id}: "
+                f"condition={condition!r}, sequence_id={sequence_id!r}, "
+                f"frame={frame!r}, relative_path={image_relative.as_posix()!r}"
+            )
+
+        mask_relative = PurePosixPath(
+            "masks",
+            *image_relative.parts[1:],
+        )
+        image_path = resolve_release_file(
+            adom_root,
+            image_relative,
+            "ADOM-v2 selected image",
+        )
+        mask_path = resolve_release_file(
+            adom_root,
+            mask_relative,
+            "ADOM-v2 selected mask",
+        )
+        split = split_by_id[sample_id.casefold()]
+        sequence_splits.setdefault((condition, sequence_id), set()).add(split)
+        samples.append(
+            AdomReleaseSample(
+                sample_id=sample_id,
+                condition=condition,
+                sequence_id=sequence_id,
+                frame=frame,
+                image_relative=image_relative,
+                mask_relative=mask_relative,
+                image_path=image_path,
+                mask_path=mask_path,
+                split=split,
+            )
+        )
+
+    leaking_sequences = {
+        f"{condition}/{sequence_id}": sorted(splits)
+        for (condition, sequence_id), splits in sequence_splits.items()
+        if len(splits) > 1
+    }
+    if leaking_sequences:
+        raise RuntimeError(
+            "ADOM-v2 condition/sequence appears in multiple splits: "
+            f"{leaking_sequences}"
+        )
+
+    return sorted(
+        samples,
+        key=lambda sample: (
+            SPLITS.index(sample.split),
+            sample.image_relative.as_posix().casefold(),
+        ),
+    )
+
+
 def resolve_adom_pair_roots(adom_root: Path, split: str) -> tuple[Path, Path]:
     """
     Supported ADOM-v2 contracts:
@@ -332,7 +635,24 @@ def inspect_semantic20_mask(mask_path: Path, image_path: Path) -> tuple[float, C
     return ratio, counter
 
 
-def add_adom_v2(
+def write_adom_statistics(
+    output_root: Path,
+    pixel_counts: Counter[int],
+) -> None:
+    stats_path = output_root / "results" / "adom_v2_class_statistics.csv"
+    stats_path.parent.mkdir(parents=True, exist_ok=True)
+    total = sum(pixel_counts.values())
+    with stats_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["class_id", "pixel_count", "pixel_percent"])
+        for class_id in sorted(pixel_counts, key=lambda x: (x == 255, x)):
+            count = pixel_counts[class_id]
+            writer.writerow(
+                [class_id, count, (100.0 * count / total if total else 0.0)]
+            )
+
+
+def add_presplit_adom_v2(
     adom_root: Path,
     output_root: Path,
     eval_policy: str,
@@ -435,19 +755,113 @@ def add_adom_v2(
             diagnostic_splits["test"],
         )
 
-    stats_path = output_root / "results" / "adom_v2_class_statistics.csv"
-    stats_path.parent.mkdir(parents=True, exist_ok=True)
-    total = sum(pixel_counts.values())
-    with stats_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["class_id", "pixel_count", "pixel_percent"])
-        for class_id in sorted(pixel_counts, key=lambda x: (x == 255, x)):
-            count = pixel_counts[class_id]
-            writer.writerow(
-                [class_id, count, (100.0 * count / total if total else 0.0)]
-            )
+    write_adom_statistics(output_root, pixel_counts)
 
     return adom_counts
+
+
+def add_adom_v2_release(
+    samples: list[AdomReleaseSample],
+    output_root: Path,
+    eval_policy: str,
+) -> dict[str, int]:
+    manifest_path = output_root / "manifest.csv"
+    rows = read_manifest(manifest_path)
+    existing_keys = {row["sample_key"] for row in rows}
+
+    split_root = output_root / "splits"
+    main_splits = {
+        split: read_split(split_root / f"{split}.txt")
+        for split in SPLITS
+    }
+    entries_by_split: dict[str, list[str]] = {split: [] for split in SPLITS}
+    pixel_counts: Counter[int] = Counter()
+
+    for sample in samples:
+        ratio, counts = inspect_semantic20_mask(
+            sample.mask_path,
+            sample.image_path,
+        )
+        pixel_counts.update(counts)
+
+        image_subpath = Path(*sample.image_relative.parts[1:])
+        mask_subpath = Path(*sample.mask_relative.parts[1:])
+        image_dst = (
+            output_root
+            / "images"
+            / "adom_v2"
+            / sample.split
+            / image_subpath
+        )
+        mask_dst = (
+            output_root
+            / "masks"
+            / "adom_v2"
+            / sample.split
+            / mask_subpath
+        )
+        hardlink_or_copy(sample.image_path, image_dst)
+        hardlink_or_copy(sample.mask_path, mask_dst)
+
+        sample_key = f"adom_v2/{sample.split}/{sample.sample_id}"
+        if sample_key in existing_keys:
+            raise RuntimeError(f"Duplicate sample key: {sample_key}")
+        existing_keys.add(sample_key)
+        entries_by_split[sample.split].append(sample_key)
+        rows.append(
+            {
+                "sample_key": sample_key,
+                "source": "adom_v2",
+                "source_split": sample.split,
+                "output_split": sample.split,
+                "sample_id": sample.sample_id,
+                "image_path": image_dst.relative_to(output_root).as_posix(),
+                "mask_path": mask_dst.relative_to(output_root).as_posix(),
+                "non_ignore_ratio": f"{ratio:.8f}",
+            }
+        )
+
+    main_splits["train"].extend(entries_by_split["train"])
+    if eval_policy == "mixed":
+        main_splits["val"].extend(entries_by_split["val"])
+        main_splits["test"].extend(entries_by_split["test"])
+
+    write_manifest(manifest_path, rows)
+    for split in SPLITS:
+        write_split(split_root / f"{split}.txt", main_splits[split])
+    if eval_policy == "diagnostic":
+        write_split(
+            split_root / "adom_v2_val_diagnostic.txt",
+            entries_by_split["val"],
+        )
+        write_split(
+            split_root / "adom_v2_test_diagnostic.txt",
+            entries_by_split["test"],
+        )
+
+    write_adom_statistics(output_root, pixel_counts)
+    return {split: len(entries_by_split[split]) for split in SPLITS}
+
+
+def add_adom_v2(
+    adom_root: Path,
+    output_root: Path,
+    eval_policy: str,
+    split_csv: Path | None,
+) -> dict[str, int]:
+    selection_candidates = [
+        adom_root / "metadata" / "selection.csv",
+        adom_root / "selection.csv",
+    ]
+    if any(path.is_file() for path in selection_candidates):
+        samples = load_adom_release_samples(adom_root, split_csv)
+        return add_adom_v2_release(samples, output_root, eval_policy)
+    if split_csv is not None:
+        raise RuntimeError(
+            "--adom-split-csv is only valid for an ADOM-v2 release "
+            "containing selection.csv."
+        )
+    return add_presplit_adom_v2(adom_root, output_root, eval_policy)
 
 
 def validate_final_package(output_root: Path) -> dict:
@@ -545,24 +959,20 @@ def main() -> int:
     repo_root = args.repo_root.expanduser().resolve()
     data_root = args.data_root.expanduser().resolve()
     output_root = args.output_root.expanduser().resolve()
+    adom_split_csv = (
+        args.adom_split_csv.expanduser().resolve()
+        if args.adom_split_csv is not None
+        else None
+    )
 
     require_dir(repo_root, "ADOM repository root")
     require_dir(data_root, "data root")
 
-    datasets_repo = (
-        repo_root / "study" / "gahyung" / "Datasets_Repo"
-    )
-
-    rellis_workflow = (
-        datasets_repo / "RELLIS-3D" / "rellis3d_semantic20_v1"
-    )
-    combined_workflow = (
-        datasets_repo
-        / "ADOM-Semantic20"
-        / "adom_semantic20_rellis_rugd_ycor_v1"
-    )
-    rugd_repo = datasets_repo / "RUGD"
-    ycor_repo = datasets_repo / "YCOR"
+    datasets_repo = repo_root / "src" / "data"
+    rellis_workflow = datasets_repo / "rellis"
+    combined_workflow = datasets_repo / "semantic_20"
+    rugd_repo = datasets_repo / "rugd"
+    ycor_repo = datasets_repo / "ycor"
 
     # Existing scripts/configs: these are the SSOT for legacy mappings.
     rellis_convert = rellis_workflow / "scripts" / "02_convert_masks.py"
@@ -592,6 +1002,33 @@ def main() -> int:
     rellis_raw = raw_root / "RELLIS-3D"
     rugd_raw = raw_root / "RUGD"
     ycor_raw = raw_root / "YCOR"
+
+    adom_root = args.adom_v2_root
+    if adom_root is None:
+        candidate = raw_root / "ADOM-v2"
+        if candidate.exists():
+            adom_root = candidate
+    if adom_root is not None:
+        adom_root = adom_root.expanduser().resolve()
+
+    if args.skip_adom_v2 and adom_split_csv is not None:
+        raise RuntimeError(
+            "--adom-split-csv cannot be combined with --skip-adom-v2."
+        )
+    if adom_split_csv is not None and adom_root is None:
+        raise RuntimeError(
+            "--adom-split-csv was provided but no ADOM-v2 root was found."
+        )
+    if not args.skip_adom_v2 and adom_root is not None:
+        require_dir(adom_root, "ADOM-v2 root")
+        selection_candidates = [
+            adom_root / "metadata" / "selection.csv",
+            adom_root / "selection.csv",
+        ]
+        if any(path.is_file() for path in selection_candidates):
+            # Fail before processing the legacy sources when release metadata
+            # or the explicit split assignment is incomplete or inconsistent.
+            load_adom_release_samples(adom_root, adom_split_csv)
 
     require_dir(rellis_raw, "RELLIS-3D raw dataset")
     require_dir(rugd_raw, "RUGD raw dataset")
@@ -682,19 +1119,14 @@ def main() -> int:
         ]
     )
 
-    adom_root = args.adom_v2_root
-    if adom_root is None:
-        candidate = raw_root / "ADOM-v2"
-        if candidate.exists():
-            adom_root = candidate
-
     adom_counts = None
     if not args.skip_adom_v2 and adom_root is not None:
         print("\n=== 6/6 Add ADOM-v2 ===")
         adom_counts = add_adom_v2(
-            adom_root.expanduser().resolve(),
+            adom_root,
             output_root,
             args.adom_eval_policy,
+            adom_split_csv,
         )
     else:
         print("\n=== 6/6 ADOM-v2 skipped/not present ===")

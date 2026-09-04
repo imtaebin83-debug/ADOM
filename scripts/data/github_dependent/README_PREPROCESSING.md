@@ -60,13 +60,11 @@ cd ADOM
 전처리 스크립트는 이 repository 안에 이미 있는 다음 파일들을 재사용합니다.
 
 ```text
-study/gahyung/Datasets_Repo/
-├── RELLIS-3D/
-│   └── rellis3d_semantic20_v1/
-├── RUGD/
-├── YCOR/
-└── ADOM-Semantic20/
-    └── adom_semantic20_rellis_rugd_ycor_v1/
+src/data/
+├── rellis/
+├── rugd/
+├── ycor/
+└── semantic_20/
 ```
 
 ---
@@ -108,15 +106,15 @@ mkdir -p ~/ADOM_data/raw
     │           ├── rgb.jpg
     │           └── labels.png
     │
-    └── ADOM-v2/             # 완성 후 추가
+    └── ADOM-v2/
         ├── images/
-        │   ├── train/
-        │   ├── val/
-        │   └── test/
-        └── masks/
-            ├── train/
-            ├── val/
-            └── test/
+        │   └── <condition>/<sequence_id>/*.png
+        ├── masks/
+        │   └── <condition>/<sequence_id>/*.png
+        └── metadata/
+            ├── selection.csv
+            ├── exclusions.csv
+            └── label_policy.md
 ```
 
 ### RELLIS-3D
@@ -148,25 +146,38 @@ YCOR/
 
 ### ADOM-v2
 
-ADOM-v2는 아직 URL/최종 package가 확정되지 않았으므로, 통합 코드는 다음 **input contract**만 요구합니다.
+공개 ADOM-v2는 다음 **input contract**를 사용합니다.
 
 ```text
 ADOM-v2/
-├── images/train/
-├── images/val/
-├── images/test/
-├── masks/train/
-├── masks/val/
-└── masks/test/
+├── images/<condition>/<sequence_id>/<frame>.png
+├── masks/<condition>/<sequence_id>/<frame>.png
+└── metadata/
+    ├── selection.csv
+    ├── exclusions.csv
+    └── label_policy.md
 ```
 
-이미지와 mask는 **동일 stem**이어야 합니다.
+이미지와 mask는 modality 아래의 **전체 상대경로**가 같아야 합니다. basename은
+condition 사이에서 반복될 수 있으므로 전역 key로 사용하지 않습니다.
 
 예:
 
 ```text
-images/train/frame_000123.png
-masks/train/frame_000123.png
+images/P1/seq01/frame_000002.png
+masks/P1/seq01/frame_000002.png
+```
+
+`selection.csv`의 현재 contract는 다음과 같습니다.
+
+```csv
+sample_id,condition,sequence_id,frame,relative_path,status
+```
+
+`exclusions.csv`의 현재 contract는 다음과 같습니다.
+
+```csv
+sample_id,condition,sequence_id,frame,relative_path,reason,notes
 ```
 
 ADOM-v2 mask는 CVAT export 원본 palette/overlay가 아니라 반드시 **class-ID mask PNG**여야 합니다.
@@ -181,13 +192,11 @@ allowed IDs: 0..18, 255
 
 ## 5. 통합 스크립트 위치
 
-이 파일을 예를 들어 다음 위치에 둡니다.
+통합 스크립트는 repository의 다음 위치에 있습니다.
 
 ```text
-~/ADOM/scripts/data/prepare_adom_semantic20_v2.py
+~/ADOM/scripts/data/github_dependent/prepare_adom_semantic20_v2.py
 ```
-
-현재 전달한 `prepare_adom_semantic20_v2.py`를 해당 위치에 복사하면 됩니다.
 
 ---
 
@@ -198,7 +207,7 @@ allowed IDs: 0..18, 255
 ```bash
 cd ~/ADOM
 
-python scripts/data/prepare_adom_semantic20_v2.py \
+python scripts/data/github_dependent/prepare_adom_semantic20_v2.py \
   --repo-root ~/ADOM \
   --data-root ~/ADOM_data \
   --output-root ~/ADOM_data/processed/adom_semantic20_v2 \
@@ -211,10 +220,11 @@ python scripts/data/prepare_adom_semantic20_v2.py \
 ```bash
 cd ~/ADOM
 
-python scripts/data/prepare_adom_semantic20_v2.py \
+python scripts/data/github_dependent/prepare_adom_semantic20_v2.py \
   --repo-root ~/ADOM \
   --data-root ~/ADOM_data \
   --output-root ~/ADOM_data/processed/adom_semantic20_v2 \
+  --adom-split-csv /path/to/adom_v2_splits.csv \
   --adom-eval-policy diagnostic \
   --overwrite
 ```
@@ -224,14 +234,28 @@ python scripts/data/prepare_adom_semantic20_v2.py \
 다른 위치에 있다면:
 
 ```bash
-python scripts/data/prepare_adom_semantic20_v2.py \
+python scripts/data/github_dependent/prepare_adom_semantic20_v2.py \
   --repo-root ~/ADOM \
   --data-root ~/ADOM_data \
   --adom-v2-root /path/to/ADOM-v2 \
+  --adom-split-csv /path/to/adom_v2_splits.csv \
   --output-root ~/ADOM_data/processed/adom_semantic20_v2 \
   --adom-eval-policy diagnostic \
   --overwrite
 ```
+
+공개 ADOM-v2에는 train/val/test split이 포함되어 있지 않습니다. 통합할 때는
+다음 형식의 별도 CSV를 반드시 전달해야 합니다.
+
+```csv
+sample_id,split
+P1_seq01_frame_000002,train
+```
+
+CSV는 `selection.csv`의 모든 `sample_id`를 정확히 한 번 포함해야 하며 `split`은
+`train`, `val`, `test` 중 하나여야 합니다. 같은 `condition/sequence_id`를 여러
+split으로 나누면 오류로 중단합니다. 분할 정책이 확정되기 전에는 이를 임의로
+생성하지 말고 `--skip-adom-v2`로 기존 3-source package만 만들 수 있습니다.
 
 ---
 
@@ -253,11 +277,11 @@ test  = RELLIS test only
 
 입니다.
 
-ADOM-v2가 `133 / 21 / 61` train/val/test split으로 만들어진 경우:
+`--adom-split-csv`에 확정된 train/val/test 할당이 들어온 경우:
 
 ```text
 main train
-  = 기존 main train + ADOM-v2 train(133)
+  = 기존 main train + ADOM-v2 train
 
 main val
   = 기존 RELLIS val
@@ -266,8 +290,8 @@ main test
   = 기존 RELLIS test
 
 diagnostic
-  = adom_v2_val_diagnostic.txt  (21)
-  = adom_v2_test_diagnostic.txt (61)
+  = adom_v2_val_diagnostic.txt
+  = adom_v2_test_diagnostic.txt
 ```
 
 이렇게 두면 **canonical RELLIS 평가**와 **자체 데이터 target 평가**를 분리할 수 있습니다.
@@ -352,10 +376,13 @@ ADOM-v2를 아직 넣지 않았다면 `adom_v2/`와 ADOM-v2 diagnostic split은 
 5. 기존 3-source validator 실행
 
 6. ADOM-v2가 있으면
-   → image/mask pairing 검사
+   → selection.csv / exclusions.csv contract 검사
+   → selection/exclusions 중복 검사
+   → 명시적 sample_id,split CSV 적용
+   → 전체 상대경로 기준 image/mask pairing 검사
    → single-channel 검사
    → 0..18/255 class ID 검사
-   → split 반영
+   → condition/sequence split leakage 검사
 
 7. 최종 전체 validation
    → image-mask 존재
@@ -402,7 +429,7 @@ cat ~/ADOM_data/processed/adom_semantic20_v2/results/final_unified_check.json
 prepare_adom_semantic20_v2.py
 README 또는 본 가이드
 mapping/config 변경사항이 있다면 해당 config
-최종 split 목록
+정책 확정 후 검토된 ADOM-v2 split assignment CSV
 작은 validation summary
 ```
 
@@ -423,22 +450,16 @@ TensorRT engine
 
 ---
 
-## 12. ADOM-v2가 완성된 뒤 수정할 부분
+## 12. ADOM-v2 split 확정 전후의 운영
 
-ADOM-v2 URL이 확정되어도 이 통합 스크립트의 핵심 코드는 바꿀 필요가 없습니다.
+공개 ADOM-v2 release 자체에는 split을 추가하거나 파일을 재배치하지 않습니다.
+정책 확정 전에는 `selection.csv`와 원본 상대경로를 그대로 유지합니다.
 
-수정할 것은 사실상 두 가지입니다.
+정책이 확정되면 별도 `sample_id,split` CSV를 작성하고 다음을 검토합니다.
 
-1. 가이드에 ADOM-v2 다운로드 URL 추가
-2. 다운로드/압축 해제 후 아래 contract로 정리
+1. `selection.csv`의 모든 sample이 정확히 한 번 할당됐는지
+2. 존재하지 않는 sample이 split CSV에 추가되지 않았는지
+3. 같은 `condition/sequence_id`가 여러 split에 걸치지 않는지
+4. 최종 train/val/test 목적과 `--adom-eval-policy`가 일치하는지
 
-```text
-raw/ADOM-v2/images/train
-raw/ADOM-v2/images/val
-raw/ADOM-v2/images/test
-raw/ADOM-v2/masks/train
-raw/ADOM-v2/masks/val
-raw/ADOM-v2/masks/test
-```
-
-만약 실제 ADOM-v2 배포 구조가 이와 다르면, `resolve_adom_pair_roots()`에 실제 구조 하나만 추가하면 됩니다.
+통합 스크립트는 위 조건을 검사한 뒤에만 ADOM-v2를 출력 package에 추가합니다.

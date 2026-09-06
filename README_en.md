@@ -62,6 +62,83 @@ The earlier Cost4 (`0..3`) contract is preserved separately for Phase 2 and refe
 
 ## Datasets and experiment axes
 
+### ADOM-v1 · ADOM-v2 downloads
+
+Our **ADOM-v1 and ADOM-v2 datasets are intended for semantic segmentation evaluation
+in Korean mountainous environments**. They provide RGB images and pixel-level reference
+masks to assess how models trained on existing off-road datasets perform in these
+environments and to inspect class-specific failure cases.
+
+Visit the download page for the desired version, download the archive, and extract it.
+Preserve the directory structure and filenames to keep images and masks paired.
+
+| Version | Images | Contents | Download |
+| --- | ---: | --- | --- |
+| ADOM-v1 | 215 | Images, partial-label masks, train/val/test lists, metadata | Link coming soon |
+| ADOM-v2 | 158 | Images, masks, visualization overlays, metadata | Link coming soon |
+
+<!-- Before release, replace both download cells with [Download](actual release URL). -->
+
+#### ADOM-v1 layout
+
+```text
+semantic20_adom_data_v1/
+├── images/<capture>/<sequence>/<frame>.png
+├── masks/<capture>/<sequence>/<frame>.png
+├── splits/
+│   ├── train.txt
+│   ├── val.txt
+│   └── test.txt
+├── metadata/
+│   ├── conversion_summary.json
+│   ├── label_mapping.json
+│   └── split_sequences.json
+└── manifest.csv
+```
+
+`images/` and `masks/` are organized by capture folder and sequence. `manifest.csv`
+records each sample's image and mask paths relative to the dataset root and its split.
+`splits/` lists extension-free sample paths for 133 training, 21 validation, and 61 test
+images. `metadata/` contains the class mapping, sequence assignments, and conversion summary.
+
+#### ADOM-v2 layout
+
+```text
+ADOM-V2(수정본)/
+├── images/<condition>/seq01/<frame>.png
+├── masks/<condition>/seq01/<frame>.png
+├── overlays/<condition>/seq01/<frame>.png
+└── metadata/
+    ├── selection.csv
+    ├── exclusions.csv
+    └── label_policy.md
+```
+
+The condition identifiers are `P1–P4`, `N1–N2`, and `C1–C2`. `selection.csv` lists
+released samples, `exclusions.csv` records exclusions, and `label_policy.md` documents
+class definitions and annotation interpretation. `overlays/` contains visual references;
+use `masks/` as evaluation ground truth. v2 does not include a predefined train/val/test split.
+
+In both versions, pair images and masks by their **complete relative paths** beneath
+the respective directories. For example, `images/P1/seq01/frame_000002.png` in v2 pairs
+with `masks/P1/seq01/frame_000002.png`. Basenames alone are insufficient because frame
+names can repeat across conditions.
+
+#### Evaluation notes
+
+Masks use Semantic20 class IDs; **exclude pixels with value `255` from evaluation**.
+The valid labels in v1 are `log(10)`, `person(11)`, and `rubble(18)`. The valid labels
+observed in v2 are `dirt(0)`, `grass(1)`, `tree(2)`, `sky(5)`, `log(10)`, `bush(13)`,
+and `rubble(18)`. Neither version should be treated as supporting evaluation of all 19 classes.
+
+If using v1 for training, preserve its supplied splits and reserve test for final
+evaluation. When using v2 as an evaluation set, keep its samples out of training and
+parameter tuning. Condition names and the `seq01` identifier alone do not establish
+target absence or independence of the original captures; consult the release's
+`metadata/label_policy.md` for interpretation. Report the version, evaluated sample list,
+classes, and ignore handling alongside results. This is a **Korean-environment diagnostic
+evaluation**, separate from the canonical RELLIS evaluation used in the experiments below.
+
 ### Training data composition
 
 | Experiment | Training data | Note |
@@ -249,7 +326,8 @@ The repository fails closed at several points so results cannot drift silently.
 
 RELLIS-3D, RUGD, YCOR, and GOOSE remain under their respective licenses and terms of use.
 This repository redistributes no source data — only conversion code and split definitions.
-The release scope of our own Korean off-road captures is decided separately.
+Our own Korean off-road captures are distributed separately through the ADOM-v1 and
+ADOM-v2 download section above.
 
 ## License
 

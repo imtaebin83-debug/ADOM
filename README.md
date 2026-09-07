@@ -68,7 +68,7 @@ flowchart LR
 | `e0` | RELLIS-3D only | source-only 기준선 |
 | `e1` | RELLIS-3D + RUGD + YCOR | 통합 패키지, manifest 14,421 샘플 |
 | `e2` | E1 + GOOSE (direct-only) | source 다양성 확장 |
-| `eadom` | E1 + 자체 수집 한국 오프로드 라벨 | **target-domain supervision** |
+| `eadom` | E0 + 자체 수집 한국 오프로드 라벨 | **target-domain supervision** |
 | `ta0` | target adaptation recipe discovery | crop/sampling/loss/optimizer ablation |
 
 **핵심 계약: validation과 test는 어느 실험에서든 canonical RELLIS 고정이다.** 학습 데이터만

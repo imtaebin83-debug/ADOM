@@ -58,7 +58,9 @@ Defined in [`src/adom/evaluation_semantic20.py`](src/adom/evaluation_semantic20.
 color palette lives in [`src/adom/perception/semantic20.py`](src/adom/perception/semantic20.py),
 and source-to-Semantic20 mappings in [`src/data/semantic_20/config/`](src/data/semantic_20/config/).
 
-The earlier Cost4 (`0..3`) contract is preserved separately for Phase 2 and reference use.
+The earlier Cost4 (`0..3`) contract is kept as a reference on the training and evaluation
+side only. Its ROS perception path was removed in
+[decision record 0046](docs/decision-records/0046-retire-the-cost4-ros-path.md).
 
 ## Datasets and experiment axes
 
@@ -181,36 +183,80 @@ Add `start_pca9685:=true` only after shadow and wheels-off validation have passe
 
 ## Repository layout
 
-The repository reads as three lanes.
+In one line: **`src/` is the brain, `ros2_ws/` is the shell that bolts onto the vehicle,
+`configs/` + `scripts/` + `docker/` are the training pipeline, and `data/` + `docs/` +
+`tests/` + `tools/` are the evidence that makes the results trustworthy.**
 
 ### 1. Data
 
-| Path | Role |
-| --- | --- |
-| [`data/`](data/README.md) | splits and manifests only; bulk data is never committed |
-| [`src/data/`](src/README.md) | RELLIS-3D / RUGD / YCOR / Semantic20 conversion and validation |
-| [`scripts/data/`](scripts/README.md) | Semantic20 package preprocessing entry points |
-| [`docs/datasets/`](docs/datasets/rellis3d-cost4.md) | dataset contracts and class mappings |
+**[`data/`](data/README.md)** — holds the *identity* of the data, not the data itself.
+Only `splits/` (train/val/test sample IDs) and `registry/` (dataset release metadata) are
+tracked; images and masks are never committed. The rest — `captures/`, `autonomy_bags/` —
+is created at run time by `scripts/init_workspace.sh`.
+
+**[`src/data/`](src/README.md)** — **dataset conversion scripts** and class mappings for
+RELLIS-3D, RUGD, YCOR, and Semantic20. Distinct in purpose from `src/adom/` below.
+
+**[`scripts/data/`](scripts/README.md)** — Semantic20 package preprocessing entry points.
+
+**[`docs/datasets/`](docs/datasets/rellis3d-cost4.md)** — dataset contracts and class mappings.
 
 ### 2. Model training
 
-| Path | Role |
+**[`configs/`](configs/README.md)** — MMSegmentation-style SegFormer configs, layered as
+`_base_/` (model, dataset, schedule, runtime fragments) → `phase1_semantic20/` (the current
+line, train IDs `0..18`) → `export/` and `runtime/`. The top-level
+`segformer_*_rellis3d.py` files are Cost4-era references.
+
+**[`src/`](src/README.md)** — **all logic that does not depend on ROS.** The installable
+`adom` package lives here.
+
+| Subpackage | Role |
 | --- | --- |
-| [`configs/`](configs/README.md) | SegFormer training/export/deployment configs (MMSeg style) |
-| [`src/adom/`](src/README.md) | MMSeg extensions, training cycle, export, evaluation |
-| [`scripts/`](scripts/README.md) | training, export, and TensorRT build entry points |
-| [`tools/`](tools/paper_eval/README.md) | paper evaluation, RC trial evaluation, submission audit |
-| [`Dockerfile`](Dockerfile), [`docker/`](docker/requirements/openmmlab.txt) | RunPod training image and pinned dependencies |
+| `adom/data/` | preprocessing, validation, packaging |
+| `adom/mmseg/` | MMSeg extensions (dataset, metric, hook, sampler) |
+| `adom/runtime/` | training and deployment cycles, contract gates, export |
+| `adom/perception/`, `adom/autonomy/` | perception, planning, and control algorithms (used by lane 3) |
+| `adom/analysis/` | uncertainty analysis |
+
+**[`scripts/`](scripts/README.md)** — the shell entry points that actually run the above:
+the training cycle (`run_semantic20_cycle.sh`), ONNX export, TensorRT engine build and
+validation, Jetson launch (`run_jetson_t4.sh`), and workspace initialization.
+
+**[`docker/requirements/`](docker/requirements/openmmlab.txt)** — the **pinned dependency
+set** for the RunPod training image, copied in by [`Dockerfile`](Dockerfile). Every version
+is pinned by hand for a `--no-deps` bootstrap that avoids the mmcv / mmdeploy / protobuf /
+OpenCV conflicts, so this file is effectively a contract stating that only this exact
+combination works.
 
 ### 3. Perception and control
 
-| Path | Role |
-| --- | --- |
-| [`ros2_ws/`](ros2_ws/README.md) | ROS 2 Jazzy colcon workspace (9 packages) |
-| `src/adom/perception/`, `src/adom/autonomy/` | ROS-independent perception, planning, and control logic |
-| [`docs/jetson-shortcuts.md`](docs/jetson-shortcuts.md) | Jetson field operation shortcuts |
+**[`ros2_ws/`](ros2_ws/README.md)** — the on-vehicle ROS 2 Jazzy colcon workspace, 9
+packages. The design rule is that these are **thin adapters** over `src/adom`: algorithms
+stay in `src/`, and the nodes here own only topic I/O, parameters, and watchdogs. ZED 2i
+RGB → Semantic20 segmentation → semantic costmap → direction-tree planner → path
+following → gamepad safety mux → PCA9685 PWM.
 
-Shared: [`docs/`](docs/README.md) (architecture, guides, decision records), [`tests/`](tests/) (data, evaluation, and runtime contract tests)
+**[`docs/jetson-shortcuts.md`](docs/jetson-shortcuts.md)** — Jetson field operation shortcuts.
+
+### Shared
+
+**[`docs/`](docs/README.md)** — `decision-records/` (ADRs, each preserved as written),
+`system-architecture/`, `setup-guides/`, `metrics/`, `datasets/`.
+
+**[`tests/`](tests/)** — closer to **contract verification** than unit testing. They assert
+manifest row counts, checkpoint SHAs, config inheritance, and runtime parameter values so
+results cannot drift silently. Both CI workflows depend on this directory.
+
+**[`tools/`](tools/paper_eval/README.md)** — offline evaluation tooling.
+
+| Tool | Role |
+| --- | --- |
+| [`paper_eval/`](tools/paper_eval/README.md) | regenerates paper tables by **re-inferring from checkpoints** rather than copying stored metrics; refuses to start unless the audit report reports `PASS` |
+| [`rc_eval/`](tools/rc_eval/README.md) | on-vehicle Go/Stop trial logging. **Subscribe- and read-only** — it never publishes a motor or servo command |
+| `paper_submission_audit/` | submission audit |
+
+### Rules
 
 - `src/` holds ROS-independent reusable logic; `ros2_ws/` nodes are thin adapters over it.
 - `tests/` runs in full on CI via `python -m unittest discover -s tests`.

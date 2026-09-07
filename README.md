@@ -57,7 +57,8 @@ flowchart LR
 소스 데이터셋에서 Semantic20으로 가는 매핑은
 [`src/data/semantic_20/config/`](src/data/semantic_20/config/)에 있다.
 
-기존 Cost4(`0..3`) 계약은 Phase 2/reference 용도로 별도 보존한다.
+기존 Cost4(`0..3`) 계약은 학습·평가 쪽에만 reference로 보존한다. ROS 인지 경로는
+[결정 기록 0046](docs/decision-records/0046-retire-the-cost4-ros-path.md)에서 제거했다.
 
 ## 데이터셋과 실험 축
 
@@ -174,36 +175,79 @@ ros2 launch adom_bringup low_level_autonomy.launch.py \
 
 ## 저장소 구조
 
-저장소는 세 개의 레인으로 읽는다.
+한 줄 요약: **`src/`가 두뇌, `ros2_ws/`가 차량에 붙는 껍데기, `configs/` + `scripts/` +
+`docker/`가 학습 파이프라인, `data/` + `docs/` + `tests/` + `tools/`가 그 결과를 신뢰할 수
+있게 만드는 증거다.**
 
 ### 1. 데이터
 
-| 경로 | 역할 |
-| --- | --- |
-| [`data/`](data/README.md) | split과 manifest만 Git 추적, 대용량 원본은 미커밋 |
-| [`src/data/`](src/README.md) | RELLIS-3D · RUGD · YCOR · Semantic20 변환·검증 스크립트 |
-| [`scripts/data/`](scripts/README.md) | Semantic20 패키지 전처리 진입점 |
-| [`docs/datasets/`](docs/datasets/rellis3d-cost4.md) | 데이터셋 계약과 클래스 매핑 |
+**[`data/`](data/README.md)** — 데이터 자체가 아니라 **데이터의 신원**만 담는다.
+`splits/`(train/val/test 샘플 ID)와 `registry/`(데이터셋 배포본 메타데이터)만 Git이
+추적하고, 실제 이미지·마스크는 절대 커밋하지 않는다. `captures/`, `autonomy_bags/` 같은
+나머지 디렉터리는 `scripts/init_workspace.sh`가 실행 시점에 만든다.
+
+**[`src/data/`](src/README.md)** — RELLIS-3D · RUGD · YCOR · Semantic20 **데이터셋 변환
+스크립트**와 클래스 매핑. 아래 `src/adom/`과는 목적이 다르다.
+
+**[`scripts/data/`](scripts/README.md)** — Semantic20 패키지 전처리 진입점.
+
+**[`docs/datasets/`](docs/datasets/rellis3d-cost4.md)** — 데이터셋 계약과 클래스 매핑 문서.
 
 ### 2. 모델 학습
 
-| 경로 | 역할 |
+**[`configs/`](configs/README.md)** — MMSegmentation 스타일 SegFormer config.
+`_base_/`(모델·데이터셋·스케줄·런타임 조각) → `phase1_semantic20/`(현재 주력, train ID
+`0..18`) → `export/`, `runtime/`로 나뉜다. 최상위의 `segformer_*_rellis3d.py`는 Cost4
+시절 reference다.
+
+**[`src/`](src/README.md)** — **ROS에 의존하지 않는 로직 전부.** 설치되는 `adom` 패키지가
+여기 있다.
+
+| 하위 패키지 | 역할 |
 | --- | --- |
-| [`configs/`](configs/README.md) | SegFormer 학습·export·배포 config (MMSeg 스타일) |
-| [`src/adom/`](src/README.md) | MMSeg 확장, 학습 사이클, export, 평가 로직 |
-| [`scripts/`](scripts/README.md) | 학습·export·TensorRT 빌드 진입점 |
-| [`tools/`](tools/paper_eval/README.md) | 논문 평가, RC 주행 평가, 제출 감사 |
-| [`Dockerfile`](Dockerfile), [`docker/`](docker/requirements/openmmlab.txt) | RunPod 학습 이미지와 pinned 의존성 |
+| `adom/data/` | 전처리, 검증, 패키징 |
+| `adom/mmseg/` | MMSeg 확장 (dataset, metric, hook, sampler) |
+| `adom/runtime/` | 학습·배포 사이클과 계약 게이트, export |
+| `adom/perception/`, `adom/autonomy/` | 인지·계획·제어 알고리즘 (레인 3에서 사용) |
+| `adom/analysis/` | 불확실성 분석 |
+
+**[`scripts/`](scripts/README.md)** — 위 로직을 실제로 돌리는 셸 진입점. 학습
+사이클(`run_semantic20_cycle.sh`), ONNX export, TensorRT 엔진 빌드·검증, Jetson
+실행(`run_jetson_t4.sh`), 워크스페이스 초기화.
+
+**[`docker/requirements/`](docker/requirements/openmmlab.txt)** — RunPod 학습 이미지의
+**핀 고정된 의존성**. [`Dockerfile`](Dockerfile)이 COPY하는 대상이다. mmcv·mmdeploy·
+protobuf·OpenCV의 버전 충돌을 피하려고 `--no-deps` 부트스트랩용으로 손수 고정한
+목록이라, 사실상 "이 조합만 동작한다"는 계약 문서다.
 
 ### 3. 인지 및 제어
 
-| 경로 | 역할 |
-| --- | --- |
-| [`ros2_ws/`](ros2_ws/README.md) | ROS 2 Jazzy colcon 워크스페이스 (9개 패키지) |
-| `src/adom/perception/`, `src/adom/autonomy/` | ROS 비의존 인지·계획·제어 로직 |
-| [`docs/jetson-shortcuts.md`](docs/jetson-shortcuts.md) | Jetson 현장 운영 단축 명령 |
+**[`ros2_ws/`](ros2_ws/README.md)** — Jetson 온보드 ROS 2 Jazzy colcon 워크스페이스,
+9개 패키지. `src/adom`을 감싸는 **얇은 어댑터**라는 것이 설계 원칙이다 — 알고리즘은
+`src/`에 두고, 여기는 topic I/O·파라미터·워치독만 담당한다. ZED 2i RGB → Semantic20
+분할 → semantic costmap → 방향 트리 플래너 → 경로 추종 → 게임패드 안전 mux →
+PCA9685 PWM.
 
-공통: [`docs/`](docs/README.md) (아키텍처·가이드·결정 기록), [`tests/`](tests/) (데이터·평가·런타임 계약 검증)
+**[`docs/jetson-shortcuts.md`](docs/jetson-shortcuts.md)** — Jetson 현장 운영 단축 명령.
+
+### 공통
+
+**[`docs/`](docs/README.md)** — `decision-records/`(ADR, 되돌리기 비싼 결정의 원문 보존),
+`system-architecture/`, `setup-guides/`, `metrics/`, `datasets/`.
+
+**[`tests/`](tests/)** — 단위 테스트라기보다 **계약 검증**에 가깝다. 데이터셋 행 수,
+체크포인트 SHA, config 상속, 런타임 파라미터 값을 단언해 결과가 조용히 어긋나는 것을
+fail-closed로 막는다. CI 워크플로 2개가 여기에 의존한다.
+
+**[`tools/`](tools/paper_eval/README.md)** — 오프라인 평가 도구.
+
+| 도구 | 역할 |
+| --- | --- |
+| [`paper_eval/`](tools/paper_eval/README.md) | 저장된 metric을 표에 복사하지 않고 **체크포인트에서 직접 재추론**해 논문 비교표를 재생성한다. 감사 리포트가 `PASS`가 아니면 시작조차 하지 않는다 |
+| [`rc_eval/`](tools/rc_eval/README.md) | 실차 Go/Stop 시험 로깅. **구독·읽기 전용**이라 모터·서보 명령을 절대 발행하지 않는다 |
+| `paper_submission_audit/` | 제출 감사 |
+
+### 규칙
 
 - `src/`는 ROS와 독립적인 재사용 로직을 담고, `ros2_ws/`의 노드는 이를 감싸는 adapter다.
 - `tests/`는 CI에서 `python -m unittest discover -s tests`로 전부 실행된다.

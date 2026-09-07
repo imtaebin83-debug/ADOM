@@ -65,7 +65,7 @@ TF(`base_link`, `zed_camera_link`, `gnss_link`)는 `adom_description`이, GNSS/E
 | --- | --- | --- |
 | `adom_description` | ament_cmake | 차량 URDF, 센서 TF, 섀시 CAD 메시 |
 | `adom_sensors` | ament_cmake | ZED 2i, RTK GNSS 드라이버 launch/config |
-| `adom_perception_ros` | ament_cmake | Semantic20 추론 노드, 마스크 컬러라이저, Cost4 레거시 경로 |
+| `adom_perception_ros` | ament_cmake | Semantic20 추론 노드, 마스크 컬러라이저 |
 | `adom_costmap_ros` | ament_cmake | 마스크+depth를 traversability costmap으로 투영 |
 | `adom_localization` | ament_cmake | ZED VIO + RTK GNSS dual-EKF (`robot_localization`) |
 | `adom_planning` | ament_cmake | 방향 트리 로컬 플래너, Nav2 설정, RTK waypoint executor |
@@ -223,7 +223,6 @@ costmap 위에서 Ackermann 기구학을 따르는 후보 경로를 트리로 �
 | 노드 | 패키지 | 역할 |
 | --- | --- | --- |
 | `semantic20_colorizer` | `adom_perception_ros` | `mono8` ID를 팔레트 색으로. 재추론하지 않고 ignore `255`는 검정 |
-| `adom_cost4_perception_node` | `adom_perception_ros` | 레거시 Cost4 경로. Semantic20 토픽과 분리 유지 |
 | `data_recorder` | `adom_control` | 게임패드 Y로 RGB 전용 rosbag 토글. 20 GB 상한, 1 GB 분할 |
 | `autonomy_data_recorder` | `adom_logging` | autonomy 세션 자동 기록. 전대역 카메라 제외, 상태 토픽 위주 |
 | `gps_track_logger` | `adom_logging` | `/fix` trail 시각화. **planning/control에 절대 투입하지 않음** |
@@ -351,13 +350,6 @@ ros2 launch adom_bringup low_level_autonomy.launch.py \
 
 ```bash
 ros2 topic pub --once /emergency_stop std_msgs/Bool "{data: true}"
-```
-
-### RViz 포함 실행
-
-```bash
-ros2 launch adom_bringup rule_autonomy.launch.py \
-  model_config:="$ADOM_MODEL_CONFIG" checkpoint:="$ADOM_CHECKPOINT"
 ```
 
 ### 데이터 수집만

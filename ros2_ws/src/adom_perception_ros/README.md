@@ -3,9 +3,7 @@
 `src/adom`의 MMSegmentation 추론 로직을 ROS 2 I/O로 감싼 Semantic20 퍼셉션
 노드다. 클래스 계약은 설치된 canonical
 `data/semantic_20/config/bridge_mapping.yaml`에서 읽으며, 출력 ID는 `0..18` 또는
-`255`만 허용한다. Cost4 mask와 혼용되지 않도록 별도 topic을 사용한다.
-기존 Cost4 경로는 `perception_cost4.launch.py`, `config/perception.yaml`,
-`adom_cost4_perception_node`로 별도 보존한다.
+`255`만 허용한다. 마스크는 `/adom/perception/semantic20_mask`로만 발행한다.
 
 ```text
 /adom/perception/semantic20_mask  sensor_msgs/Image (mono8, IDs 0..18/255)
@@ -95,7 +93,7 @@ ros2 launch adom_perception_ros perception.launch.py \
 
 이 기본 실행 쌍은 `e49ad80`에 기록된 Semantic20 SegFormer-B0 E0 legacy baseline이다.
 checkpoint는 Git에 포함되지 않으므로 perception 담당자에게 전달받아 위 경로에 둔다.
-E1, B2 또는 Cost4 checkpoint를 이 config와 혼용하지 않는다. Jetson `t4` 실행은
+E1 또는 B2 checkpoint를 이 config와 혼용하지 않는다. Jetson `t4` 실행은
 저장소 루트의 `scripts/run_jetson_t4.sh`를 사용한다.
 
 ROS runtime config는 640x360 입력을 파이프라인에서 직접 640x384로 `Pad`하지 않는다.

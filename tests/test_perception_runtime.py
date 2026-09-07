@@ -79,19 +79,23 @@ class Semantic20PerceptionContractTests(unittest.TestCase):
         self.assertEqual(statistics["present_class_ids"], [0, 1, 18])
         self.assertAlmostEqual(statistics["class_pixel_ratios"][18], 2 / 6, 6)
 
-    def test_cost4_and_semantic20_ros_configs_are_separate(self):
+    def test_semantic20_ros_config_owns_the_perception_contract(self):
         config_root = ROOT / "ros2_ws" / "src" / "adom_perception_ros" / "config"
-        cost4 = yaml.safe_load((config_root / "perception.yaml").read_text())
+        # The legacy Cost4 config was removed with its node and launch file. The
+        # semantic20 config is now the only perception parameter set, so assert it
+        # still publishes on the semantic20 topic rather than the retired
+        # /adom/perception/semantic_mask one.
+        self.assertEqual(
+            sorted(path.name for path in config_root.glob("*.yaml")),
+            ["perception_semantic20.yaml"],
+        )
         semantic20 = yaml.safe_load(
             (config_root / "perception_semantic20.yaml").read_text()
         )
-        cost4_params = cost4["adom_perception"]["ros__parameters"]
         semantic20_params = semantic20["adom_perception"]["ros__parameters"]
-        self.assertEqual(cost4_params["mask_topic"], "/adom/perception/semantic_mask")
         self.assertEqual(
             semantic20_params["mask_topic"], "/adom/perception/semantic20_mask"
         )
-        self.assertNotIn("bridge_mapping_path", cost4_params)
         self.assertEqual(semantic20_params["target_fps"], 30.0)
         self.assertEqual(semantic20_params["evidence_mask_fps"], 2.0)
         self.assertEqual(

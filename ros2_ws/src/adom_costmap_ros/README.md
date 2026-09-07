@@ -1,7 +1,7 @@
 # adom_costmap_ros
 
 Segmentation mask, registered depth, camera intrinsics와 TF를 결합해 로봇 중심 semantic
-`OccupancyGrid`를 발행한다. Cost4의 위험도가 높은 관측이 같은 cell에서 항상 우선하며,
+`OccupancyGrid`를 발행한다. 위험도가 높은 관측이 같은 cell에서 항상 우선하며,
 차량 폭을 위한 inflation을 적용한다.
 
 `inflation_seed_cost` 이상인 이미 lethal한 cell만 inflation을 시작한다. 주변 ring은

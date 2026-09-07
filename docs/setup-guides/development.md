@@ -40,7 +40,7 @@ Do not commit datasets, generated labels, checkpoints, exported ONNX files, Tens
 Use:
 
 - `data/` for local dataset placement conventions
-- `models/` for local checkpoint/export placement conventions
+- `models/` for local checkpoint/export placement conventions — see [jetson-model-checkpoint-handoff.md](jetson-model-checkpoint-handoff.md)
 
 ## First Setup Tasks
 

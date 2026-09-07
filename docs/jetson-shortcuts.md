@@ -426,7 +426,7 @@ profile config는 외부 `ADOM_MODEL_CONFIG`보다 우선하므로 이전 export
 padding 계약을 우회하지 않는다. canonical SHA가 일치하는 두 MMEngine checkpoint는
 PyTorch 2.6+ loader 호환 설정을 검증 이후 자동 적용하므로 별도 `TORCH_FORCE_*` 설정이
 필요하지 않다. checkpoint의 RunPod→로컬→Jetson 전달, SHA 확인과 live 검증 절차는
-[`docs/setup-guides/jetson-model-checkpoint-handoff.md`](docs/setup-guides/jetson-model-checkpoint-handoff.md)를
+[`docs/setup-guides/jetson-model-checkpoint-handoff.md`](setup-guides/jetson-model-checkpoint-handoff.md)를
 따른다.
 현재 둘 다 PyTorch/MMSeg CUDA backend를 사용하며 TensorRT engine의 ROS 연결은 후속
 작업이다.

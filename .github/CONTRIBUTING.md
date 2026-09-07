@@ -11,7 +11,14 @@
 - Keep ROS2 nodes in `ros2_ws/` as thin adapters over `src/` logic.
 - Keep offline paper/RC evaluation scripts in `tools/`.
 - Add or update `tests/` whenever a data, evaluation, or runtime contract changes.
-- Keep large files out of git. Use `data/` and `models/` only for README files, metadata, and path conventions.
+- Keep large files out of git. `data/`는 split과 manifest만, `models/`는 런타임에 생성되는 checkpoint/export 배치 경로일 뿐이며 실제 파일은 커밋하지 않는다. 배치 규칙은 [`docs/setup-guides/jetson-model-checkpoint-handoff.md`](../docs/setup-guides/jetson-model-checkpoint-handoff.md)를 따른다.
+
+## 외부 오픈소스 사용 규칙
+
+- 전체 upstream repo를 그대로 복사해서 커밋하지 않는다.
+- 수정이 필요한 외부 프로젝트는 개인 fork에서 작업한다.
+- 빌드나 실행에 직접 필요해졌을 때만 submodule 또는 명확한 install guide로 연결한다.
+- 외부 코드를 추가할 때는 upstream URL, license, commit hash 또는 release version, local modifications, 필요한 이유를 PR 본문과 관련 문서에 함께 남긴다.
 
 ## Experiment Checklist
 

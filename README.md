@@ -132,7 +132,7 @@ python -m pip install --editable .
 ```
 
 학습에는 MMSegmentation 스택이 추가로 필요하다
-([`requirements/openmmlab.txt`](requirements/openmmlab.txt), [`Dockerfile`](Dockerfile)).
+([`docker/requirements/openmmlab.txt`](docker/requirements/openmmlab.txt), [`Dockerfile`](Dockerfile)).
 
 ### 학습 1-cycle
 
@@ -174,35 +174,42 @@ ros2 launch adom_bringup low_level_autonomy.launch.py \
 
 ## 저장소 구조
 
-```text
-.
-├── configs/     # SegFormer 학습·export·배포 config (MMSeg 스타일)
-├── data/        # split과 manifest만 추적, 대용량 데이터 미커밋
-├── docs/        # 아키텍처, 세팅 가이드, benchmark 정의, 결정 기록
-├── external/    # 외부 오픈소스 연결 지점
-├── models/      # 체크포인트/export 배치 규칙, 실제 파일 미커밋
-├── ros2_ws/     # ROS 2 Jazzy colcon 워크스페이스 (9개 패키지)
-├── scripts/     # 학습·export·Jetson 운영 진입점
-├── src/         # 전처리·학습 확장·추론·평가·자율주행 로직
-├── tests/       # 데이터·평가·런타임 계약 검증
-└── tools/       # 논문 평가, RC 주행 평가, 제출 감사
-```
+저장소는 세 개의 레인으로 읽는다.
 
-디렉터리별 상세는 각 README를 따른다:
-[configs](configs/README.md) ·
-[data](data/README.md) ·
-[docs](docs/README.md) ·
-[external](external/README.md) ·
-[models](models/README.md) ·
-[ros2_ws](ros2_ws/README.md) ·
-[scripts](scripts/README.md) ·
-[src](src/README.md) ·
-[tools/paper_eval](tools/paper_eval/README.md) ·
-[tools/rc_eval](tools/rc_eval/README.md)
+### 1. 데이터
+
+| 경로 | 역할 |
+| --- | --- |
+| [`data/`](data/README.md) | split과 manifest만 Git 추적, 대용량 원본은 미커밋 |
+| [`src/data/`](src/README.md) | RELLIS-3D · RUGD · YCOR · Semantic20 변환·검증 스크립트 |
+| [`scripts/data/`](scripts/README.md) | Semantic20 패키지 전처리 진입점 |
+| [`docs/datasets/`](docs/datasets/rellis3d-cost4.md) | 데이터셋 계약과 클래스 매핑 |
+
+### 2. 모델 학습
+
+| 경로 | 역할 |
+| --- | --- |
+| [`configs/`](configs/README.md) | SegFormer 학습·export·배포 config (MMSeg 스타일) |
+| [`src/adom/`](src/README.md) | MMSeg 확장, 학습 사이클, export, 평가 로직 |
+| [`scripts/`](scripts/README.md) | 학습·export·TensorRT 빌드 진입점 |
+| [`tools/`](tools/paper_eval/README.md) | 논문 평가, RC 주행 평가, 제출 감사 |
+| [`Dockerfile`](Dockerfile), [`docker/`](docker/requirements/openmmlab.txt) | RunPod 학습 이미지와 pinned 의존성 |
+
+### 3. 인지 및 제어
+
+| 경로 | 역할 |
+| --- | --- |
+| [`ros2_ws/`](ros2_ws/README.md) | ROS 2 Jazzy colcon 워크스페이스 (9개 패키지) |
+| `src/adom/perception/`, `src/adom/autonomy/` | ROS 비의존 인지·계획·제어 로직 |
+| [`docs/jetson-shortcuts.md`](docs/jetson-shortcuts.md) | Jetson 현장 운영 단축 명령 |
+
+공통: [`docs/`](docs/README.md) (아키텍처·가이드·결정 기록), [`tests/`](tests/) (데이터·평가·런타임 계약 검증)
 
 - `src/`는 ROS와 독립적인 재사용 로직을 담고, `ros2_ws/`의 노드는 이를 감싸는 adapter다.
 - `tests/`는 CI에서 `python -m unittest discover -s tests`로 전부 실행된다.
 - 대용량 데이터셋, 학습 결과, checkpoint, TensorRT engine은 git에 올리지 않는다.
+- 로컬 `models/` 디렉터리는 Git 추적 대상이 아니며, 배치 규칙은
+  [`docs/setup-guides/jetson-model-checkpoint-handoff.md`](docs/setup-guides/jetson-model-checkpoint-handoff.md)를 따른다.
 
 ## 재현성과 안전 장치
 
@@ -232,8 +239,8 @@ ros2 launch adom_bringup low_level_autonomy.launch.py \
 - [RELLIS-3D Cost4 data contract](docs/datasets/rellis3d-cost4.md)
 - [RunPod training and DevOps guide](docs/devops.md) and [one-cycle command](docs/runpod-one-cycle.md)
 - [Decision records](docs/decision-records/README.md) — 실험 설계와 주요 결정의 근거
-- [RC vehicle (Traxxas XL-5) setup](RC_SETTING.md) and [Jetson shortcut commands](SHORTCUT.md)
-- [Contribution guide](CONTRIBUTING.md)
+- [RC vehicle (Traxxas XL-5) setup](docs/setup-guides/rc-vehicle-esc.md) and [Jetson shortcut commands](docs/jetson-shortcuts.md)
+- [Contribution guide](.github/CONTRIBUTING.md)
 
 ## 데이터셋 출처
 

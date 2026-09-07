@@ -304,7 +304,7 @@ class RuntimeContractTests(unittest.TestCase):
             self.assertEqual(_git_sha(REPO_ROOT), "image-sha")
 
     def test_mmseg_tokenizer_dependencies_are_pinned(self) -> None:
-        requirements = (REPO_ROOT / "requirements" / "openmmlab.txt").read_text(
+        requirements = (REPO_ROOT / "docker" / "requirements" / "openmmlab.txt").read_text(
             encoding="utf-8"
         )
         for package, expected in (

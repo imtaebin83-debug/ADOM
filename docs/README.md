@@ -20,3 +20,4 @@
 | `metrics/` | benchmark와 metric 정의 |
 | `datasets/` | 데이터셋 전처리 계약과 클래스 매핑 |
 | `devops.md`, `runpod-one-cycle.md` | RunPod 학습 이미지와 1-cycle 실행 절차 |
+| `jetson-shortcuts.md` | Jetson 현장 운영 단축 명령 모음 |

@@ -33,8 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/openmmlab.txt /tmp/requirements/openmmlab.txt
-COPY requirements/opencv-headless-compat /tmp/requirements/opencv-headless-compat
+COPY docker/requirements/openmmlab.txt /tmp/requirements/openmmlab.txt
+COPY docker/requirements/opencv-headless-compat /tmp/requirements/opencv-headless-compat
 
 # Pin the packaging and numerical stacks before installing OpenMMLab.
 # NumPy 1.24.4 is the common compatible version for the NGC image's numba,

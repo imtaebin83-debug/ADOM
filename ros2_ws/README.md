@@ -371,7 +371,7 @@ ros2 launch adom_bringup data_collection.launch.py
 ### Jetson 단축 진입점
 
 프로파일 config/체크포인트 수와 SHA-256을 검증한 뒤 실행한다. 자세한 내용은
-[`SHORTCUT.md`](../SHORTCUT.md).
+[`docs/jetson-shortcuts.md`](../docs/jetson-shortcuts.md).
 
 ```bash
 scripts/run_jetson_t4.sh eadom
@@ -380,6 +380,6 @@ scripts/run_jetson_t4.sh eadom
 ## 참고
 
 - 패키지별 상세는 각 패키지의 README를 따른다.
-- 차량 ESC 설정: [`RC_SETTING.md`](../RC_SETTING.md)
-- Jetson 운영 단축 명령: [`SHORTCUT.md`](../SHORTCUT.md)
+- 차량 ESC 설정: [`docs/setup-guides/rc-vehicle-esc.md`](../docs/setup-guides/rc-vehicle-esc.md)
+- Jetson 운영 단축 명령: [`docs/jetson-shortcuts.md`](../docs/jetson-shortcuts.md)
 - 설계 근거: [decision records](../docs/decision-records/README.md)

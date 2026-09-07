@@ -139,7 +139,7 @@ python -m pip install --editable .
 ```
 
 Training additionally needs the MMSegmentation stack
-([`requirements/openmmlab.txt`](requirements/openmmlab.txt), [`Dockerfile`](Dockerfile)).
+([`docker/requirements/openmmlab.txt`](docker/requirements/openmmlab.txt), [`Dockerfile`](Dockerfile)).
 
 ### One training cycle
 
@@ -181,35 +181,42 @@ Add `start_pca9685:=true` only after shadow and wheels-off validation have passe
 
 ## Repository layout
 
-```text
-.
-├── configs/     # SegFormer training/export/deployment configs (MMSeg style)
-├── data/        # splits and manifests only; bulk data is never committed
-├── docs/        # architecture, setup guides, benchmark definitions, decision records
-├── external/    # attachment point for third-party open source
-├── models/      # checkpoint and export placement rules; no model files committed
-├── ros2_ws/     # ROS 2 Jazzy colcon workspace (9 packages)
-├── scripts/     # training, export, and Jetson operation entry points
-├── src/         # preprocessing, training extensions, inference, evaluation, autonomy
-├── tests/       # data, evaluation, and runtime contract tests
-└── tools/       # paper evaluation, RC trial evaluation, submission audit
-```
+The repository reads as three lanes.
 
-Per-directory detail lives in each README:
-[configs](configs/README.md) ·
-[data](data/README.md) ·
-[docs](docs/README.md) ·
-[external](external/README.md) ·
-[models](models/README.md) ·
-[ros2_ws](ros2_ws/README.md) ·
-[scripts](scripts/README.md) ·
-[src](src/README.md) ·
-[tools/paper_eval](tools/paper_eval/README.md) ·
-[tools/rc_eval](tools/rc_eval/README.md)
+### 1. Data
 
-- `src/` holds ROS-independent reusable logic; nodes in `ros2_ws/` are adapters over it.
+| Path | Role |
+| --- | --- |
+| [`data/`](data/README.md) | splits and manifests only; bulk data is never committed |
+| [`src/data/`](src/README.md) | RELLIS-3D / RUGD / YCOR / Semantic20 conversion and validation |
+| [`scripts/data/`](scripts/README.md) | Semantic20 package preprocessing entry points |
+| [`docs/datasets/`](docs/datasets/rellis3d-cost4.md) | dataset contracts and class mappings |
+
+### 2. Model training
+
+| Path | Role |
+| --- | --- |
+| [`configs/`](configs/README.md) | SegFormer training/export/deployment configs (MMSeg style) |
+| [`src/adom/`](src/README.md) | MMSeg extensions, training cycle, export, evaluation |
+| [`scripts/`](scripts/README.md) | training, export, and TensorRT build entry points |
+| [`tools/`](tools/paper_eval/README.md) | paper evaluation, RC trial evaluation, submission audit |
+| [`Dockerfile`](Dockerfile), [`docker/`](docker/requirements/openmmlab.txt) | RunPod training image and pinned dependencies |
+
+### 3. Perception and control
+
+| Path | Role |
+| --- | --- |
+| [`ros2_ws/`](ros2_ws/README.md) | ROS 2 Jazzy colcon workspace (9 packages) |
+| `src/adom/perception/`, `src/adom/autonomy/` | ROS-independent perception, planning, and control logic |
+| [`docs/jetson-shortcuts.md`](docs/jetson-shortcuts.md) | Jetson field operation shortcuts |
+
+Shared: [`docs/`](docs/README.md) (architecture, guides, decision records), [`tests/`](tests/) (data, evaluation, and runtime contract tests)
+
+- `src/` holds ROS-independent reusable logic; `ros2_ws/` nodes are thin adapters over it.
 - `tests/` runs in full on CI via `python -m unittest discover -s tests`.
-- Bulk datasets, training outputs, checkpoints, and TensorRT engines stay out of git.
+- Large datasets, training outputs, checkpoints, and TensorRT engines are never committed.
+- The local `models/` directory is untracked; its placement rules live in
+  [`docs/setup-guides/jetson-model-checkpoint-handoff.md`](docs/setup-guides/jetson-model-checkpoint-handoff.md).
 
 ## Reproducibility and safety gates
 
@@ -242,8 +249,8 @@ The repository fails closed at several points so results cannot drift silently.
 - [RELLIS-3D Cost4 data contract](docs/datasets/rellis3d-cost4.md)
 - [RunPod training and DevOps guide](docs/devops.md) and [one-cycle command](docs/runpod-one-cycle.md)
 - [Decision records](docs/decision-records/README.md) — rationale for experiment design and key decisions
-- [RC vehicle (Traxxas XL-5) setup](RC_SETTING.md) and [Jetson shortcut commands](SHORTCUT.md)
-- [Contribution guide](CONTRIBUTING.md)
+- [RC vehicle (Traxxas XL-5) setup](docs/setup-guides/rc-vehicle-esc.md) and [Jetson shortcut commands](docs/jetson-shortcuts.md)
+- [Contribution guide](.github/CONTRIBUTING.md)
 
 ## Dataset attribution
 

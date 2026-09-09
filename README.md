@@ -63,6 +63,80 @@ flowchart LR
 
 ## 데이터셋과 실험 축
 
+### ADOM-v1 · ADOM-v2 다운로드
+
+자체 수집한 **ADOM-v1과 ADOM-v2는 국내 산악 환경의 의미 분할 평가에 활용하기 위한
+데이터셋**이다. RGB 이미지와 픽셀 단위 정답 마스크를 제공하며, 기존 오프로드 데이터로
+학습한 모델의 국내 환경 적용 성능과 클래스별 실패 사례를 확인하는 데 사용할 수 있다.
+
+아래 다운로드 페이지에서 원하는 버전의 압축 파일을 내려받고 압축을 해제한다.
+이미지와 마스크를 연결할 수 있도록 하위 폴더 구조와 파일명은 유지한다.
+
+| 버전 | 이미지 수 | 제공 구성 | 다운로드 |
+| --- | ---: | --- | --- |
+| ADOM-v1 | 215 | 이미지, 부분 라벨 마스크, train/val/test 목록, 메타데이터 | 링크 추가 예정 |
+| ADOM-v2 | 158 | 이미지, 마스크, 시각화 오버레이, 메타데이터 | 링크 추가 예정 |
+
+
+#### ADOM-v1 폴더 구성
+
+```text
+semantic20_adom_data_v1/
+├── images/<capture>/<sequence>/<frame>.png
+├── masks/<capture>/<sequence>/<frame>.png
+├── splits/
+│   ├── train.txt
+│   ├── val.txt
+│   └── test.txt
+├── metadata/
+│   ├── conversion_summary.json
+│   ├── label_mapping.json
+│   └── split_sequences.json
+└── manifest.csv
+```
+
+`images/`와 `masks/`는 촬영 폴더와 시퀀스를 기준으로 구성된다. `manifest.csv`에는
+샘플별 이미지·마스크 상대경로와 split이 기록되어 있다. `splits/`는 train 133장,
+val 21장, test 61장의 확장자 없는 샘플 상대경로 목록이며, `metadata/`에는 클래스
+매핑, 시퀀스 분할 정보와 변환 요약이 포함된다.
+
+#### ADOM-v2 폴더 구성
+
+```text
+ADOM-V2(수정본)/
+├── images/<condition>/seq01/<frame>.png
+├── masks/<condition>/seq01/<frame>.png
+├── overlays/<condition>/seq01/<frame>.png
+└── metadata/
+    ├── selection.csv
+    ├── exclusions.csv
+    └── label_policy.md
+```
+
+`condition`은 `P1–P4`, `N1–N2`, `C1–C2`의 조건 식별자다. `selection.csv`는 배포
+샘플 목록, `exclusions.csv`는 제외 기록, `label_policy.md`는 클래스 정의와 라벨
+해석 기준을 담는다. `overlays/`는 시각화 자료이며 평가 정답은 `masks/`를 사용한다.
+v2에는 별도의 train/val/test 분할이 포함되어 있지 않다.
+
+두 버전 모두 이미지와 마스크는 각 폴더 아래의 **전체 상대경로**로 대응한다.
+예를 들어 v2의 `images/P1/seq01/frame_000002.png`는
+`masks/P1/seq01/frame_000002.png`와 연결된다. 파일명만으로 연결하면 조건 간에
+반복되는 프레임 이름을 혼동할 수 있다.
+
+#### 평가 시 참고사항
+
+마스크는 Semantic20 클래스 ID를 사용하며 **`255` 픽셀은 평가에서 제외**한다.
+v1의 유효 라벨은 `log(10)`, `person(11)`, `rubble(18)`이고, v2에 실제 관측된 유효
+라벨은 `dirt(0)`, `grass(1)`, `tree(2)`, `sky(5)`, `log(10)`, `bush(13)`,
+`rubble(18)`이다. 두 버전 모두 19개 클래스 전체의 평가를 지원하는 것으로 해석하지 않는다.
+
+v1을 학습에도 사용하는 경우 제공된 분할을 유지하고 test는 최종 평가에 사용한다.
+v2를 평가셋으로 사용할 때는 해당 샘플을 학습이나 파라미터 조정에 사용하지 않는다.
+v2의 조건 이름이나 `seq01` 표기만으로 negative 여부 또는 원본 촬영의 독립성을
+판단할 수 없으며, 세부 해석은 배포본의 `metadata/label_policy.md`를 따른다.
+결과에는 버전, 평가 샘플 목록, 평가 클래스와 ignore 처리 방식을 함께 명시한다.
+이 평가는 아래 실험의 canonical RELLIS 평가와 구분되는 **국내 환경 진단 평가**다.
+
 ### 학습 데이터 구성
 
 | 실험 | 학습 데이터 | 비고 |
@@ -276,7 +350,7 @@ ros2 launch adom_bringup low_level_autonomy.launch.py \
 
 RELLIS-3D, RUGD, YCOR, GOOSE는 각 배포처의 라이선스와 이용 약관을 따른다. 이 저장소는
 원본 데이터를 재배포하지 않으며 변환 코드와 split 정의만 포함한다. 자체 수집한 한국 오프로드
-데이터의 공개 범위는 별도로 정한다.
+데이터는 위 ADOM-v1 · ADOM-v2 다운로드 항목을 통해 별도 배포한다.
 
 ## License
 

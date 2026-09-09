@@ -2,13 +2,15 @@
 
 [English](README_en.md)
 
-MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 **카메라 단독 인지 기반 자율주행** 연구.
-LiDAR 없이 RGB 한 장에서 지형을 의미 분할하고, 이를 semantic costmap과 로컬 플래너로 연결해
-1/10 스케일 RC 차량이 비정형 오프로드를 주행한다.
+MUM-T(유무인 복합체계) 산악 오프로드 작전 환경을 위한 **카메라 기반 의미분할 모델의
+도메인 적응과 온보드 인지** 연구. 장기적으로 RGB 영상의 지형 의미분할 결과를 semantic
+costmap과 로컬 플래너에 연결해 1/10 스케일 RC 차량의 비정형 오프로드 주행을 구현한다.
 
-**ADOM** studies camera-only off-road autonomy for MUM-T (Manned-Unmanned Teaming):
-domain-adapted semantic segmentation on an embedded GPU, wired end-to-end into
-semantic costmapping, local planning, and Ackermann control.
+**ADOM** studies domain adaptation and on-board deployment of camera-based semantic
+segmentation for MUM-T (Manned-Unmanned Teaming) in mountainous off-road environments.
+
+현재 5일 PoC의 시연 범위는 자율항법이 아니라 저속 Go/Stop 안전 시연이다. 명령 timeout 시
+neutral을 출력하며, STOP 이후에는 수동 reset이 필요하다.
 
 ## 이 저장소가 담고 있는 것
 
@@ -77,11 +79,39 @@ flowchart LR
 
 ### 모델 축과 학습 레시피
 
-`B0 / B2 / B5` 세 capacity를 동일한 2-stage 레시피로 학습한다.
+논문의 seed 42 비교는 `B0 / B2`와 `E0 / E-ADOM`의 2×2 설계다. 아래에서
+iteration은 gradient accumulation과 무관한 **optimizer update**를 뜻한다.
 
-- **Stage 1**: MiT 백본 freeze, head-only, 4k iteration, LR `6e-4`
-- **Stage 2**: Stage 1 가중치만 로드하고 optimizer reset, end-to-end 40k iteration,
-  LR `6e-5`, early stopping
+- **초기화**: 공식 ImageNet MiT-B0/B2 pretrained weight
+- **Stage 1**: MiT backbone freeze, decode head만 4,000 updates, AdamW LR `6e-4`,
+  warm-up 200 updates
+- **Stage 2**: Stage 1 weight만 로드하고 optimizer reset, 전체 모델 40,000 updates,
+  AdamW LR `6e-5`, decode-head LR multiplier `10`, warm-up 500 updates
+- **공통 설정**: effective batch 16, seed 42 deterministic, AMP dynamic loss scaling,
+  CrossEntropyLoss(`avg_non_ignore=True`), class weight 없음
+- **입력**: BGR→RGB, ImageNet mean/std, keep-ratio resize(`0.5..2.0`),
+  `512×512` crop(`cat_max_ratio=0.75`), horizontal flip `p=0.5`,
+  `PhotoMetricDistortion`
+
+학습은 고정 update까지 수행하며 **early stopping으로 종료하지 않는다**. E-ADOM checkpoint는
+RELLIS validation에서 best `ValSupported13` mIoU의 1.0%p 이내인 후보 중
+`RareRisk4` mIoU가 가장 높은 모델로 선택한다. B0-E-ADOM은 26,000, B2-E-ADOM은
+9,000 update checkpoint가 선택됐다. E0는 이전 legacy run의 raw validation mIoU 규칙을
+사용해 B0-E0 6,000, B2-E0 14,000 update checkpoint를 선택했다. 따라서 네 조건이 동일한
+checkpoint 선택 규칙을 공유한다고 해석하지 않는다.
+
+E-ADOM 학습 split은 RELLIS-3D 4,435장과 ADOM-v1 133장을 합친 4,568장이다. shuffled
+uniform `InfiniteSampler`를 사용하며 source/target 재가중은 없다. 이에 따른 기대 노출 비율은
+RELLIS-3D 97.09%, ADOM-v1 2.91%다. validation/test는 각각 canonical RELLIS-3D
+900장/899장으로 고정한다. Semantic20 train ID는 `0..18`, ignore는 `255`다.
+
+학습 레시피와 RTX 4090 실행 계약은
+[E-ADOM/E0 recipe](docs/decision-records/0011-emergency-eadom-e0-recipe.md)와
+[RTX 4090 runtime](docs/decision-records/0012-emergency-eadom-rtx4090-runtime.md)에
+기록돼 있다. 코드, 계약 문서 및 보존된 RunPod artifact를 대조한 실행 환경은 NVIDIA
+GeForce RTX 4090(24,564 MiB), driver
+`580.126.20`, CUDA `12.2.2`, PyTorch `2.1.0a0`였다. B2는 micro-batch
+16/accumulation 1 probe를 통과했다.
 
 ## 연구 질문과 현재 결과
 
@@ -89,12 +119,19 @@ flowchart LR
 `{B0, B2} × {E0, E-ADOM}` 2x2 설계로 capacity와 supervision의 상호작용을 분리해 관찰하고,
 B5로 capacity curve가 계속 오르는지 포화하는지 확인한다.
 
-자체 수집 한국 오프로드 held-out에서 관측된 값:
+RunPod artifact에서 동일한 evaluator로 재계산한 seed 42 값:
 
-| 모델 | Korean held-out mIoU | log IoU |
-| --- | --- | --- |
-| B0-E-ADOM | 56.96 | — |
-| B2-E-ADOM | **95.49** | 96.77 |
+| 모델 | RELLIS native-supported mIoU (%) | 국내 partial-label common mIoU (%) |
+| --- | ---: | ---: |
+| B0-E0 | 59.11 | 0.00 |
+| B0-E-ADOM | 58.04 | 56.96 |
+| B2-E0 | 58.48 | 0.12 |
+| B2-E-ADOM | **61.45** | **95.49** |
+
+국내 diagnostic은 checkpoint 동결 후 평가한 61장이다. log 10장과 rubble 51장의
+target-only partial label로 구성되며, checkpoint 선택이나 학습 중 조기 종료에는 사용하지
+않았다. 이 값은 논문의 완전 재주석 `ADOM-v1-7cls` 결과와 다른 평가 계약이므로 두 값을
+직접 비교하지 않는다.
 
 > [!IMPORTANT]
 > **이 수치는 일반화 성능이 아니라 diagnostic으로 읽어야 한다.**

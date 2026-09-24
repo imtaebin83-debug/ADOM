@@ -2,6 +2,12 @@
 
 from .actuation import speed_to_pwm_us
 from .costmap import CostmapConfig, build_costmap
+from .gnss_speed import (
+    GnssSpeedEstimator,
+    GnssSpeedEstimatorConfig,
+    SpeedFeedback,
+    select_feedback_speed,
+)
 from .imu_speed import ImuSpeedEstimate, ImuSpeedEstimator, ImuSpeedEstimatorConfig
 from .path_control import (
     PathControlCommand,
@@ -27,6 +33,8 @@ from .stuck_recovery import (
 
 __all__ = [
     "CostmapConfig",
+    "GnssSpeedEstimator",
+    "GnssSpeedEstimatorConfig",
     "ImuSpeedEstimate",
     "ImuSpeedEstimator",
     "ImuSpeedEstimatorConfig",
@@ -35,6 +43,7 @@ __all__ = [
     "PathControlConfig",
     "RulePlan",
     "SideCostAnalysis",
+    "SpeedFeedback",
     "StuckRecoveryConfig",
     "StuckRecoveryDecision",
     "StuckRecoveryGate",
@@ -45,6 +54,7 @@ __all__ = [
     "haversine_distance_m",
     "local_gps_xy_m",
     "plan_corridor",
+    "select_feedback_speed",
     "select_lookahead_point",
     "speed_to_pwm_us",
 ]

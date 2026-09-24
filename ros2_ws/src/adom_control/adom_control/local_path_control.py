@@ -10,10 +10,12 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import Imu
+from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from std_msgs.msg import Float32, String
 
 from adom.autonomy import (
+    GnssSpeedEstimator,
+    GnssSpeedEstimatorConfig,
     ImuSpeedEstimator,
     ImuSpeedEstimatorConfig,
     PathControlConfig,
@@ -21,6 +23,7 @@ from adom.autonomy import (
     StuckRecoveryDecision,
     StuckRecoveryGate,
     control_local_path,
+    select_feedback_speed,
 )
 
 
@@ -32,7 +35,12 @@ def message_stamp_ns(message, fallback_ns: int) -> int:
 
 
 class LocalPathControlNode(Node):
-    """Track a robot-frame local path without using GPS as a control input."""
+    """Track a robot-frame local path.
+
+    GNSS is never a steering or safety input. When a fresh fix-derived ground
+    speed is available it replaces the IMU estimate as the speed feedback that
+    corrects the measured-PWM nominal command; otherwise the IMU estimate is used.
+    """
 
     def __init__(self) -> None:
         super().__init__("local_path_control")
@@ -40,6 +48,7 @@ class LocalPathControlNode(Node):
             "local_path_topic": "/adom/navigation/local_path",
             "planned_speed_topic": "/adom/navigation/planned_speed",
             "imu_topic": "/zed/zed_node/imu/data",
+            "gnss_fix_topic": "/fix",
             "cmd_vel_topic": "/cmd_vel",
             "status_topic": "/adom/control/local_path_status",
             "drive_topic": "/drive",
@@ -68,6 +77,13 @@ class LocalPathControlNode(Node):
             "imu_stationary_command_threshold_mps": 0.02,
             "imu_stationary_hold_sec": 0.50,
             "drive_feedback_timeout_sec": 0.25,
+            "gnss_speed_feedback_enabled": False,
+            "gnss_min_fix_status": NavSatStatus.STATUS_FIX,
+            "gnss_speed_timeout_sec": 1.0,
+            "gnss_speed_smoothing_alpha": 0.5,
+            "gnss_min_dt_sec": 0.05,
+            "gnss_max_dt_sec": 2.0,
+            "gnss_max_speed_mps": 10.0,
             "stuck_recovery_enabled": True,
             "stuck_command_min_mps": 0.12,
             "stuck_max_estimated_speed_mps": 0.08,
@@ -119,6 +135,14 @@ class LocalPathControlNode(Node):
                 velocity_leak_per_sec=float(self.p["imu_velocity_leak_per_sec"]),
             )
         )
+        self._gnss_estimator = GnssSpeedEstimator(
+            GnssSpeedEstimatorConfig(
+                smoothing_alpha=float(self.p["gnss_speed_smoothing_alpha"]),
+                minimum_dt_sec=float(self.p["gnss_min_dt_sec"]),
+                maximum_dt_sec=float(self.p["gnss_max_dt_sec"]),
+                maximum_speed_mps=float(self.p["gnss_max_speed_mps"]),
+            )
+        )
         self._stuck_recovery = StuckRecoveryGate(
             StuckRecoveryConfig(
                 command_min_mps=float(self.p["stuck_command_min_mps"]),
@@ -151,6 +175,9 @@ class LocalPathControlNode(Node):
         self._acceleration_x_mps2 = 0.0
         self._imu_stationary_update = False
         self._yaw_rate_rps = 0.0
+        self._gnss_speed_mps: float | None = None
+        self._last_gnss_speed_ns: int | None = None
+        self._gnss_fix_status: int | None = None
 
         self._cmd_pub = self.create_publisher(
             Twist, str(self.p["cmd_vel_topic"]), 10
@@ -170,6 +197,13 @@ class LocalPathControlNode(Node):
         self.create_subscription(
             Imu, str(self.p["imu_topic"]), self._on_imu, qos_profile_sensor_data
         )
+        if bool(self.p["gnss_speed_feedback_enabled"]):
+            self.create_subscription(
+                NavSatFix,
+                str(self.p["gnss_fix_topic"]),
+                self._on_fix,
+                qos_profile_sensor_data,
+            )
         self.create_subscription(
             AckermannDriveStamped,
             str(self.p["drive_topic"]),
@@ -178,7 +212,12 @@ class LocalPathControlNode(Node):
         )
         self.create_timer(1.0 / float(self.p["control_rate_hz"]), self._update)
         self.get_logger().warning(
-            "Local path control starts fail-safe at zero until path and IMU arrive; GPS is logging-only."
+            "Local path control starts fail-safe at zero until path and IMU arrive; "
+            + (
+                "fresh GNSS ground speed replaces the IMU speed feedback when available."
+                if bool(self.p["gnss_speed_feedback_enabled"])
+                else "GNSS speed feedback is disabled; IMU speed feedback only."
+            )
         )
 
     def _on_path(self, message: Path) -> None:
@@ -240,6 +279,23 @@ class LocalPathControlNode(Node):
         self._last_imu_stamp_ns = stamp_ns
         self._last_imu_ns = now_ns
 
+    def _on_fix(self, message: NavSatFix) -> None:
+        now_ns = self.get_clock().now().nanoseconds
+        self._gnss_fix_status = int(message.status.status)
+        if self._gnss_fix_status < int(self.p["gnss_min_fix_status"]):
+            # A lost or degraded fix must not be differenced against the next one.
+            self._gnss_estimator.reset()
+            self._gnss_speed_mps = None
+            return
+        speed_mps = self._gnss_estimator.update(
+            float(message.latitude),
+            float(message.longitude),
+            message_stamp_ns(message, now_ns),
+        )
+        if speed_mps is not None:
+            self._gnss_speed_mps = speed_mps
+            self._last_gnss_speed_ns = now_ns
+
     @staticmethod
     def _age(now_ns: int, stamp_ns: int | None) -> float:
         return math.inf if stamp_ns is None else (now_ns - stamp_ns) / 1e9
@@ -273,6 +329,7 @@ class LocalPathControlNode(Node):
         path_age = self._age(now_ns, self._last_path_ns)
         speed_age = self._age(now_ns, self._last_planned_speed_ns)
         imu_age = self._age(now_ns, self._last_imu_ns)
+        gnss_age = self._age(now_ns, self._last_gnss_speed_ns)
         common = {
             "path_age_sec": None if not math.isfinite(path_age) else round(path_age, 3),
             "planned_speed_age_sec": (
@@ -295,10 +352,17 @@ class LocalPathControlNode(Node):
         if imu_age > float(self.p["imu_timeout_sec"]):
             self._stop("imu_watchdog", **common)
             return
+        feedback = select_feedback_speed(
+            self._estimated_speed_mps,
+            self._gnss_speed_mps,
+            gnss_age,
+            gnss_timeout_sec=float(self.p["gnss_speed_timeout_sec"]),
+            gnss_enabled=bool(self.p["gnss_speed_feedback_enabled"]),
+        )
         try:
             command = control_local_path(
                 self._path_xy,
-                self._estimated_speed_mps,
+                feedback.speed_mps,
                 self._config,
                 planned_speed_mps=self._planned_speed_mps,
             )
@@ -337,9 +401,20 @@ class LocalPathControlNode(Node):
             nominal_speed_command_mps=round(command.speed_mps, 3),
             planned_speed_mps=round(self._planned_speed_mps, 3),
             estimated_speed_mps=round(self._estimated_speed_mps, 3),
+            speed_feedback_source=feedback.source,
+            feedback_speed_mps=round(feedback.speed_mps, 3),
             speed_feedback_error_mps=round(
-                self._planned_speed_mps - self._estimated_speed_mps, 3
+                self._planned_speed_mps - feedback.speed_mps, 3
             ),
+            gnss_speed_mps=(
+                None
+                if self._gnss_speed_mps is None
+                else round(self._gnss_speed_mps, 3)
+            ),
+            gnss_speed_age_sec=(
+                None if not math.isfinite(gnss_age) else round(gnss_age, 3)
+            ),
+            gnss_fix_status=self._gnss_fix_status,
             imu_bias_x_mps2=round(self._imu_bias_mps2, 4),
             imu_stationary_update=self._imu_stationary_update,
             actuator_speed_command_mps=round(self._actuator_speed_mps, 3),

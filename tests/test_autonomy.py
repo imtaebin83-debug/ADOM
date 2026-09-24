@@ -7,6 +7,8 @@ import yaml
 
 from adom.autonomy import (
     CostmapConfig,
+    GnssSpeedEstimator,
+    GnssSpeedEstimatorConfig,
     ImuSpeedEstimator,
     ImuSpeedEstimatorConfig,
     PathControlConfig,
@@ -18,6 +20,7 @@ from adom.autonomy import (
     gps_speed_mps,
     local_gps_xy_m,
     plan_corridor,
+    select_feedback_speed,
     speed_to_pwm_us,
 )
 from adom.autonomy.costmap import (
@@ -578,3 +581,68 @@ class StuckRecoveryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GnssSpeedFeedbackTests(unittest.TestCase):
+    def test_first_fix_only_sets_reference(self):
+        estimator = GnssSpeedEstimator(GnssSpeedEstimatorConfig())
+        self.assertIsNone(estimator.update(0.0, 0.0, 0))
+        self.assertIsNone(estimator.speed_mps)
+
+    def test_consecutive_fixes_give_ground_speed(self):
+        estimator = GnssSpeedEstimator(GnssSpeedEstimatorConfig(smoothing_alpha=1.0))
+        estimator.update(0.0, 0.0, 0)
+        # About 0.22 m east at the equator over one second.
+        speed = estimator.update(0.0, 0.000002, 1_000_000_000)
+        self.assertAlmostEqual(speed, 0.222, places=2)
+
+    def test_smoothing_blends_with_previous_speed(self):
+        estimator = GnssSpeedEstimator(GnssSpeedEstimatorConfig(smoothing_alpha=0.5))
+        estimator.update(0.0, 0.0, 0)
+        first = estimator.update(0.0, 0.000002, 1_000_000_000)
+        second = estimator.update(0.0, 0.000002, 2_000_000_000)
+        self.assertAlmostEqual(second, first * 0.5)
+
+    def test_too_fast_samples_keep_the_reference_fix(self):
+        estimator = GnssSpeedEstimator(
+            GnssSpeedEstimatorConfig(smoothing_alpha=1.0, minimum_dt_sec=0.5)
+        )
+        estimator.update(0.0, 0.0, 0)
+        self.assertIsNone(estimator.update(0.0, 0.000001, 100_000_000))
+        speed = estimator.update(0.0, 0.000002, 1_000_000_000)
+        self.assertAlmostEqual(speed, 0.222, places=2)
+
+    def test_long_gap_and_implausible_jump_are_rejected(self):
+        estimator = GnssSpeedEstimator(GnssSpeedEstimatorConfig())
+        estimator.update(0.0, 0.0, 0)
+        self.assertIsNone(estimator.update(0.0, 0.000002, 5_000_000_000))
+        self.assertIsNone(estimator.update(0.0, 1.0, 6_000_000_000))
+        self.assertIsNone(estimator.speed_mps)
+
+    def test_fresh_gnss_speed_replaces_imu_feedback(self):
+        feedback = select_feedback_speed(0.9, 0.4, 0.2, gnss_timeout_sec=1.0)
+        self.assertEqual(feedback.source, "gnss")
+        self.assertAlmostEqual(feedback.speed_mps, 0.4)
+
+    def test_stale_missing_or_disabled_gnss_falls_back_to_imu(self):
+        for args, enabled in (
+            ((0.9, 0.4, 1.5), True),
+            ((0.9, None, 0.2), True),
+            ((0.9, 0.4, math.inf), True),
+            ((0.9, 0.4, 0.2), False),
+        ):
+            feedback = select_feedback_speed(
+                *args, gnss_timeout_sec=1.0, gnss_enabled=enabled
+            )
+            self.assertEqual(feedback.source, "imu")
+            self.assertAlmostEqual(feedback.speed_mps, 0.9)
+
+    def test_gnss_feedback_corrects_measured_pwm_command(self):
+        feedback = select_feedback_speed(0.0, 0.8, 0.1, gnss_timeout_sec=1.0)
+        command = control_local_path(
+            np.asarray([[0.5, 0.0], [1.5, 0.0], [3.0, 0.0]]),
+            feedback.speed_mps,
+            PathControlConfig(max_speed_mps=1.0, min_speed_mps=0.1, speed_kp=0.15),
+            planned_speed_mps=0.6,
+        )
+        self.assertAlmostEqual(command.speed_mps, 0.57)

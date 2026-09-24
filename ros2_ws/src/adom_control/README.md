@@ -3,8 +3,8 @@
 ## Local path control
 
 `local_path_control`은 `/adom/navigation/local_path`를 pure-pursuit 방식으로 추종하고,
-planner의 `/adom/navigation/planned_speed`를 보존해 `/cmd_vel`을 발행한다. GPS는 제어
-입력으로 사용하지 않는다. 휠 속도 센서가 없으므로
+planner의 `/adom/navigation/planned_speed`를 보존해 `/cmd_vel`을 발행한다. GPS는 조향이나
+정지 판단에 쓰지 않고, 선택적인 속도 feedback으로만 사용한다(아래 GNSS speed feedback). 휠 속도 센서가 없으므로
 기본 PWM 대응은 open-loop이다. ZED IMU는 freshness watchdog뿐 아니라 정지 중 x축
 가속도 bias 학습, zero-velocity update, 주행 중 단기 속도 적분과 제한된 P feedback에
 사용한다. IMU 또는 path가 timeout이거나 path가 비어 있으면 zero command를 발행한다.
@@ -65,14 +65,33 @@ ros2 launch adom_control local_path_control.launch.py
 ros2 topic echo /adom/control/local_path_status
 ```
 
-기본 feedback topic은 `/zed/zed_node/imu/data`이다. GPS `/fix`는 `adom_logging`이
-이동 궤적 기록에만 사용한다. 최종 `/drive.speed`가 0 부근에서 0.5초 유지될 때 raw x축
+기본 feedback topic은 `/zed/zed_node/imu/data`이다. GPS `/fix`는 `adom_logging`의
+이동 궤적 기록과 아래의 선택적 GNSS speed feedback에 사용한다. 최종 `/drive.speed`가 0 부근에서 0.5초 유지될 때 raw x축
 가속도로 bias를 EMA 갱신하고 추정 속도를 0으로 리셋한다. 주행 명령 중에는 bias 제거
 가속도를 적분해 short-horizon 속도를 만들고
 `speed_kp`로 command를 보정한다. `local_path_status`의 `imu_bias_x_mps2`,
 `estimated_speed_mps`, `speed_feedback_error_mps`, `imu_stationary_update`로 확인한다.
 IMU만으로 등속 절대 속도는 관측할 수 없으므로 장기 정확도를 위해서는 wheel encoder,
 VESC telemetry 또는 별도 속도 센서가 필요하다.
+
+### GNSS speed feedback
+
+`gnss_speed_feedback_enabled: true`이면 `/fix`(`sensor_msgs/NavSatFix`)를 구독해 연속된
+fix의 위치 차분으로 지상 속도를 계산하고 EMA(`gnss_speed_smoothing_alpha`)로 평활한다.
+`gnss_speed_timeout_sec` 안에 갱신된 GNSS 속도가 있으면 IMU 추정 대신 이 값을 `speed_kp`
+보정의 측정 속도로 사용한다. 실측 PWM 대응은 그대로 기본 명령이며, GNSS는 그 명령을
+제한적으로 보정할 뿐이다.
+
+- fix status가 `gnss_min_fix_status` 미만이면 기준 fix를 초기화하고 IMU로 되돌아간다.
+- `gnss_min_dt_sec`보다 짧은 간격의 fix는 건너뛰고, `gnss_max_dt_sec`보다 긴 공백 뒤에는
+  기준 fix를 다시 잡는다. `gnss_max_speed_mps`를 넘는 점프는 버린다.
+- GNSS가 없거나 오래되어도 정지하지 않고 IMU feedback으로 전환한다. path, planned speed,
+  IMU watchdog은 기존과 같다.
+- stuck recovery 판단은 기존처럼 IMU 추정 속도를 사용한다.
+
+`local_path_status`의 `speed_feedback_source`(`gnss`/`imu`), `feedback_speed_mps`,
+`gnss_speed_mps`, `gnss_speed_age_sec`, `gnss_fix_status`로 확인한다. RTK 보정이 안정적이지
+않으면 저속에서 위치 차분 속도의 잡음이 크므로, 실차 검증 전에는 `speed_kp`를 작게 유지한다.
 
 F1TENTH 호환 `/drive` (`AckermannDriveStamped`)를 PCA9685 CH0/CH1 PWM으로
 출력한다. 8BitDo Ultimate C 2.4G 게임패드의 매뉴얼/자율 모드 전환을 지원한다.

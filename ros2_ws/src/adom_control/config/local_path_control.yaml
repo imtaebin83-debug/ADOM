@@ -39,6 +39,20 @@ local_path_control:
     imu_stationary_hold_sec: 0.50
     drive_feedback_timeout_sec: 0.25
 
+    # Optional GNSS ground-speed feedback. The measured-PWM mapping remains the
+    # nominal command; a fresh fix-derived speed replaces the IMU estimate in the
+    # bounded speed_kp correction. Missing, stale, or degraded fixes fall back to
+    # the IMU estimate. GNSS never steers the vehicle or gates a safety stop.
+    gnss_speed_feedback_enabled: true
+    gnss_fix_topic: /fix
+    # sensor_msgs/NavSatStatus: -1 no fix, 0 fix, 1 SBAS, 2 GBAS (RTK receivers).
+    gnss_min_fix_status: 0
+    gnss_speed_timeout_sec: 1.0
+    gnss_speed_smoothing_alpha: 0.5
+    gnss_min_dt_sec: 0.05
+    gnss_max_dt_sec: 2.0
+    gnss_max_speed_mps: 10.0
+
     # One bounded escape attempt is allowed only on a persistent turning path
     # with little longitudinal speed and yaw response. Empty/blocked paths and
     # every watchdog still stop before this logic is evaluated.
